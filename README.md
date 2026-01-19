@@ -9,7 +9,7 @@
 ![Go Version](https://img.shields.io/badge/Go-1.21+-blue)
 ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS-green)
 
-**VisionC2** is a Go-based Command & Control (C2) framework designed for security research and educational purposes.
+**VisionC2** is a Go-based Command & Control (C2) framework focused on Layer4/Layer7 Floods aswell as Remote Shell Execution.
 It features TLS-encrypted communications, multi-architecture support, and centralized bot management.
 
 ---
@@ -40,9 +40,9 @@ It features TLS-encrypted communications, multi-architecture support, and centra
 
 ### Security
 
-* **Mutual Authentication** – Challenge–response validation
-* **TLS 1.2 / 1.3 Support**
-* **Connection Validation** – Bot identity verification
+* **Mutual Authentication** – Challenge–response validation between connecting Bots and C2
+* **TLS 1.2 / 1.3 Support** - Means all communications are 100% secure
+* **Secure Login/CNC** – Login Pannel is password protected aswell as requring a secret phrase to access it
 * **Dead Bot Cleanup** – Automatic pruning of inactive clients
 
 ---
