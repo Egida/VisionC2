@@ -12,6 +12,9 @@
 **VisionC2** is a Go-based Command & Control (C2) framework focused on Layer4/Layer7 Floods aswell as Remote Shell Execution.
 It features TLS-encrypted communications, multi-architecture support, and centralized bot management.
 
+
+<img width="1152" height="577" alt="Screenshot 2026-01-19 122231" src="https://github.com/user-attachments/assets/bc373b3f-0832-4e71-ac50-4b2600d2b25b" />
+
 ---
 
 ## ⚡ Features
@@ -38,12 +41,6 @@ It features TLS-encrypted communications, multi-architecture support, and centra
   * DNS Amplification
   * GRE Flood
 
-### Security
-
-* **Mutual Authentication** – Challenge–response validation between connecting Bots and C2
-* **TLS 1.2 / 1.3 Support** - Means all communications are 100% secure
-* **Secure Login/CNC** – Login Pannel is password protected aswell as requring a secret phrase to access it
-* **Dead Bot Cleanup** – Automatic pruning of inactive clients
 
 ---
 
@@ -244,23 +241,6 @@ logout | exit
 | vredisd0    | s390x        | linux | s390x    |
 | kvmirqd     | RISC-V 64    | linux | riscv64  |
 
----
-
-## 📁 Project Structure
-
-```
-VisionC2/
-├── bot/
-│   ├── bins/
-│   ├── build.sh
-│   └── main.go
-├── cnc/
-│   ├── main.go
-│   ├── miscellaneous.go
-│   └── users.json
-└── tools/
-    └── obfuscate_c2.py
-```
 
 ---
 
@@ -274,14 +254,6 @@ You agree to:
 2. Comply with all applicable laws
 3. Accept full responsibility for usage
 4. Avoid malicious or unauthorized deployment
-
----
-
-## ⚠️ Disclaimer
-
-**Educational use only.**
-Unauthorized access to systems is illegal and unethical.
-The author assumes no liability for misuse.
 
 ---
 
