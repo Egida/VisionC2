@@ -4,8 +4,8 @@
 ![Go Version](https://img.shields.io/badge/Go-1.21+-blue)
 ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS-green)
 
-**VisionC2** is a Go-based Command & Control (C2) framework focused on Layer4/Layer7 floods and remote shell execution.  
-It features TLS-encrypted communication, multi-architecture bot clients, and centralized management.
+**VisionC2** is a upgraded version of BotnetGo with a focus on DDos and Shell Execution.
+It features TLS-encrypted communication, multi-architecture bot clients, and new commands/attacks.
 
 ---
 
@@ -31,7 +31,7 @@ It features TLS-encrypted communication, multi-architecture bot clients, and cen
   - SYN / ACK Flood
   - DNS Amplification
   - GRE Flood
-
+  - HTTPS/CF/TLS BYPASS (WIP)
 ---
 
 ## 🔧 Prerequisites
