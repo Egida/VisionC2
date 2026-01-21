@@ -22,22 +22,13 @@
 - **Persistence Layers**: Multiple survival mechanisms across platforms
 - **Architecture-Agnostic**: 14+ CPU architectures supported seamlessly
 
-### 💼 **Professional Operations**
-- **SOCKS5 Proxy Integration**: Built-in reverse proxy tunneling for secure access
-- **Formatted Output System**: Clean, professional command results with visual hierarchy
-- **Real-Time Bot Analytics**: Live monitoring of bot health, architecture, and status
-- **Team Collaboration**: Multiple operators with defined permission levels
-- **Audit-Ready Logging**: Complete command history and user activity tracking
-
 ---
 
 ## ⚡ Core Capabilities
 
 ### **Enterprise Command & Control**
-- **Role-Based Access Control**: Granular permissions for team-based operations
-- **Multi-User Administration**: Support for distributed security teams
-- **Real-Time Bot Management**: Live interaction with deployed agents
-- **Centralized Coordination**: Simultaneous command execution across entire networks
+- **Real-Time Bot Management**: Target by botid or broadcast 
+- **Streamlined Ouput**: Psuedo Interactive Shell via !botid !shell <command>
 - **Professional Interface**: Color-coded terminal with dynamic user indicators
 
 ### **Advanced Attack Vectors**
@@ -104,6 +95,10 @@ openssl req -new -x509 -sha256 -key server.key -out server.crt -days 365 \
 cd cnc
 # Edit main.go with your server details
 go run .  # First run creates admin user
+
+# Logging in
+nc 1.1.1.1 955 (this is your server port and address)
+You'll see a blank screen at first type "spamtec" to find login prompt 
 ```
 
 ### Bot Deployment
