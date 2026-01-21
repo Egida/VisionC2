@@ -8,6 +8,7 @@
 
 ## Dev TODO
 - Check and Fix Persistence Methods
+- Anti Bot/Anylsis Watchdog   (infinite loop targeting competing malware and analysis tools)
 - Implement user:pass options into reverse Socks5 Proxy Module
 - Adjustments to run seamless on windows aswell 
 - Hidden Admin Portal to easier manage individual bots 
@@ -40,8 +41,8 @@
 - **Sandbox Evasion**: Multi-stage detection of virtualized environments
 - **String Obfuscation**: Critical strings are hidden from static analysis
 - **Binary Protection**: UPX compression with string removal techniques
-- **Persistence Layers**: Multiple survival mechanisms across platforms
-- **Architecture-Agnostic**: 14+ CPU architectures supported seamlessly
+- **Bot Killer/Watchdog**: (WIP)
+
 
 ---
 
