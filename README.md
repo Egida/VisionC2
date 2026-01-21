@@ -6,30 +6,9 @@
 
 **VisionC2** is an advanced botnet framework built in Go focused on network stress testing. It features end to end encryption, sophisticated anti-analysis techniques, as well as DDOS/RCE/SOCKS Modules with more features to come.
 
----
-
-### 🔐 **Military-Grade Security Stack**
-- **TLS 1.3 Encryption**: State-of-the-art encrypted communications
-- **HMAC Authentication**: Challenge-response authentication prevents impersonation
-- **Multi-User Role Management**: Four-tier permission system (Owner, Admin, Pro, Basic)
-- **Command Origin Tracking**: Every action is logged and attributed to specific users
-- **Automatic Data Obfuscation**: Sensitive outputs are Base64-encoded in transit
-
-### 🛡️ **Advanced Anti-Detection**
-- **Sandbox Evasion**: Multi-stage detection of virtualized environments
-- **String Obfuscation**: Critical strings are hidden from static analysis
-- **Binary Protection**: UPX compression with string removal techniques
-- **Persistence Layers**: Multiple survival mechanisms across platforms
-- **Architecture-Agnostic**: 14+ CPU architectures supported seamlessly
 
 ---
-
 ## ⚡ Core Capabilities
-
-### **Enterprise Command & Control**
-- **Real-Time Bot Management**: Target by botid or broadcast 
-- **Streamlined Ouput**: Psuedo Interactive Shell via !botid !shell <command>
-- **Professional Interface**: Color-coded terminal with dynamic user indicators
 
 ### **Advanced Attack Vectors**
 - **Network Stress Testing**: UDP/TCP/HTTP/SYN/ACK flood capabilities
@@ -44,6 +23,26 @@
 - **Stealth Persistence**: Multiple installation and survival methods
 - **Encrypted Communications**: TLS-protected command channels
 - **Resource-Aware Execution**: Minimal footprint with maximum capability
+
+### **Enterprise Command & Control**
+- **Real-Time Bot Management**: Target by botid or broadcast 
+- **Streamlined Ouput**: Psuedo Interactive Shell via !botid !shell <command>
+- **Professional Interface**: Color-coded terminal with dynamic user indicators
+
+---
+### 🔐 **Military-Grade Security Stack**
+- **TLS 1.3 Encryption**: State-of-the-art encrypted communications
+- **HMAC Authentication**: Challenge-response authentication prevents impersonation
+- **Multi-User Role Management**: Four-tier permission system (Owner, Admin, Pro, Basic)
+- **Command Origin Tracking**: Every action is logged and attributed to specific users
+- **Automatic Data Obfuscation**: Sensitive outputs are Base64-encoded in transit
+
+### 🛡️ **Advanced Anti-Detection**
+- **Sandbox Evasion**: Multi-stage detection of virtualized environments
+- **String Obfuscation**: Critical strings are hidden from static analysis
+- **Binary Protection**: UPX compression with string removal techniques
+- **Persistence Layers**: Multiple survival mechanisms across platforms
+- **Architecture-Agnostic**: 14+ CPU architectures supported seamlessly
 
 ---
 
