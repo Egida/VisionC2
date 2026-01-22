@@ -7,6 +7,22 @@
 **VisionC2** is an advanced botnet framework built in Go focused on network stress testing. Features end-to-end TLS 1.3 encryption, anti-analysis techniques, and DDOS/RCE/SOCKS modules.
 
 ---
+## 🏗️ Architecture Overview
+
+VisionC2 operates on a client-server model with clear separation between administrative interfaces and bot agents:
+
+```
+┌─────────────────┐    TLS 1.3    ┌─────────────────┐
+│   Admin Console │◄──────────────►│    C2 Server    │
+│  (Multi-User)   │                │  (Go Backend)   │
+└─────────────────┘                └─────────────────┘
+                                         │ TLS 1.3
+                                         ▼
+┌─────────────────┐                ┌─────────────────┐
+│   Bot Agents    │◄───────────────┤  Bot Registry   │
+│ (14+ Architectures)│                │ & Management   │
+└─────────────────┘                └─────────────────┘
+```
 
 ## 🚀 Installation & Setup
 
@@ -52,35 +68,57 @@ nc YOUR_IP YOUR_ADMIN_PORT
 
 ---
 
-## 🛠️ Commands
+## 🛠️ Command Reference
 
-| Command | Description |
-|---------|-------------|
-| `bots` | List active agents |
-| `!shell <cmd>` | Remote execution |
-| `!persist` | Establish persistence |
-| `!socks <port>` | SOCKS5 proxy |
-| `!udpflood <ip> <port> <dur>` | UDP flood |
-| `!tcpflood <ip> <port> <dur>` | TCP flood |
-| `help` | All commands |
+### User Management
+- `help` - Context-aware help system (shows available commands)
+- `db` - User database management (Owner only)
+- `private` - Specialized commands based on clearance level
+
+### Bot Operations
+- `bots` - List all active agents with detailed status
+- `!<botid> <command>` - Target specific agent
+- `!info` - Comprehensive system intelligence
+- `!persist` - Enhanced persistence mechanisms
+- `!reinstall` - Agent redeployment
+- `!lolnogtfo` - Secure agent removal
+
+### Network Operations  
+- `!socks <port>` - Establish SOCKS5 reverse proxy
+- `!stopsocks` - Terminate proxy connections
+- `!shell <command>` - Secure remote execution
+- `!detach <command>` - Background process execution
+- `!stream <command>` - Real-time output streaming
+
+### Stress Testing
+- `!udpflood <ip> <port> <duration>`
+- `!tcpflood <ip> <port> <duration>`
+- `!http <ip> <port> <duration>`
+- `!syn/!ack/!gre/!dns` - Protocol-specific attacks
 
 ---
 
-## 🏗️ Architecture
 
-```
-Admin ◄──TLS 1.3──► C2 Server (443) ◄──► Bot Agents (14 archs)
-```
-
----
 
 ## 🔐 Security
+### **Advanced Attack Vectors**
+- **Network Stress Testing**: UDP/TCP/HTTP/SYN/ACK flood capabilities
+- **Protocol-Level Attacks**: DNS amplification and GRE flood techniques
+- **Secure Shell Access**: Remote command execution with encrypted output
+- **Proxy Tunneling**: Built-in SOCKS5 reverse proxy for secure access
+- **Remote Command Execution**: Background execution and detach capabilities
 
-- TLS 1.3 encrypted communications
-- HMAC challenge-response auth
-- XOR+Base64 C2 obfuscation
-- UPX compressed binaries
-- Multi-tier user roles
+- **TLS 1.3 encrypted communications
+- **HMAC challenge-response auth
+- **XOR+Base64 C2 obfuscation
+- **UPX compressed binaries
+- **Multi-tier user roles
+
+### 🛡️ **Advanced Anti-Detection**
+- **Sandbox Evasion**: Multi-stage detection of virtualized environments
+- **String Obfuscation**: Critical strings are hidden from static analysis
+- **Binary Protection**: UPX compression with string removal techniques
+- **Bot Killer/Watchdog**: (WIP)
 
 ---
 
@@ -89,5 +127,19 @@ Admin ◄──TLS 1.3──► C2 Server (443) ◄──► Bot Agents (14 arch
 **Authorized security research only.** Obtain written permission before use.
 
 ---
+
+
+## 🤝 Community & Support
+
+### Contributing
+We welcome contributions from security professionals:
+- Code improvements and optimizations
+- Additional evasion techniques
+- Enhanced security features
+- Documentation and examples
+
+### Acknowledgments
+Built upon the framework of [1birdo](https://github.com/1Birdo)'s BotnetGo
+
 
 📧 **[dev@sinners.city](mailto:dev@sinners.city)** | Based on [1birdo](https://github.com/1Birdo)'s BotnetGo
