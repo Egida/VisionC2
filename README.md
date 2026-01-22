@@ -98,21 +98,15 @@ nc YOUR_IP YOUR_ADMIN_PORT
 
 ---
 
-
+Here's the updated content with the top part formatted like the bottom section:
 
 ## 🔐 Security
-### **Advanced Attack Vectors**
-- **Network Stress Testing**: UDP/TCP/HTTP/SYN/ACK flood capabilities
-- **Protocol-Level Attacks**: DNS amplification and GRE flood techniques
-- **Secure Shell Access**: Remote command execution with encrypted output
-- **Proxy Tunneling**: Built-in SOCKS5 reverse proxy for secure access
-- **Remote Command Execution**: Background execution and detach capabilities
 
-- **TLS 1.3 encrypted communications
-- **HMAC challenge-response auth
-- **XOR+Base64 C2 obfuscation
-- **UPX compressed binaries
-- **Multi-tier user roles
+- **TLS 1.3**: Encrypted communications for all network traffic
+- **HMAC challenge-response auth**: Secure authentication mechanism
+- **XOR+Base64 C2 obfuscation**: Command and control traffic obfuscation
+- **UPX compressed binaries**: Executable compression and protection
+- **Multi-tier user roles**: Granular access control system
 
 ### 🛡️ **Advanced Anti-Detection**
 - **Sandbox Evasion**: Multi-stage detection of virtualized environments
@@ -142,4 +136,4 @@ We welcome contributions from security professionals:
 Built upon the framework of [1birdo](https://github.com/1Birdo)'s BotnetGo
 
 
-📧 **[dev@sinners.city](mailto:dev@sinners.city)** | Based on [1birdo](https://github.com/1Birdo)'s BotnetGo
+📧 **[dev@sinners.city](mailto:dev@sinners.city)**
