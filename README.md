@@ -180,41 +180,6 @@ nc YOUR_IP YOUR_ADMIN_PORT
 optional: protect UPX packed binaries from string analysis https://github.com/Syn2Much/upx-stripper
 ```
 
-## 🛠️ Command Reference
-
-### User Management
-
-- `help` - Context-aware help system (shows available commands)
-- `db` - User database management (Owner only)
-- `private` - Specialized commands based on clearance level
-
-### Bot Operations
-
-- `bots` - List all active agents with detailed status
-- `!<botid> <command>` - Target specific agent
-- `!info` - Comprehensive system intelligence
-- `!persist` - Enhanced persistence mechanisms
-- `!reinstall` - Agent redeployment
-- `!lolnogtfo` - Secure agent removal
-
-### Network Operations  
-
-- `!socks <port>` - Establish SOCKS5 reverse proxy
-- `!stopsocks` - Terminate proxy connections
-- `!shell <command>` - Secure remote execution
-- `!detach <command>` - Background process execution
-- `!stream <command>` - Real-time output streaming
-
-### Stress Testing
-
-- `!udpflood <ip> <port> <duration>`
-- `!tcpflood <ip> <port> <duration>`
-- `!http <url/ip> <port> <duration>`
-- `!https <url> <duration>` - TLS 1.3 flood with HTTP/2 fingerprinting
-- `!tls <url> <duration>` - Alias for HTTPS flood
-- `!cfbypass <url> <duration>` - Cloudflare UAM bypass attack
-- `!syn/!ack/!gre/!dns` - Protocol-specific attacks
-
 ## 🏗️ Architecture Overview
 
 VisionC2 operates on a client-server model with clear separation between administrative interfaces and bot agents:
@@ -251,6 +216,42 @@ VisionC2 operates on a client-server model with clear separation between adminis
 └──────────────────────────────────────────────────────────────┘
 ```
 
+## 🛠️ Command Reference
+
+### User Management
+
+- `help` - Context-aware help system (shows available commands)
+- `db` - User database management (Owner only)
+- `private` - Specialized commands based on clearance level
+
+### Bot Operations
+
+- `bots` - List all active agents with detailed status
+- `!<botid> <command>` - Target specific agent
+- `!info` - Comprehensive system intelligence
+- `!persist` - Enhanced persistence mechanisms
+- `!reinstall` - Agent redeployment
+- `!lolnogtfo` - Secure agent removal
+
+### Network Operations  
+
+- `!socks <port>` - Establish SOCKS5 reverse proxy
+- `!stopsocks` - Terminate proxy connections
+- `!shell <command>` - Secure remote execution
+- `!detach <command>` - Background process execution
+- `!stream <command>` - Real-time output streaming
+
+### Stress Testing
+
+- `!udpflood <ip> <port> <duration>`
+- `!tcpflood <ip> <port> <duration>`
+- `!http <url/ip> <port> <duration>`
+- `!https <url> <duration>` - TLS 1.3 flood with HTTP/2 fingerprinting
+- `!tls <url> <duration>` - Alias for HTTPS flood
+- `!cfbypass <url> <duration>` - Cloudflare UAM bypass attack
+- `!syn/!ack/!gre/!dns` - Protocol-specific attacks
+
+
 ## 📋 WIP/TODO
 - Multiple Domain/Rotating Host Support
 - Multiple/Rotating Ports
@@ -279,4 +280,3 @@ We welcome contributions from security professionals:
 Built upon the framework of [1birdo](https://github.com/1Birdo)'s BotnetGo
 
 📧 **Contact**: [dev@sinners.city](mailto:dev@sinners.city)
-`
