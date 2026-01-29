@@ -22,16 +22,21 @@
 - Fixed SOCKS5 proxy, target resolution, telnet handling
 - Anti-analysis obfuscation (meaningless function names)
 
-### v3.1 - January 2026
+### v3.2 - January 2026
+
+- Added Reverse Socks 5 Modules
+- Cleaned up CNC UI
+- Built Setup.py to automate setup process
+
+### v3.1 - Decenber 2025
 
 - Initial release with TLS 1.3 encrypted communications
 - 14 architecture cross-compilation support
 - HMAC challenge-response authentication
 
 ---
+<img width="562" height="1314" alt="Screenshot 2026-01-28 235647" src="https://github.com/user-attachments/assets/18dba9dd-3067-4b7b-9bcf-a41e1db5b031" />
 
-
-<img width="828" height="1335" alt="Screenshot 2026-01-28 200534" src="https://github.com/user-attachments/assets/fb441aec-de8c-453f-8a65-3018a4055532" />
 
 ## 🚀 Installation & Setup
 
