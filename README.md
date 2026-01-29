@@ -237,7 +237,8 @@ VisionC2 operates on a client-server model with clear separation between adminis
 - Multiple/Rotating Ports
 - Locker/Killer to stay on the device and kill competing malware
 - Spread/Self-Rep Mechanism
-  
+- Enhanced Daemonize
+- Single Instance/Port Takeover Networking  
 
 ## ⚖️ Disclaimer
 
@@ -254,8 +255,7 @@ We welcome contributions from security professionals:
 - Code improvements and optimizations
 - Additional evasion techniques
 - Enhanced security features
-- Documentation and examples
-
+- Documentation and examples 
 ### Acknowledgments
 
 Built upon the framework of [1birdo](https://github.com/1Birdo)'s BotnetGo
