@@ -18,7 +18,7 @@
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
 **VisionC2** 
-*is an advanced cross-arch botnet focused on network stress testing it features end-to-end TLS 1.3 encryption, anti-analysis techniques, and DDOS/RCE/SOCKS modules. Vision is built to be setup via setup script meaning there are no code changes required.*
+*Vision hides the C2 Url behind 4 layers of encryption. Vision is built to be setup via setup script meaning there are no code changes required.*
 ![Animation](https://github.com/user-attachments/assets/35b58bb7-04ac-4318-9bd3-ceaed2a0235b)
 
 *2 Servers = 40k RPS/3-6 GBPS*
