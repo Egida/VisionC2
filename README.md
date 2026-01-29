@@ -226,8 +226,10 @@ VisionC2 operates on a client-server model with clear separation between adminis
 ## 📋 Changelog
 ### v3.4 - February 2026
 - BOT Send total device ram on registry
+- BOT Debug Logged full connection/register/tls/main loop
 - CNC Update New Eye Logo
 - CNC Show Total Bot Ram tracked
+
 ### v3.3 - February 2026
 
 - `!stop` command - Instantly halt all running attacks
