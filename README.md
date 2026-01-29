@@ -4,20 +4,13 @@
 ## 📑 Table of Contents
 - [📋 Changelog](#-changelog)
 - [🚀 Installation & Setup](#-installation--setup)
-  - [Prerequisites](#prerequisites)
-  - [⭐ Use the Setup Wizard (Recommended)](#-use-the-setup-wizard-recommended)
 - [🎯 Quick Usage](#-quick-usage)
 - [🛠️ Command Reference](#️-command-reference)
-  - [User Management](#user-management)
-  - [Bot Operations](#bot-operations)
-  - [Network Operations](#network-operations)
-  - [Stress Testing](#stress-testing)
 - [🏗️ Architecture Overview](#️-architecture-overview)
 - [📋 WIP/TODO](#-wiptodo)
 - [⚖️ Disclaimer](#️-disclaimer)
 - [🤝 Community & Support](#-community--support)
-  - [Contributing](#contributing)
-  - [Acknowledgments](#acknowledgments)
+
 
 ![VisionC2 Banner](https://img.shields.io/badge/VisioNNet-V3.3-red)
 ![Go Version](https://img.shields.io/badge/Go-1.23.0+-blue)
