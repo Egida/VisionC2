@@ -1,6 +1,6 @@
 # VisionC2 – Advanced Botnet Command & Control Framework
 
-![VisionC2 Banner](https://img.shields.io/badge/VisioNNet-V3-red)
+![VisionC2 Banner](https://img.shields.io/badge/VisioNNet-V3.3-red)
 ![Go Version](https://img.shields.io/badge/Go-1.23.0+-blue)
 ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS-green)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
