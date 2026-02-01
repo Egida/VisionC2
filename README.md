@@ -278,15 +278,12 @@ Bots use a multi-method resolution system to find your C2 server:
 - HMAC challenge-response authentication
 
 ## 📋 WIP/TODO
-- Multiple/Rotating Ports for C2 connections
+- Auto Generated DGA Fallback Domains for bot  
 - Locker/Killer to stay on the device and eliminate competing malware
-- Spread/Self-Rep Mechanism for lateral movement
+- Spread/Self-Rep Mechanism for
 - Enhanced Daemonize with better stealth
 - Single Instance/Port Takeover Networking capabilities
-- Web-based admin interface
-- Encrypted configuration storage
-- Geographic targeting and filtering
-- Blockchain-based C2 fallback system
+
 
 ## ⚖️ Disclaimer
 
