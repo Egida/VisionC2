@@ -156,7 +156,7 @@ nc YOUR_SERVER_IP YOUR_ADMIN_PORT
 
 Once connected:
 1. Type `spamtec` to trigger the login prompt
-2. Enter your credentials (default: `admin:admin`)
+2. Enter your credentials (default: `admin:changeme`)
 3. Type `help` to see available commands
 
 ### Bot Deployment
