@@ -214,19 +214,6 @@ Bots use a multi-method resolution system to find your C2 server:
 
 ## 🛠️ Command Reference
 
-### User Management Commands
-
-- `help` - Context-aware help system (shows available commands based on your clearance level)
-- `db` - User database management (Owner only)
-  - `db add <username> <password> <clearance>` - Add new user
-  - `db del <username>` - Remove user
-  - `db list` - List all users
-- `private` - Specialized commands based on clearance level
-- `clear` - Clear the console screen
-- `exit` / `quit` - Disconnect from admin console
-
-## 🛠️ Command Reference
-
 ### User Management
 
 - `help` - Context-aware help system (shows available commands)
