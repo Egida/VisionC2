@@ -33,7 +33,7 @@ sudo apt update && sudo apt install -y upx-ucl openssl git wget gcc python3
 # Go 1.23+ required - download from https://go.dev/dl/
 ```
 
-### ⭐ Use the Setup Wizard (Recommended)
+### ⭐ Use the Setup Wizard (Required for Encrypting C2 URL/IP)
 
 ```bash
 git clone https://github.com/Syn2Much/VisionC2.git
