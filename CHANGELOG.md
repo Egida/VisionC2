@@ -33,7 +33,7 @@ All notable changes to VisionC2 are documented in this file.
  
 ---
  
-### v1.4 - January 31, 2026
+### v1.4 - January 2026
  
 #### 🚀 New Features
 * **Proxy List Support for Layer 7 Attacks** - Route attacks through proxy lists
@@ -51,7 +51,7 @@ All notable changes to VisionC2 are documented in this file.
  
 ---
  
-### v1.3 - January 29, 2026
+### v1.3 - January 2026
  
 #### 🚀 New Features
 * **RAM Tracking** - Bots now report total system RAM on registration
@@ -77,7 +77,7 @@ All notable changes to VisionC2 are documented in this file.
  
 ---
  
-### v1.2 - January 28, 2026
+### v1.2 - January 2026
  
 #### 🔒 Security Enhancements
 * **C2 Address Obfuscation** - Enhanced multi-layer encryption
@@ -108,7 +108,7 @@ All notable changes to VisionC2 are documented in this file.
 | v1.5 | Feb 2026 | Auto UPX stripping, comprehensive code docs, +50 user agents |
 | v1.4 | Jan 2026 | Proxy list support for L7 attacks |
 | v1.3 | Jan 2026 | RAM tracking, debug logging, UI improvements |
-| v1.2 | Jan 2026 | RC4 obfuscation, documentation updates |
+| v1.2 | Jan 2026 | RC4 obfuscation, documentation updates, CF/TLS Bypass Methods |
 | v1.1 | Dec 2025 | Initial release - TLS 1.3, 14 architectures, attack suite |
  
 ---
