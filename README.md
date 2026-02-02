@@ -163,7 +163,6 @@ Once connected:
 
 Bot binaries are located in `bot/bins/` after building. The directory contains executables for 14+ architectures:
 
-> **Optional**: Protect UPX packed binaries from string analysis using [upx-stripper](https://github.com/Syn2Much/upx-stripper)
 
 ## 🏗️ Architecture Overview
 
@@ -247,10 +246,10 @@ Bots use a multi-method resolution system to find your C2 server:
 - `!cfbypass <url> <duration>` - Cloudflare UAM bypass attack
 - `!syn/!ack/!gre/!dns` - Protocol-specific attacks
   
-  ## 📋 Changelog
-  ### v1.5 - Febuary 2026
-  - ** deUPX(Binary Protector/Obfuscator) now called immeditealy after Build
-     > `Protects against Binary string analysis/grep`
+## 📋 Changelog
+### v1.5 - Febuary 2026
+- **deUPX**: (Binary Protector/Obfuscator) now called immeditealy after Build
+  > `Protects against Binary string analysis/grep`
 ### v1.4 - January 2026
 - **BOT**: Added support for using Layer7 attacks behind proxy list
   > `!http target.com 443 60 -p https://example.com/proxies.txt`
@@ -304,17 +303,14 @@ The developers assume no liability and are not responsible for any misuse or dam
 ### Acknowledgments
 
 - Built upon the framework of [1birdo](https://github.com/1Birdo)'s BotnetGo
-- Thanks to the security research community for feedback and testing
-- Contributors and testers who help improve the framework
 
 ### Support
 
 - **GitHub Issues**: For bug reports and feature requests
 - **Email**: [dev@sinners.city](mailto:dev@sinners.city) for security-related concerns
-- **Discord**: Community server (link in repository)
 
 ### License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the GNU License - see the LICENSE file for details.
 
 ---
