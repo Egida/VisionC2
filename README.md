@@ -206,8 +206,8 @@ python setup.py
 
 | Method         | Description / Fallback                    | Example Input        |
 | -------------- | ----------------------------------------- | -------------------- |
-| DNS TXT Record | Checks domain TXT record                  | `lookup.example.com` |
-| DoH TXT Lookup | Cloudflare/Google DNS-over-HTTPS          | `lookup.example.com` |
+| DOH TXT Record | Cloudflare/Google DNS-over-HTTPS                  | `lookup.example.com` |
+| DNS TXT Lookup | Checks Domain Text Record                 | `lookup.example.com` |
 | A Record       | Standard DNS fallback                     | `c2.example.com`     |
 | Direct IP      | Uses IP:port directly if no DNS available | `192.168.1.100`      |
 
@@ -217,7 +217,7 @@ python setup.py
 
 - Auto Generated DGA Fallback Domains for bot
 - Locker/Killer to stay on the device and eliminate competing malware
-- Spread/Self-Rep Mechanism for
+- Spread/Self-Rep Mechanism 
 - Enhanced Daemonize with better stealth
 - Single Instance/Port Takeover Networking capabilities
 
