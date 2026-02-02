@@ -14,7 +14,7 @@ All notable changes to **VisionC2** are documented in this file.
   * Binary protection now runs automatically at the end of setup
   * Added `deUPX.py` for automated UPX pattern removal
   * Integrated into `build.sh` for seamless post-build obfuscation
-  * Reduces static string analysis and signature-based detection 
+  * Reduces static string analysis and signature-based detection
 
 #### 📚 Documentation
 
@@ -37,6 +37,11 @@ All notable changes to **VisionC2** are documented in this file.
 
   * Expanded Layer 7 fingerprint diversity
   * Improves HTTP-based attack effectiveness
+* **DoH-First C2 Resolution**
+
+  * DNS-over-HTTPS now prioritized over plain DNS for C2 lookups
+  * Encrypted queries harder to detect and block
+  * Fallback order: DoH TXT → DNS TXT → A Record → Direct IP
 
 ---
 
@@ -135,4 +140,3 @@ All notable changes to **VisionC2** are documented in this file.
 | v1.1    | Dec 2025 | Initial release — TLS 1.3, 14 architectures                  |
 
 ---
-
