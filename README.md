@@ -19,61 +19,50 @@
 
 ---
 
-#### 🎯 Attack Capabilities
+#### 🎯 Bot Capabilities
 
 * **Layer 4**
 
-  * UDP, TCP, SYN, ACK, GRE, and DNS-based traffic generation
+  * UDP, TCP, SYN, ACK, GRE, and DNS-based Attack Methods
+
 * **Layer 7**
 
   * HTTP / HTTPS / TLS traffic with HTTP/2 fingerprinting
-  * Cloudflare UAM handling support
-* **Control**
+  * Cloudflare UAM bypass with captcha solving
 
-  * Global stop command to immediately halt all active tasks
+* **RCE**
+
+  * Send shell commands to bot(s) with real-time output streaming or fire-and-forget mode
+
+* **SOCKS5**
+
+  * Turn any agent into a SOCKS5 proxy server on a specified port
 
 ---
 
 #### 🔒 Security Features
 
 * **TLS 1.3** with perfect forward secrecy for all communications
-* **Multi-Layer Encryption & Obfuscation**
 
-  * No hardcoded C2
-  * C2 address protected via RC4, XOR, byte substitution, and MD5
+  > Zero plain-text communications
+
+* **No hardcoded C2**
+
+  > C2 address protected via RC4, XOR, byte substitution, and MD5
+
 * **HMAC Authentication**
 
-  * Challenge–response verification for agent integrity
+  > Challenge–response verification for agent integrity
+
 * **Anti-Analysis Protections**
 
-  * Multi-stage sandbox and analysis environment detection
+  > Multi-stage sandbox and analysis environment detection
 
 ---
 
-#### 🔧 Infrastructure & Operations
+**Vision is built to be set up via a setup script, meaning there are no code changes required.**
 
-* **Automated Setup Wizard**
-
-  * Full deployment or C2 update-only modes
-  * Token generation and TLS certificate handling
-* **Reverse SOCKS5 Proxy Support**
-
-  * Traffic routing and pivoting through connected agents
-* **Remote Command Execution**
-
-  * Secure command dispatch with real-time or detached execution
-* **CNC Admin Console**
-
-  * Multi-user management and live agent visibility
-* **Flexible C2 Resolution**
-
-  * DNS TXT-based discovery with DoH fallback support
-
----
-
-**Vision is built to be setup via setup script meaning there are no code changes required.**
-
-*Performance: 2 Servers = 40k RPS / 2–6 gbps*
+*Performance: 2 servers = 40k RPS / 2–6 Gbps*
 
 ![Animation](https://github.com/user-attachments/assets/35b58bb7-04ac-4318-9bd3-ceaed2a0235b)
 
