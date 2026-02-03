@@ -59,9 +59,7 @@
 ---
 **Vision is built to be set up via a setup script, meaning there are no code changes required.**
 
-*Performance: 2 servers = 40k RPS / 2–6 Gbps*
-
-![Animation](https://github.com/user-attachments/assets/35b58bb7-04ac-4318-9bd3-ceaed2a0235b)
+*Performance: 2 servers = 30k-40k RPS / 2–6 Gbps Depending on Method and Target*
 
 ---
 
