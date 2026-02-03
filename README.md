@@ -111,12 +111,29 @@ Step 5/5: Build
 
 **That's it!** The wizard handles everything:
 
-- C2 address configuration & obfuscation
-- Random magic codes & protocol versions
-- TLS certificate generation
-- Source code updates
-- Building CNC + 14 bot architectures
+### Configuration File
 
+After setup, check `setup_config.txt` for your configuration:
+
+```
+============================================================
+VisionC2 Configuration
+============================================================
+[C2 Server]
+C2 Address: c2.example.com:443
+Admin Port: 420
+Bot Port: 443
+
+[Security]
+Magic Code: IhxWZGJDzdSviX$s
+Protocol Version: r5.6-stable
+
+[Usage]
+1. Start CNC: cd cnc && ./cnc
+2. Connect Admin: nc c2.example.com 420
+3. Login trigger: spamtec
+4. Bot binaries: bot/bins/
+```
 ---
 ## 🎯 Quick Usage
 
@@ -152,29 +169,7 @@ Once connected:
 Bot binaries are located in `bot/bins/` after building. The directory contains executables for 14+ architectures.
 
 ---
-### Configuration File
 
-After setup, check `setup_config.txt` for your configuration:
-
-```
-============================================================
-VisionC2 Configuration
-============================================================
-[C2 Server]
-C2 Address: c2.example.com:443
-Admin Port: 420
-Bot Port: 443
-
-[Security]
-Magic Code: IhxWZGJDzdSviX$s
-Protocol Version: r5.6-stable
-
-[Usage]
-1. Start CNC: cd cnc && ./cnc
-2. Connect Admin: nc c2.example.com 420
-3. Login trigger: spamtec
-4. Bot binaries: bot/bins/
-```
 ## 🏗️ Architecture Overview
 ```
 Admin Console
