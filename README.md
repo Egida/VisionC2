@@ -3,8 +3,6 @@
 
 ## 📑 Table of Contents
 
-- [📋 Changelog](https://github.com/Syn2Much/VisionC2/blob/main/CHANGELOG.md)
-- [📋 Full Guide](https://github.com/Syn2Much/VisionC2/blob/main/USAGE.md)
 - [🚀 Installation & Setup](#-installation--setup)
 - [🎯 Quick Usage](#-quick-usage)
 - [🛠️ Command Reference](https://github.com/Syn2Much/VisionC2/blob/main/cnc/COMMANDS.md)
