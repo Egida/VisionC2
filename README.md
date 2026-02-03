@@ -4,13 +4,15 @@
 ## 📑 Table of Contents
 
 - [📋 Changelog](https://github.com/Syn2Much/VisionC2/blob/main/CHANGELOG.md)
+- [📋 Full Guide](https://github.com/Syn2Much/VisionC2/blob/main/USAGE.md)
 - [🚀 Installation & Setup](#-installation--setup)
 - [🎯 Quick Usage](#-quick-usage)
 - [🛠️ Command Reference](https://github.com/Syn2Much/VisionC2/blob/main/cnc/COMMANDS.md)
 - [🏗️ Architecture Overview](#️-architecture-overview)
-- [📋 WIP/TODO](#-wiptodo)
-- [⚖️ Disclaimer](#️-disclaimer)
-- [🤝 Community & Support](#-community--support)
+- [📋 Changelog](https://github.com/Syn2Much/VisionC2/blob/main/CHANGELOG.md)
+- [💡 Full Guide](https://github.com/Syn2Much/VisionC2/blob/main/USAGE.md)
+
+
 
 ![VisionC2 Banner](https://img.shields.io/badge/VisionNet-V1.5-red)
 ![Go Version](https://img.shields.io/badge/Go-1.23.0+-blue)
