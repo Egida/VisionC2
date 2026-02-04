@@ -24,7 +24,7 @@
 ---
 
 <p align="center">
-  <b>Watch Vision's TLS Bypass Method crash one of the largest DSTAT Graphs with 6 servers</b>
+  <b> TLS Bypass vs one of the largest DSTAT Graphs (6 servers)</b>
 </p>
 
 <p align="center">
@@ -127,75 +127,44 @@ Bot binaries are automatically built to `bot/bins/`.
 ---
 
 ## 🏗️ Architecture
-
 ```
 Admin Console ──TLS 1.3──► C2 Server ◄──TLS 1.3── Bot Agents (14+ arches)
 ```
 
 ### Bot Startup Flow
-
 ```
-START → Sandbox Check ──[detected]──► EXIT(200)
-              │
-              ▼
-       Persistence Install (rc.local + cron)
-              │
-              ▼
-┌─────────────────────────────────────────────────────┐
-│  C2 RESOLUTION: Decrypt URL → DoH TXT → DNS TXT → A Record → Direct IP  │
-└─────────────────────────────────────────────────────┘
-              │
-              ▼
-    ┌──► TLS Connect (C2:443) → Authenticate (HMAC+MD5) → Command Loop ──┐
-    │                                                                     │
-    └─────────────────────── Reconnect on Disconnect ◄────────────────────┘
+START → Sandbox Check ─[detected]─► EXIT(200)
+          │
+          ▼
+    Persistence (rc.local + cron)
+          │
+          ▼
+    C2 Resolution: Decrypt URL → DoH TXT → DNS TXT → A Record → Direct IP
+          │
+          ▼
+    TLS Connect → HMAC Auth → Command Loop ◄─── Reconnect on Disconnect
 ```
 
-### HMAC Challenge-Response Authentication
-
+### HMAC Challenge-Response
 ```
-   BOT                                         C2 SERVER
-    │                                              │
-    │ ──────── TLS Handshake ────────────────────► │
-    │                                              │
-    │ ◄─────── AUTH_CHALLENGE:<random_32_chars> ── │  Server generates unique challenge
-    │                                              │
-    │   Bot computes: Base64(MD5(challenge + MAGIC_CODE + challenge))
-    │                                              │
-    │ ──────── AUTH_RESPONSE:<hash> ─────────────► │  Server computes same hash
-    │                                              │
-    │ ◄─────── AUTH_SUCCESS + Bot info request ─── │  Hashes match = authenticated
-    │                                              │
-    │ ──────── ARCH|RAM|VERSION ─────────────────► │  Bot sends system info
-    │                                              │
-    │ ◄═══════ Command Loop Begins ═══════════════ │
+BOT                                    C2 SERVER
+ │ ──── TLS Handshake ───────────────► │
+ │ ◄─── AUTH_CHALLENGE:<random_32> ─── │  Unique challenge
+ │      Hash: Base64(MD5(challenge + MAGIC + challenge))
+ │ ──── AUTH_RESPONSE:<hash> ────────► │  Server verifies
+ │ ◄─── AUTH_SUCCESS ────────────────► │  
+ │ ──── ARCH|RAM|VERSION ────────────► │  System info
+ │ ◄═══ Command Loop ════════════════► │
 ```
+**Why?** Prevents replay (unique challenge) • No plaintext secrets • Lightweight MD5 for embedded
 
-**Why Challenge-Response?**
-
-- **Prevents replay attacks**: Each connection gets a unique random challenge
-- **No plaintext secrets**: Magic code never transmitted over the wire
-- **Mutual verification**: Both sides must know the shared secret
-- **Lightweight**: MD5 is fast, minimal overhead on embedded devices
-
-### C2 URL Decryption (4-Layer Obfuscation)
-
+### C2 URL Decryption (4-Layer)
 ```
-Encrypted Blob (Base64)
-    │
-    ├─► Layer 1: Base64 Decode
-    ├─► Layer 2: XOR with Derived Key [MD5(seed + split_bytes + entropy)]
-    ├─► Layer 3: RC4 Stream Cipher
-    ├─► Layer 4: Reverse Byte Substitution (ROL 3, XOR 0xAA)
-    └─► Verify: MD5 Checksum (last 4 bytes)
-    │
+Base64 Blob → Base64 Decode → XOR (derived key) → RC4 → Byte Sub (ROL3, XOR 0xAA) → MD5 verify
     ▼
-Decrypted: "192.168.1.1:443"
+"192.168.1.1:443"
 ```
-
-**Why Multi-Layer?** Base64 hides binary data • XOR defeats static extraction • RC4 encrypts • Byte substitution confuses • MD5 detects tampering
-
-**C2 Resolution Order:** DoH TXT → DNS TXT → A Record → Direct IP
+**Why Multi-Layer?** Base64 hides binary • XOR defeats static analysis • RC4 encrypts • MD5 detects tampering
 
 ---
 ## 🗺️ Roadmap
