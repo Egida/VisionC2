@@ -12,6 +12,7 @@
 **Optimizations & Docs**
 * HTTP/L7 improvements: connection pooling & keep-alive
 * Rewritten documentation (USAGE.md, COMMANDS.md) for TUI
+* Improved Setup.py flow and helper text
 
 ### v1.6 — Feb 2026
 **Core Improvements**
@@ -23,40 +24,6 @@
 **UI Updates**
 * Redesigned login screen with animations & lockout
 * Streamlined command menus (`attack`/`methods` split)
-
-### v1.6 — February 2026
-
-#### 🔧 Core Improvements
-
-* **Target DNS Resolution Order Changed**
-  * Cloudflare DoH now prioritized over system DNS for target resolution
-  * System DNS now used as final fallback instead of first attempt
-  * Improves reliability in environments with restricted local DNS
-
-* **Cron-Based Persistence on Startup**
-  * Adds cron job that checks every minute if bot is running
-  * Automatically restarts bot if killed, until system reboot
-  * Skips if cron entry already exists to avoid duplicates
-
-* **Proxy Validation Before Attacks**
-  * CNC validates all proxies in parallel against httpbin.org
-  * Only working proxies sent to bots, all bots use same validated list
-
-* **Reduced Bot-to-CNC Chatter**
-  * Bots no longer send attack status messages back to CNC
-  * Cleaner server logs, reduced bandwidth overhead, CNC already tracks attacks locally
-  
-#### 🎨 UI / UX
-
-* **Login Screen Redesign**
-
-  * Animated spinner, eye-themed UI, progress-based auth feedback
-  * Success/failure banners and 3-attempt lockout screen
-* **Command Menu Rework**
-
-  * Split attack commands into `attack` / `methods`
-  * Slimmed `help` menu with shortcut links
-  * `?` now shows help + attack hints
 
 ---
 
