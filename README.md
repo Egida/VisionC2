@@ -6,7 +6,7 @@
 ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS-green)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
-> **VisionC2** is a modern, Go based botnet framework focused on network stress testing. It includes enterprise-grade encryption (TLS 1.3 + HMAC), multi-architecture bot support (14+), remote shell, SOCKS5 proxying, and an interactive terminal user interface.
+> **VisionC2** is a Go based botnet focused on network stress testing. It includes enterprise-grade encryption (TLS 1.3 + HMAC), multi-architecture bot support (14+), remote shell, SOCKS5 proxying, and an interactive terminal user interface.
 
 <p align="center">
 <b>VisionC2 now features a complete Terminal User Interface built in BubbleTea</b>
@@ -74,7 +74,8 @@ Bot binaries are automatically built to `bot/bins/`.
 
 ### Performance
 
-- Up to 30k–40k RPS / 2–6 Gbps (2-server baseline)
+- 2 Servers = 30k-40k Requests Per Second. Layer4 2-6 GBPS.
+ > These are reliant on your bots hardware/network.
 - 14+ architecture support (automated cross-compilation)
 - Fully automated 5-minute setup
 
@@ -99,7 +100,7 @@ Admin Console ──TLS 1.3──► C2 Server
 
 ## Configuration
 
-After running the setup wizard, review `setup_config.txt` for:
+After running the setup wizard code changes will be made automatically, however review `setup_config.txt` for:
 
 - C2 address & ports
 - Magic code & encryption keys
@@ -143,5 +144,3 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 - Contact: <dev@sinners.city>
 
 ---
-
-This version is clean, professional, well-structured, and ready to be your main `README.md`. Let me know if you want a dark-mode friendly version, a version with screenshots, or further adjustments (e.g., remove certain sections).
