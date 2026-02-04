@@ -24,7 +24,7 @@
 ---
 
 <p align="center">
-  <b>Watch Vision's TLS Bypass Method crash one of the largest DSTAT Graphs</b>
+  <b>Watch Vision's TLS Bypass Method crash one of the largest DSTAT Graphs with 6 servers</b>
 </p>
 
 <p align="center">
