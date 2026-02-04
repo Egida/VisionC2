@@ -1,8 +1,30 @@
-## ☾℣☽ VisionC2 Changelog 
+## ☾℣☽ VisionC2 Changelog
+
+### v1.8 — Feb 2026
+
+**Features**
+
+* CPU core tracking (per bot + total in stats bar)
+* TUI proxy URL field for L7 attacks
+* Cyberpunk-themed Attack Center UI 
+
+**Proxy Optimizations**
+
+* Bot-side proxy fetching (no CNC validation, max RPS)
+* Round-robin rotation with 2s timeouts
+
+**Build Fixes**
+
+* UPX compression fix (`-1` instead of `--best --lzma`)
+* Setup.py copies binary to project root as `server`
+* Flexible cert paths (works from root or cnc dir)
+
+---
 
 ### v1.7 — Feb 2026
 
 **Full TUI Control Panel**
+
 * Complete interactive terminal UI (default mode via `./cnc`)
 * Real-time bot dashboard with shell access & management commands
 * Consolidated Attack Center with live countdowns & progress
@@ -10,18 +32,22 @@
 * Toast notifications & connection history logs
 
 **Optimizations & Docs**
+
 * HTTP/L7 improvements: connection pooling & keep-alive
 * Rewritten documentation (USAGE.md, COMMANDS.md) for TUI
 * Improved Setup.py flow and helper text
 
 ### v1.6 — Feb 2026
+
 **Core Improvements**
+
 * DNS: Prioritizes Cloudflare DoH over system DNS
 * Persistence: Cron-based auto-restart on bot death
 * Proxies: Validated in parallel before attacks
 * Reduced bot-to-CNC status chatter
 
 **UI Updates**
+
 * Redesigned login screen with animations & lockout
 * Streamlined command menus (`attack`/`methods` split)
 
