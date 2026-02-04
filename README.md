@@ -54,20 +54,34 @@
         ▼
 [ C2 Server ] ── TLS 1.3 ──► [ Bot Agents (14+ arches) ]
    │                                   │
-   │                                   ├─ Sandbox check → exit
-   │                                   ├─ Persistence (cron / rc.local)
-   │                                   ├─ C2 resolve:
-   │                                   │   EncURL → DoH/DNS → IP
-   │                                   ├─ HMAC auth:
-   │                                   │   Challenge → Response → OK
-   │                                   │   (MD5 + MAGIC, Base64)
+   │                                   ├─ Startup:
+   │                                   │   • Sandbox check → exit
+   │                                   │   • Persistence (cron / rc.local)
+   │                                   │
+   │                                   ├─ C2 Resolution:
+   │                                   │   • Base64 decode
+   │                                   │   • XOR (derived key)
+   │                                   │   • RC4 decrypt
+   │                                   │   • Byte sub (ROL3, XOR 0xAA)
+   │                                   │   • MD5 verify → IP:PORT
+   │                                   │   • DoH TXT → DNS TXT → A record
+   │                                   │
+   │                                   ├─ HMAC Auth:
+   │                                   │   1. TLS handshake
+   │                                   │   2. C2 → CHALLENGE (rand_32)
+   │                                   │   3. Bot → RESPONSE
+   │                                   │      Base64(MD5(ch + MAGIC + ch))
+   │                                   │   4. C2 → AUTH_SUCCESS
+   │                                   │   5. Bot → ARCH | RAM | VERSION
+   │                                   │
    │                                   └─ Runtime:
-   │                                       Cmd loop / Shell / SOCKS5
+   │                                       • Encrypted command loop
+   │                                       • Attacks / Shell / SOCKS5
+   │                                       • Reconnect on drop
    │
    └─ Issues HMAC challenge
       Verifies response
       Queues commands
-
 
 ```
 
