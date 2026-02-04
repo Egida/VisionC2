@@ -95,13 +95,6 @@ Bot binaries are automatically built to `bot/bins/`.
 ---
 
 ## ✨ Features
-Got it — you don’t want a new template. You want **your exact content**, just normalized so it visually matches a polished Markdown feature block.
-
-Here is your content, cleanly formatted and tightened, with identical structure and hierarchy:
-
----
-
-## ✨ Features
 
 ### 🤖 Bot Capabilities
 
