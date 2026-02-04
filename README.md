@@ -1,20 +1,40 @@
-
 # VisionC2 – Advanced Botnet Command & Control Framework
 
-![VisionC2](https://img.shields.io/badge/VisionC2-V1.7-red)
-![Go](https://img.shields.io/badge/Go-1.23.0+-blue)
-![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS-green)
-![License](https://img.shields.io/badge/License-MIT-yellow)
+![VisionC2](https://img.shields.io/badge/VisionC2-V1.7-red) ![Go](https://img.shields.io/badge/Go-1.23.0+-blue) ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS-green) ![License](https://img.shields.io/badge/License-MIT-yellow)
 
-> **VisionC2** is a Go based botnet with a TUI based CNC focused on network stress testing. It includes enterprise-grade encryption (TLS 1.3 + HMAC), multi-architecture bot support (14+), remote shell, SOCKS5 proxying, and an interactive terminal user interface.
+> **VisionC2** is a Go-based botnet with a TUI-based CNC focused on network stress testing. It includes enterprise-grade encryption (TLS 1.3 + HMAC), multi-architecture bot support (14+), remote shell, SOCKS5 proxying, and an interactive terminal user interface.
+
+---
+
+## 📑 Table of Contents
+
+### This Document
+
+- [Quick Start](#-quick-start)
+- [Features](#-features)
+- [Architecture](#️-architecture)
+
+### Documentation
+
+| Document | Description |
+|----------|-------------|
+| [USAGE.md](USAGE.md) | Full setup guide, deployment, and TUI usage |
+| [COMMANDS.md](cnc/COMMANDS.md) | Complete command reference for attacks & shell |
+| [CHANGELOG.md](CHANGELOG.md) | Version history and release notes |
+
+---
 
 <p align="center">
-<b>Watch Vision's TLS Bypass Method crash one of the largest DSTAT Graphs</b>
+  <b>Watch Vision's TLS Bypass Method crash one of the largest DSTAT Graphs</b>
 </p>
 
-![Animation](https://github.com/user-attachments/assets/52ffce78-eb92-4f7c-b34e-ba6ff227e416)
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/52ffce78-eb92-4f7c-b34e-ba6ff227e416" alt="Demo Animation">
+</p>
 
-## Quick Start
+---
+
+## 🚀 Quick Start
 
 ### Prerequisites
 
@@ -50,7 +70,21 @@ cd cnc
 
 Bot binaries are automatically built to `bot/bins/`.
 
-## Features
+**Binary Naming** – Binaries are disguised as kernel/system processes to evade Mirai/Qbot killers and blend with legitimate processes:
+
+| Binary | Architecture | Description |
+|--------|--------------|-------------|
+| `kworkerd0` | x86 (386) | 32-bit Intel/AMD |
+| `ethd0` | x86_64 | 64-bit Intel/AMD |
+| `mdsync1` | ARMv7 | Raspberry Pi 2/3 |
+| `ip6addrd` | ARM64 | Raspberry Pi 4, Android |
+| ... | +10 more | MIPS, PPC64, RISC-V, s390x |
+
+> See [`bot/build.sh`](bot/build.sh) or [`USAGE.md`](USAGE.md) for full 14-architecture mapping.
+
+---
+
+## ✨ Features
 
 ### Bot Capabilities
 
@@ -69,50 +103,112 @@ Bot binaries are automatically built to `bot/bins/`.
 ### TUI Features
 
 - Real-time bot management, visual attack builder, live shell access, and targeting filters
-- Built-in SOCKS5 proxy manager (one-click per bot)
-- Broadcast shell execution with architecture, RAM, and count filtering
+- Single Agent Targeting: Interactive management menu for each bot (terminal-like shell on specific bot)
+- Built-in SOCKS5 proxy manager (one-click per bot): Easily manage new or existing proxies
+- Broadcast shell execution with architecture, RAM, and bot count filtering
 
 ### Performance
 
-- 2 Servers = 30k-40k Requests Per Second. Layer4 2-6 GBPS.
- > These are reliant on your bots hardware/network.
+- **2 Servers** = **30k-40k Requests Per Second**. **Layer 4**: **2-6 Gbps**  
+  > *Note: Performance is reliant on your bots' hardware/network.*
 - 14+ architecture support (automated cross-compilation)
 - Fully automated 5-minute setup
 
-## Architecture
+---
+
+## 🏗️ Architecture
 
 ```
-Admin Console ──TLS 1.3──► C2 Server
-                            │
-                     Bot Registry
-                            ▲
-                     TLS 1.3 │
-                            │
-                       Bot Agents (14+ arches)
+Admin Console ──TLS 1.3──► C2 Server ◄──TLS 1.3── Bot Agents (14+ arches)
 ```
 
-**C2 Resolution Order** (highly resilient):
+### Bot Startup Flow
 
-1. DoH TXT record
-2. DNS TXT record
-3. A record
-4. Direct IP
+```
+START → Sandbox Check ──[detected]──► EXIT(200)
+              │
+              ▼
+       Persistence Install (rc.local + cron)
+              │
+              ▼
+┌─────────────────────────────────────────────────────┐
+│  C2 RESOLUTION: Decrypt URL → DoH TXT → DNS TXT → A Record → Direct IP  │
+└─────────────────────────────────────────────────────┘
+              │
+              ▼
+    ┌──► TLS Connect (C2:443) → Authenticate (HMAC+MD5) → Command Loop ──┐
+    │                                                                     │
+    └─────────────────────── Reconnect on Disconnect ◄────────────────────┘
+```
 
-## Configuration
+### HMAC Challenge-Response Authentication
 
-After running the setup wizard code changes will be made automatically, however review `setup_config.txt` for:
+```
+   BOT                                         C2 SERVER
+    │                                              │
+    │ ──────── TLS Handshake ────────────────────► │
+    │                                              │
+    │ ◄─────── AUTH_CHALLENGE:<random_32_chars> ── │  Server generates unique challenge
+    │                                              │
+    │   Bot computes: Base64(MD5(challenge + MAGIC_CODE + challenge))
+    │                                              │
+    │ ──────── AUTH_RESPONSE:<hash> ─────────────► │  Server computes same hash
+    │                                              │
+    │ ◄─────── AUTH_SUCCESS + Bot info request ─── │  Hashes match = authenticated
+    │                                              │
+    │ ──────── ARCH|RAM|VERSION ─────────────────► │  Bot sends system info
+    │                                              │
+    │ ◄═══════ Command Loop Begins ═══════════════ │
+```
+
+**Why Challenge-Response?**
+
+- **Prevents replay attacks**: Each connection gets a unique random challenge
+- **No plaintext secrets**: Magic code never transmitted over the wire
+- **Mutual verification**: Both sides must know the shared secret
+- **Lightweight**: MD5 is fast, minimal overhead on embedded devices
+
+### C2 URL Decryption (4-Layer Obfuscation)
+
+```
+Encrypted Blob (Base64)
+    │
+    ├─► Layer 1: Base64 Decode
+    ├─► Layer 2: XOR with Derived Key [MD5(seed + split_bytes + entropy)]
+    ├─► Layer 3: RC4 Stream Cipher
+    ├─► Layer 4: Reverse Byte Substitution (ROL 3, XOR 0xAA)
+    └─► Verify: MD5 Checksum (last 4 bytes)
+    │
+    ▼
+Decrypted: "192.168.1.1:443"
+```
+
+**Why Multi-Layer?** Base64 hides binary data • XOR defeats static extraction • RC4 encrypts • Byte substitution confuses • MD5 detects tampering
+
+**C2 Resolution Order:** DoH TXT → DNS TXT → A Record → Direct IP
+
+---
+
+## ⚙️ Configuration
+
+After running the setup wizard, code changes will be made automatically. However, review `setup_config.txt` for:
 
 - C2 address & ports
 - Magic code & encryption keys
 - Generated 4096-bit certificates
 
-## Usage
+---
 
-- Bot port: **443** (TLS – fixed)
-- Admin port: configurable (default 420)
+## 💻 Usage
+
+- **Bot port**: **443** (TLS – fixed)
+- **Admin port**: Configurable (default: 420)
 - Full command reference: [`cnc/COMMANDS.md`](cnc/COMMANDS.md)
+- Full setup documentation: [`cnc/USAGE.md`](cnc/USAGE.md)
 
-## Roadmap
+---
+
+## 🗺️ Roadmap
 
 ### In Progress
 
@@ -127,17 +223,23 @@ After running the setup wizard code changes will be made automatically, however 
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed history.
 
-## Disclaimer
+---
+
+## ⚠️ Disclaimer
 
 **FOR AUTHORIZED SECURITY RESEARCH AND STRESS TESTING ONLY**
 
 The authors are not responsible for any misuse, damage, or legal consequences arising from the use of this software. Use responsibly and legally.
 
-## License
+---
+
+## 📜 License
 
 This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
 
-## Support
+---
+
+## 🤝 Support
 
 - Documentation: [USAGE.md](USAGE.md)
 - Issues & feature requests → GitHub Issues
