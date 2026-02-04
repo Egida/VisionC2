@@ -57,25 +57,8 @@ All notable changes to **VisionC2** are documented below.
 
 * **Connection Pooling & Keep-Alive**
   * Reuses TCP connections across requests
-  * HTTP/2 multiplexing support
-  * Configurable idle connection limits
-
-* **Chunked Request Body**
-  * Randomized chunk sizes (512B–2KB)
-  * Delays between chunks to evade WAF detection
-
-* **JA3 Fingerprint Randomization**
-  * Randomized TLS cipher suites per connection
-  * Mimics diverse browser fingerprints
-
-* **Header Randomization**
-  * Random order of HTTP headers
-  * Varied Accept-Encoding, Accept-Language values
-
-* **Realistic Request Patterns**
-  * Random delays between requests (10-100ms)
-  * Referrer chain simulation
-  * Cookie persistence across requests
+  * New HTTP Client Config/Settings
+  * Adjusted timeout limits and way we start go routines
 
 #### 📚 Documentation
 
