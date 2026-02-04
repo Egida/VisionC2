@@ -49,6 +49,26 @@ git clone https://github.com/Syn2Much/VisionC2.git
 cd VisionC2
 python3 setup.py
 ```
+---
+
+## ⚙️ Configuration
+
+After running the setup wizard, code changes will be made automatically. However, review `setup_config.txt` for:
+
+- C2 address & ports
+- Magic code & encryption keys
+- Generated 4096-bit certificates
+
+---
+
+## 💻 Usage
+
+- **Bot port**: **443** (TLS – fixed)
+- **Admin port**: Configurable (default: 420)
+- Full command reference: [`cnc/COMMANDS.md`](cnc/COMMANDS.md)
+- Full setup documentation: [`cnc/USAGE.md`](USAGE.md)
+
+---
 
 ### Starting the C2
 
@@ -187,26 +207,6 @@ Decrypted: "192.168.1.1:443"
 **C2 Resolution Order:** DoH TXT → DNS TXT → A Record → Direct IP
 
 ---
-
-## ⚙️ Configuration
-
-After running the setup wizard, code changes will be made automatically. However, review `setup_config.txt` for:
-
-- C2 address & ports
-- Magic code & encryption keys
-- Generated 4096-bit certificates
-
----
-
-## 💻 Usage
-
-- **Bot port**: **443** (TLS – fixed)
-- **Admin port**: Configurable (default: 420)
-- Full command reference: [`cnc/COMMANDS.md`](cnc/COMMANDS.md)
-- Full setup documentation: [`cnc/USAGE.md`](USAGE.md)
-
----
-
 ## 🗺️ Roadmap
 
 ### In Progress
