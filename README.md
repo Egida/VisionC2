@@ -46,7 +46,7 @@
 [ Admin ] → [ C2 Server/TUI ] ↔ [ Bot Agents ]
                     │              │
             TLS 1.3 │              ├─ Persistence (cron/rc.local)
-            HMAC Auth │           ├─ Multi-layer C2 Resolution
+            HMAC Auth │            ├─ Multi-layer C2 Resolution
                     │              ├─ Sandbox Detection
                     │              └─ Encrypted Command Loop
                     │
