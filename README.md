@@ -204,7 +204,7 @@ After running the setup wizard, code changes will be made automatically. However
 - **Bot port**: **443** (TLS – fixed)
 - **Admin port**: Configurable (default: 420)
 - Full command reference: [`cnc/COMMANDS.md`](cnc/COMMANDS.md)
-- Full setup documentation: [`cnc/USAGE.md`](cnc/USAGE.md)
+- Full setup documentation: [`cnc/USAGE.md`](USAGE.md)
 
 ---
 
