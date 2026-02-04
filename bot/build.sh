@@ -40,8 +40,11 @@ build_for_arch() {
     
     # Rename the built binary to the obfuscated name from AMBS array
     mv bot "${AMBS[$INDEX]}"
-    # Compress the binary with UPX
-    upx --best --lzma "${AMBS[$INDEX]}"
+    # Compress the binary with UPX (use -1 for fastest/safest compression)
+    # Note: --best --lzma can corrupt Go static binaries on some systems
+    if command -v upx &> /dev/null; then
+        upx -1 "${AMBS[$INDEX]}" 2>/dev/null || echo "UPX compression skipped for $arch_name"
+    fi
     # Move to bins directory
     mv "${AMBS[$INDEX]}" "$BINS_DIR/"
     INDEX=$((INDEX + 1))
