@@ -486,9 +486,9 @@ def build_cnc(cnc_path: str) -> bool:
 
 
 def build_bots(base_path: str) -> bool:
-    """Build bot binaries using build.sh from project root"""
+    """Build bot binaries using tools/build.sh from project root"""
     try:
-        build_script = os.path.join(base_path, "build.sh")
+        build_script = os.path.join(base_path, "tools", "build.sh")
 
         # Make build.sh executable
         os.chmod(build_script, 0o755)
@@ -497,7 +497,7 @@ def build_bots(base_path: str) -> bool:
         info("This may take a few minutes...")
         print()
 
-        result = subprocess.run(["bash", "build.sh"], cwd=base_path, text=True)
+        result = subprocess.run(["bash", build_script], cwd=base_path, text=True)
 
         return result.returncode == 0
     except Exception as e:
@@ -506,9 +506,9 @@ def build_bots(base_path: str) -> bool:
 
 
 def deupx_binaries(base_path: str, bot_path: str) -> bool:
-    """Strip UPX signatures from packed binaries using deUPX.py"""
+    """Strip UPX signatures from packed binaries using tools/deUPX.py"""
     try:
-        deupx_script = os.path.join(bot_path, "deUPX.py")
+        deupx_script = os.path.join(base_path, "tools", "deUPX.py")
         bins_dir = os.path.join(base_path, "bins")
 
         if not os.path.exists(deupx_script):
