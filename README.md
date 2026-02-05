@@ -112,10 +112,15 @@ VisionC2/
 │   ├── main.go
 │   ├── attacks.go
 │   └── ...
+├── tools/                  # Bot source code
+│   ├── deupx.py         # UPX stripper/packer
+│   ├── build.sh         # Vision Cross Compiler
+│   └── ...
 └── Docs/                 # Documentation
     ├── USAGE.md
     ├── COMMANDS.md
     └── CHANGELOG.md
+    
 ```
 ---
 
@@ -176,7 +181,7 @@ Bot binaries are automatically cross-compiled to `bot/bins/`.
 - Finish TUI Updates
 - Enhanced daemonization
 - Competitor locker / killer module
-
+  
 **Planned**
 - Auto-generated DGA fallback domains
 - Self-replication & worm-like spreading
