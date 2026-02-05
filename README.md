@@ -18,31 +18,29 @@
 ## 🧪 Quick Demo
 
 ![VisionC2 TUI Demo](https://github.com/user-attachments/assets/8f9b3263-1df4-4fe4-ad3b-d02bc5907c21)
-
+---
 ## ✨ Features
 
 ### Bot Capabilities
-- **Layer 4 Attacks** — UDP, TCP SYN/ACK/RST, GRE, DNS amplification, ICMP, NTP, SSDP, etc.
-- **Layer 7 Attacks** — HTTP floods, HTTPS/TLS Bypass with realistic browser fingerprinting, Cloudflare UAM/bypass
-- **Remote Shell** — Fully interactive per-bot shell + fire-and-forget broadcast execution
-- **SOCKS5 Proxy** — Turn any infected host into a high-performance SOCKS5 proxy on demand
+- **Layer 4 Attacks** — UDP, TCP, SYN, ACK, GRE, and DNS flood methods
+- **Layer 7 Attacks** — HTTP/HTTPS/TLS with **HTTP/2 fingerprinting** and **Cloudflare UAM bypass**
+- **Remote Execution** — **Interactive per-bot shell** and **fire-and-forget broadcast commands**
+- **SOCKS5 Proxy** — Convert any agent into a **high-performance SOCKS5 proxy server** on demand
 
 ### CNC & TUI Interface
-- Beautiful full-screen **Terminal User Interface** 
-- Real-time bot grid with architecture, country, RAM, cores, and uptime
-- Attack builder with live statistics
-- Single-agent interactive shell
-- Broadcast shell with powerful filters (OS, arch, RAM ≥ X GB, country, etc.)
-- Built-in SOCKS5 proxy manager (start/stop per bot or in bulk)
+- **Full-screen TUI** (Terminal User Interface) for Command & Control
+- **Real-time dashboard** with bot management and live statistics
+- **Visual attack builder** with detailed metrics
+- **Single-Agent Control** — fully interactive per-bot shell interface
+- **Broadcast Shell Execution** — Powerful filters by **architecture**, **RAM amount**, **bot count**, and more
+- **Built-in SOCKS5 Proxy Manager** — One-click start/stop per bot or in bulk operations
 
 ### Encryption & Stealth
-- TLS 1.3 + Perfect Forward Secrecy
-- HMAC challenge-response authentication
-- Multi-layer String obfuscation (RC4 → XOR → byte substitution → MD5)
-- Anti-analysis: sandbox detection, VM checks, debugger detection
-- C2 resolution via DoH + TXT records + A records + Direct IP 
-
-
+- **TLS 1.3** with **Perfect Forward Secrecy**
+- **HMAC challenge-response** authentication system
+- **Multi-layer obfuscation** — RC4 → XOR → byte substitution → MD5
+- **Anti-analysis & evasion** — **Sandbox detection** • **VM detection** • **Debugger detection**
+---
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -130,14 +128,13 @@ All binaries are UPX-packed, stripped, and named to blend with legitimate system
 
 **In Progress**
 - Finish TUI Updates
-- Enhanced daemonization 
+- Enhanced daemonization
 - Competitor locker / killer module
 
 **Planned**
 - Auto-generated DGA fallback domains
 - Self-replication & worm-like spreading
 - Single-instance port takeover
-
 
 ## ⚠️ Legal Disclaimer
 
@@ -154,4 +151,3 @@ GNU General Public License v3.0 — see [LICENSE](LICENSE)
 - Contact: `dev@sinners.city`
 
 ---
-
