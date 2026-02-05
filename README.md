@@ -61,9 +61,9 @@ python3 setup.py
 
 ## ⚙️ Configuration
 
-Code changes are made automatically via setup.py
+Code changes are made automatically via an interactive setup 
 
-Review `setup_config.txt` to see current:
+Review `setup_config.txt` after running to see current:
 * C2 address & ports
 * Magic code & encryption keys
 * Generated 4096-bit TLS certificates
