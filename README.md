@@ -13,8 +13,7 @@
 
 </div>
 
-![Animation](https://github.com/user-attachments/assets/fd8d324f-f925-407a-8b3b-02b3bed34c90)
-
+![Animation](https://github.com/user-attachments/assets/4475a3a1-b3a5-4bb3-b00a-b30e88210dcd)
 
 ---
 ## ✨ Features
