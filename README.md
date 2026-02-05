@@ -54,6 +54,7 @@ sudo apt update && sudo apt install -y upx-ucl openssl git wget gcc python3 scre
 ```bash
 git clone https://github.com/Syn2Much/VisionC2.git
 cd VisionC2
+chmod +x *
 python3 setup.py
 # CNC and Bot Binaries will be built during this proccess
 ```
