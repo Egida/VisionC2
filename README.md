@@ -1,10 +1,13 @@
 
+
 <div align="center">
 
-# ☾℣☽ision - **Advanced Go-Based Botnet**
+# ☾℣☽ision C2 - Advanced Go-Based C2 Framework
 
-**DDoS • SOCKS5 Proxying • Remote Shell • Multi-Architecture • TUI View**
 
+`DDoS` · `SOCKS5 Proxy` · `Remote Shell` · `Multi-Arch` · `TUI Dashboard`
+
+---
 ![Go](https://img.shields.io/badge/Go-1.23.0+-00ADD8?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS-009688?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-GNU%20GPLv3-yellow?style=for-the-badge)
@@ -19,8 +22,12 @@
 - [Documentation](#-documentation)
 - [Roadmap](#%EF%B8%8F-roadmap)
 
-
+> **Vision** is a Go-based C2 framework secured by TLS 1.3 with HMAC challenge-response authentication, multi-layer C2 address encryption, and sandbox evasion through VM/anaylsis/debugger detection — compiling persistent agents for 14+ Linux architectures.
+> 
 ![Animation](https://github.com/user-attachments/assets/4475a3a1-b3a5-4bb3-b00a-b30e88210dcd)
+
+
+
 
 ---
 
