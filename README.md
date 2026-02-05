@@ -1,12 +1,10 @@
 
 <div align="center">
 
-# ☾℣☽ision C2
+# ☾℣☽ision - **Advanced Go-Based C2 & Botnet**  
 
-**Advanced Go-Based C2 Framework**  
 **DDoS • SOCKS5 Proxying • Remote Shell • Multi-Architecture**
 
-![VisionC2](https://img.shields.io/badge/VisionC2-V1.8-red?style=for-the-badge)
 ![Go](https://img.shields.io/badge/Go-1.23.0+-00ADD8?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS-009688?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-GNU%20GPLv3-yellow?style=for-the-badge)
