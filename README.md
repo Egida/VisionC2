@@ -14,10 +14,10 @@
 ## 📑 Table of Contents
 
 - [Features](#-features)
-- [Architecture](#%EF%B8%8F-architecture)
-- [Quick Start](#-quick-start)
+- [Install & Build](#-getting-setup)
 - [Running the C2 Server](#%EF%B8%8F-running-the-c2-server)
 - [Documentation](#-documentation)
+- [Roadmap](#%EF%B8%8F-roadmap)
 
 
 ![Animation](https://github.com/user-attachments/assets/4475a3a1-b3a5-4bb3-b00a-b30e88210dcd)
@@ -58,11 +58,11 @@
 │                          │                          │                                                  │
 │ /proc scan:              │ Obfuscated const         │ TLS 1.2+ Handshake ──────────────────────────►   │
 │  VM: vmware,vbox,qemu    │  │                       │                                                  │
-│  Sandbox: cuckoo,any.run │  ▼ Base64 → XOR          │ ◄──────────── AUTH_CHALLENGE:<nonce> ──────────  │
+│  Sandbox: cuckoo,any.run │  ▼ Base64 → XOR          │ ◄──────────── HMAC_CHALLENGE:<nonce> ──────────  │
 │  Tools: gdb,strace,ida   │  ▼ RC4 (derived key)     │                                                  │
 │  Parent: gdb,strace,rr   │  ▼ Byte sub → MD5 check  │ Base64(MD5(nonce+magic+nonce)) ──────────────►   │
 │                          │  │                       │                                                  │
-│ Detected → exit(200)     │  ▼ Plaintext C2          │ ◄──────────── AUTH_SUCCESS ───────────────────   │
+│ Detected → exit(200)     │  ▼ Plaintext C2          │ ◄──────────── HMAC_SUCCESS ───────────────────   │
 │                          │  │                       │                                                  │
 │ Clean ──────────────────►│  ▼ DNS resolve:          │ REGISTER:ver:id:arch:ram:cpu ─────────────────►  │
 │                          │  DoH TXT → UDP TXT       │                                                  │
@@ -74,7 +74,7 @@
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Getting Setup
 
 **Ubuntu/Debian:**
 
