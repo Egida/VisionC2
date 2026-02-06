@@ -22,7 +22,7 @@
 - [Documentation](#-documentation)
 - [Roadmap](#%EF%B8%8F-roadmap)
 
-> **Vision** is a Go-based C2 framework featuring a simple one click setup script. Secured by TLS 1.3 with HMAC challenge-response authentication, multi-layer C2 address encryption, and sandbox evasion through VM/debugger detection — compiling persistent agents for 14+ architectures.
+> **Vision** is a Go-based C2 framework featuring a simple one click setup script. Secured by TLS 1.3 + HMAC authentication, multi-layer C2 address encryption, and sandbox evasion through VM/Debugger detection — compiling persistent agents for 14+ architectures.
 
 ![Animation](https://github.com/user-attachments/assets/4475a3a1-b3a5-4bb3-b00a-b30e88210dcd)
 
@@ -74,6 +74,8 @@ chmod +x *
 
 ```bash
 python3 setup.py
+
+# Prompts will appear asking for C2 URL, Port, and config for you TLS Certs
 ```
 
 The setup script will:
@@ -129,9 +131,11 @@ VisionC2/
 ├── bot/                    # Bot agent source
 │   ├── main.go             # Entry point, config, shell exec, main loop
 │   ├── connection.go       # TLS connection, DNS resolution, auth, C2 handler
+│   ├── ....
 ├── cnc/                    # CNC server source
 │   ├── main.go             # Server entry, TLS listener, user listener
 │   ├── connection.go       # TLS config, bot auth handler, bot management
+│   ├── ....
 ├── tools/
 │   ├── build.sh            # Cross-compilation for 14 architectures
 │   └── deUPX.py            # UPX signature stripper
