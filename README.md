@@ -38,7 +38,7 @@
 | `!stop` | Stop all attacks |
 | `!udpflood` | UDP flood attack |
 | `!tcpflood` | TCP connection flood |
-| `!http` | HTTP POST flood |
+| `!http` | HTTP GET/POST flood |
 | `!https`, `!tls` | HTTPS/TLS flood |
 | `!cfbypass` | Cloudflare bypass flood |
 | `!syn` | Raw SYN flood |
