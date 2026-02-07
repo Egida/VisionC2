@@ -1,14 +1,18 @@
 ## ☾℣☽ VisionC2 Changelog
 
+
+### v1.9 — Feb 2026
+- Fixed issue with UPX stripping tool being to aggressive and corrupting binaries
+- Daemonize (WIP
+- TUI Updates (WIP)
+
+
+
 ### v1.8 — Feb 2026
-
-
-
 **Features**
 * CPU core tracking (per bot + total in stats bar)
 * TUI proxy URL field for L7 attacks
 * Cyberpunk-themed Attack Center UI
-
 
 **Proxy Optimizations**
 
