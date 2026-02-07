@@ -113,6 +113,7 @@ screen ./server --split
 # Connect to admin interface
 nc your-server-ip 1337
 # Login with "spamtec" to access hidden portal
+# Uses cnc/users.json as a database 
 ```
 
 > [COMMANDS.md](Docs/COMMANDS.md) — **Complete CNC command reference**
