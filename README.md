@@ -17,23 +17,8 @@
 
 </div>
 
-## 📑 Contents
 
-- [Remote Shell](#remote-shell)
-- [Layer 4 (Network)](#layer-4-network)
-- [Layer 7 (Application)](#layer-7-application)
-- [Getting Setup](#-getting-setup)
-- [TUI Mode](#option-1-tui-mode-recommended)
-- [Telnet/Multi-User Mode](#option-2-telnet--multi-user-mode)
-- [Author](#-author)
-
-
----
-
-## 🖥️ CNC Interface (TUI – Bubble Tea)
-
-The CNC runs as a Terminal User Interface providing live bot telemetry, attack control, and remote command execution.
-
+## 🖥️ CNC/TUI (Bubble Tea)
 **Features**
 - Dashboard: bot count, RAM / CPU usage, uptime
 - Bot list with live stats and actions
