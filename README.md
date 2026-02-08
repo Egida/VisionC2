@@ -3,11 +3,12 @@
 
 # ☾℣☽ision C2
 
+**Vision** is a Go-based Botnet framework featuring one-click setup, TLS-secured communications, layered C2 address obfuscation, sandbox evasion, and cross-compiled persistent agents for **14+ architectures**.
+
 ![Go](https://img.shields.io/badge/Go-1.23.0+-00ADD8?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS-009688?style=for-the-badge)
 
 
-**Vision** is a Go-based Botnet framework featuring one-click setup, TLS-secured communications, layered C2 address obfuscation, sandbox evasion, and cross-compiled persistent agents for **14+ architectures**.
 
 <img width="973" height="658" alt="Screenshot 2026-02-07 224651" src="https://github.com/user-attachments/assets/9c6d9ada-a8ff-499e-8445-8d8ea2409936" />
 
