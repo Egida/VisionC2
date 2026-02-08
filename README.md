@@ -16,7 +16,6 @@
 
 </div>
 
----
 ## 📑 Contents
 
 - [Remote Shell](#remote-shell)
@@ -26,6 +25,7 @@
 - [TUI Mode](#option-1-tui-mode-recommended)
 - [Telnet/Multi-User Mode](#option-2-telnet--multi-user-mode)
 - [Author](#-author)
+
 
 ---
 
@@ -154,19 +154,21 @@ nc your-server-ip 1337
 ## 🏗️ Architecture Overview
 
 ```text
+Bot Startup
+-----------------
 Sandbox / Debug Checks
- ├─ VM, sandbox, debugger detection
+ ├─ VM, sandbox, debugger detection (VM ENV check, Analysis tools check, Active Debugger check)
  └─ Exit on detection
 
 C2 Address Decryption
- ├─ Base64 → XOR → RC4 → checksum
- └─ DNS resolution chain
+ ├─ Base64 → XOR → RC4 → checksum (C2 never hardcoded in plain text)
+ └─ DNS resolution chain (Resillient, Supports Txt Recrods, A Records, and Direct IP
 
 Bot ⇄ CNC Protocol
- ├─ TLS handshake
- ├─ HMAC challenge / response
- ├─ Registration payload
- └─ Encrypted command loop
+ ├─ TLS handshake (No Plain Text)
+ ├─ HMAC challenge / response (Prevent Relay Attacks)
+ ├─ Registration payload (botid:arch:ram:cpu:uplink:process)
+ └─ Encrypted command loop (TLS 1.2+)
 ```
 
 ---
