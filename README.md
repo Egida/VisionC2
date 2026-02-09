@@ -1,177 +1,165 @@
 
 <div align="center">
 
-# ☾℣☽ision C2
+# Vision C2
 
-**Vision** is a Go-based Botnet framework featuring one-click setup, TLS-secured communications, layered C2 address obfuscation, sandbox evasion, and cross-compiled persistent agents for **14+ architectures**.
+**Vision** is a Go-based Command & Control framework featuring one-click setup, TLS-secured communications, advanced obfuscation techniques, sandbox evasion, and cross-compiled agents for **14+ architectures**.
 
-![Go](https://img.shields.io/badge/Go-1.23.0+-00ADD8?style=for-the-badge)
-![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS-009688?style=for-the-badge)
+![Go](https://img.shields.io/badge/Go-1.23.0+-00ADD8?style=for-the-badge&logo=go)
+![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS-009688?style=for-the-badge&logo=linux&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-4c1?style=for-the-badge)
 
+<br>
 
-
-<img width="973" height="658" alt="Screenshot 2026-02-07 224651" src="https://github.com/user-attachments/assets/9c6d9ada-a8ff-499e-8445-8d8ea2409936" />
-
- **Changelog:** You can always find the latest and complete change history in  
-[`Docs/CHANGELOG.md`](Docs/CHANGELOG.md)
+![Dashboard Screenshot](https://github.com/user-attachments/assets/9c6d9ada-a8ff-499e-8445-8d8ea2409936)
 
 </div>
 
+## ✨ Features
 
-## CNC/TUI (Bubble Tea)
-> Built in BubbleTea for ease of use and arrow key control 
+### C2 Interface (TUI)
+Built with BubbleTea for intuitive keyboard-controlled navigation:
+- **Dashboard**: Real-time bot count, system resource monitoring (RAM/CPU), and uptime
+- **Bot Management**: Live statistics and action controls for connected agents
+- **Attack Builder**: Configurable attack methods with target and duration controls
+- **Remote Shell**: Interactive shell access (broadcast and per-bot)
+- **SOCKS5 Proxy**: Built-in proxy server management
+- **Help System**: Integrated documentation and command reference
 
-**Features**
-- Dashboard: bot count, RAM / CPU usage, uptime
-- Bot list with live stats and actions
-- Attack builder with method, target, and duration control
-- Broadcast shell and per-bot remote shell
-- SOCKS5 proxy management
-- Built-in help system
+### Security & Obfuscation
+- TLS 1.2+ encrypted communications
+- Multi-layer C2 address obfuscation (Base64 → XOR → RC4 → checksum)
+- Sandbox and VM detection evasion
+- HMAC challenge/response authentication
+- No plaintext C2 addresses in binaries
 
----
+### Cross-Platform Support
+- **14+ CPU architectures** via Go cross-compilation
+- Native support for Linux, Windows, and macOS
+- One-click setup and deployment
 
-## ⚔️ Attack Builder
+## ⚔️ Attack Methods
 
-> Vision features a collection of high performance stress testing methods broadcasted to all bots 
+### Layer 4 (Network Layer)
+| Method      | Protocol | Description                          |
+|-------------|----------|--------------------------------------|
+| UDP Flood   | UDP      | High-volume 1024-byte payload spam  |
+| TCP Flood   | TCP      | Connection exhaustion attack        |
+| SYN Flood   | Raw TCP  | SYN packets with random source ports|
+| ACK Flood   | Raw TCP  | ACK packet flooding                 |
+| GRE Flood   | GRE (47) | GRE protocol packets with max payload|
+| DNS Flood   | UDP/DNS  | Random DNS query types (A/AAAA/MX/NS)|
 
-### Layer 4 (Network)
+### Layer 7 (Application Layer)
+| Method          | Description                                  |
+|-----------------|----------------------------------------------|
+| HTTP Flood      | GET/POST requests with randomized headers    |
+| HTTPS/TLS Flood | TLS handshake exhaustion with request bursts |
+| CF Bypass       | CloudFlare bypass via session/cookie reuse  |
+| Proxy Support   | All L7 methods support proxy list integration|
 
-| Method    | Protocol     | Technique                     |
-|-----------|--------------|-------------------------------|
-| UDP Flood | UDP          | 1024-byte payload spam        |
-| TCP Flood | TCP          | Connection exhaustion         |
-| SYN Flood | Raw TCP      | Raw SYN packets, random ports |
-| ACK Flood | Raw TCP      | Raw ACK packets               |
-| GRE Flood | Raw GRE (47) | GRE packets, max payload      |
-| DNS Flood | UDP / DNS    | Random A/AAAA/MX/NS queries   |
+## 🚀 Installation
 
-### Layer 7 (Application)
-
-| Method          | Technique                             |
-|-----------------|---------------------------------------|
-| HTTP Flood      | GET/POST requests, randomized headers |
-| HTTPS/TLS Flood | TLS handshake with request bursts     |
-| CF Bypass       | Session reuse, cookie persistence     |
-| Proxies         | All L7 can optionally use a proxy list|
----
-
-
-
-## Remote Shell
-
-> Interactive shell access on each agent with real-time output and command history.
-
-<div align="center">
-  <img
-<img width="1157" height="675" alt="Screenshot 2026-02-07 224828" src="https://github.com/user-attachments/assets/063bcbf2-bb95-4d92-849e-f7a2ce8fb957" />
-
-</div>
-
-
----
-
-## 🚀 Getting Setup
-
-### Dependencies (Ubuntu / Debian)
-
+### Prerequisites
 ```bash
+# Ubuntu/Debian
 sudo apt update && sudo apt install -y \
-  upx-ucl openssl git wget gcc python3 screen build-essential
+    upx-ucl openssl git wget gcc python3 screen build-essential
 ```
 
-### 1️⃣ Clone the Repository
+### Quick Setup
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/Syn2Much/VisionC2.git
+   cd VisionC2
+   chmod +x *
+   ```
 
-```bash
-git clone https://github.com/Syn2Much/VisionC2.git
-cd VisionC2
-chmod +x *
-```
+2. **Run interactive setup**
+   ```bash
+   python3 setup.py
+   ```
+   The setup script will:
+   - Generate 4096-bit TLS certificates
+   - Create encryption keys and configuration
+   - Cross-compile binaries for all supported architectures
+   - Build the C2 server binary
 
-### 2️⃣ Run Interactive Setup
+3. **Output locations**
+   - C2 Server: `./server`
+   - Agent Binaries: `./bins/`
+   - Configuration: `setup_config.txt`
 
-```bash
-python3 setup.py
-```
+## 🖥️ Usage
 
-**The setup script will:**
-
-1. Generate 4096-bit TLS certificates
-2. Create encryption keys and magic values
-3. Patch configuration into source
-4. Cross-compile bot binaries (14+ architectures)
-5. Build the CNC server binary
-
-### Output Locations
-
-* **CNC Server:** `./server`
-* **Bot Binaries:** `./bins/`
-* **Config:** `setup_config.txt`
-
----
-
-## 🖥️ Running the C2 Server
-
-### Option 1: TUI Mode (Recommended)
-
+### Starting the C2 Server
+**Option 1: TUI Mode (Recommended)**
 ```bash
 screen ./server
 ```
+- Detach: `Ctrl + A` → `D`
+- Reattach: `screen -r`
 
-* Detach: `Ctrl + A` → `D`
-* Reattach: `screen -r`
-
-### Option 2: Telnet / Multi-User Mode
-
+**Option 2: Telnet/Multi-User Mode**
 ```bash
 screen ./server --split
 nc your-server-ip 1337
 ```
+- User database: `cnc/users.json`
+- Default login keyword: `spamtec`
 
-* User DB: `cnc/users.json`
-* Login keyword: `spamtec`
-
-📘 **Reference:** `Docs/COMMANDS.md`
-
----
-
-## 🏗️ Architecture Overview
+## 🏗️ Architecture
 
 ```text
-Bot Startup
------------------
-Sandbox / Debug Checks
- ├─ VM, sandbox, debugger detection (VM ENV check, Analysis tools check, Active Debugger check)
- └─ Exit on detection
+Agent Startup Sequence
+──────────────────────
+1. Security Checks
+   ├─ VM detection
+   ├─ Sandbox analysis
+   ├─ Debugger detection
+   └─ Exit on positive detection
 
-C2 Address Decryption
- ├─ Base64 → XOR → RC4 → checksum (C2 never hardcoded in plain text)
- └─ DNS resolution chain (Resillient, Supports Txt Recrods, A Records, and Direct IP
+2. C2 Resolution
+   ├─ Multi-layer address decryption
+   └─ DNS fallback chain (TXT/A records, direct IP)
 
-Bot ⇄ CNC Protocol
- ├─ TLS handshake (No Plain Text)
- ├─ HMAC challenge / response (Prevent Relay Attacks)
- ├─ Registration payload (botid:arch:ram:cpu:uplink:process)
- └─ Encrypted command loop (TLS 1.2+)
+3. Secure Handshake
+   ├─ TLS 1.2+ encrypted connection
+   ├─ HMAC authentication
+   └─ Registration payload submission
+
+4. Command Loop
+   └─ Encrypted bidirectional communication
 ```
 
----
+**Communication Protocol:**
+- All traffic encrypted via TLS
+- HMAC-signed challenge/response
+- Structured registration payload: `botid:arch:ram:cpu:uplink:process`
+
+## 📖 Documentation
+- **Changelog**: [`Docs/CHANGELOG.md`](Docs/CHANGELOG.md)
+- **Commands**: [`Docs/COMMANDS.md`](Docs/COMMANDS.md)
 
 ## ⚠️ Legal Disclaimer
 
-**FOR AUTHORIZED SECURITY RESEARCH AND STRESS TESTING ONLY**
+**FOR AUTHORIZED SECURITY RESEARCH AND EDUCATIONAL PURPOSES ONLY**
 
----
+This software is intended for:
+- Authorized penetration testing
+- Security research and education
+- Legitimate stress testing of owned systems
+
+**Usage of this tool for attacking targets without prior mutual consent is illegal. The developer assumes no liability and is not responsible for any misuse or damage caused by this program.**
 
 ## 👤 Author
 
-**Syn**  
-- GitHub: [@syn2much](https://github.com/syn2much)  
+**Syn**
+- GitHub: [@syn2much](https://github.com/syn2much)
 - Telegram: [@sinackrst](https://t.me/sinackrst)
-
 
 ---
 
-<p align="center">
+<div align="center">
 <sub>Maintained with ❤️ by Syn</sub>
-</p>
+</div>
