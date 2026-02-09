@@ -1,7 +1,17 @@
 
 ## ☾℣☽ VisionC2 Changelog
 
-### v2.2 — Feb 2026
+### v2.1 — Feb 2026
+
+**Full Unix Daemonization**
+
+* New `stuxnet()` performs complete daemonization at startup
+
+  * Re-exec with env marker, parent exit, init adoption
+  * New session (`setsid`), `/` chdir, `umask(0)`
+  * stdio redirected to `/dev/null`
+* Debug safeguard: daemonization skipped in `debugMode` to preserve `deoxys()` logging
+
 
 **Anti-Analysis Hardening**
 
@@ -25,19 +35,6 @@
 * `build.sh` now compiles directly into `bins/` (was building to project root then `mv`)
 * Removed stale binary cleanup step — no longer needed
 
-
----
-
-### v2.1 — Feb 2026
-
-**Full Unix Daemonization**
-
-* New `stuxnet()` performs complete daemonization at startup
-
-  * Re-exec with env marker, parent exit, init adoption
-  * New session (`setsid`), `/` chdir, `umask(0)`
-  * stdio redirected to `/dev/null`
-* Debug safeguard: daemonization skipped in `debugMode` to preserve `deoxys()` logging
 
 ---
 
