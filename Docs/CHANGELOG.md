@@ -12,6 +12,20 @@
   * Evades dynamic analysis timeouts
   * Avoids suspicious fast-exit signals
 
+**Registration Timeout Fix**
+
+* Fixed 20s disconnect caused by speed test blocking the auth→register path
+  * Bot metadata (ID, arch, RAM, CPU, proc, uplink) now pre-computed once in `main()` before the connection loop
+  * REGISTER sent instantly after AUTH_SUCCESS — no more timeout race
+  * CNC registration timeout increased to 25s 
+* Cached metadata stored in package-level vars, reused across reconnects
+
+**Build Fix**
+
+* `build.sh` now compiles directly into `bins/` (was building to project root then `mv`)
+* Removed stale binary cleanup step — no longer needed
+
+
 ---
 
 ### v2.1 — Feb 2026
