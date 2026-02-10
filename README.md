@@ -35,10 +35,6 @@
 |                            | OS Support      | Linux, Windows, macOS                                 |
 |                            | Deployment      | One-click setup                                       |
 
-
-
-![Animation](https://github.com/user-attachments/assets/bab596ce-5269-42ca-ae97-cae26437ae41)
-
 ## ⚔️ Attack Methods
 
 ### Layer 4 (Network Layer)
@@ -59,6 +55,7 @@
 | CF Bypass       | CloudFlare bypass via session/cookie reuse  |
 | Proxy Support   | All L7 methods support proxy list integration|
 
+![Animation](https://github.com/user-attachments/assets/bab596ce-5269-42ca-ae97-cae26437ae41)
 ## 🚀 Installation
 
 ### Prerequisites
