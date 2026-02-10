@@ -52,6 +52,7 @@
 | HTTP Flood      | GET/POST requests with randomized headers & user-agents      |
 | HTTPS/TLS Flood | TLS handshake exhaustion + burst of full requests            |
 | CF Bypass       | Cloudflare bypass via session/cookie reuse & fingerprinting  |
+| Rapid Reset     | HTTP/2 CVE-2023-44487 — batched HEADERS+RST_STREAM framing  |
 | Proxy Support   | Full proxy list integration for all L7 methods (HTTP/SOCKS5) |
 
 ![Animation](https://github.com/user-attachments/assets/bab596ce-5269-42ca-ae97-cae26437ae41)
