@@ -29,6 +29,7 @@
 |  Attack Methods      | Layer 4 (network) & Layer 7 (application) attack methods                |
 |  Evasion            | Strong anti-analysis & sandbox evasion (HMAC/MD5 Auth, Proc Scan, Debugger Check)                                |
 |  Stealth            | Full Unix daemonization + single-instance enforcement                   |
+|  Persistent          | Automatic Crontabs, startup Scripts, rexecute downloader on reboot                 |
 |  C2 Resilience      | Supports TXT Records, A Records, Direct IP. Never stored in plaintext.    |
 |  Cross-Platform     | Multi-architecture bot binaries (14 targets out-of-the-box)             |
 
