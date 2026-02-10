@@ -3,16 +3,17 @@
 
 # ☾℣☽ VisionC2
 
-> **TLS-encrypted command & control** — 14-arch cross-compilation, raw-socket L4 + HTTP/2 Rapid Reset L7 floods, remote shell, reverse proxy, and a real-time TUI built in Go. One `setup.py`, thousands of agents.
-
-![Vision C2](vision-banner.svg)
----
-
+ > **TLS-encrypted C2 with 14-arch cross-compilation** — Deploy thousands of agents via one `setup.py` to execute L4/L7 DDoS floods, remote shells, and network pivots through a real-time Go TUI
+ ---
 ![Go](https://img.shields.io/badge/Go-1.23.0+-00ADD8?style=for-the-badge&logo=go)
 ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS-009688?style=for-the-badge&logo=linux&logoColor=white)
 ![License](https://img.shields.io/badge/License-GNU%20GPL-blue?style=for-the-badge&logo=go)
 
 [![Architecture](https://img.shields.io/badge/Full_Architecture-Documentation-blueviolet?style=for-the-badge)](Docs/ARCHITECTURE.md)
+[![Changelog](https://img.shields.io/badge/Full_ChangeLog-Documentation-blueviolet?style=for-the-badge)](Docs/CHANGELOG.md)
+
+![Vision C2](vision-banner.svg)
+---
 
 <br>
 </div>
