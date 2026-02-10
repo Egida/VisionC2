@@ -1,41 +1,43 @@
 
 <div align="center">
 
-# Vision C2
+# **Vision C2 Go-based Command & Control framework**
 
-**Vision** is a Go-based Command & Control framework featuring one-click setup, TLS-secured communications, advanced obfuscation techniques, sandbox evasion, and cross-compiled agents for **14+ architectures**.
 
+![Vision C2](vision-banner.svg)
+---
 ![Go](https://img.shields.io/badge/Go-1.23.0+-00ADD8?style=for-the-badge&logo=go)
 ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS-009688?style=for-the-badge&logo=linux&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-4c1?style=for-the-badge)
 
 <br>
 
-![Dashboard Screenshot](https://github.com/user-attachments/assets/9c6d9ada-a8ff-499e-8445-8d8ea2409936)
+
+
 
 </div>
 
-## ✨ Features
+### ✨ Features Overview
 
-### C2 Interface (TUI)
-Built with BubbleTea for intuitive keyboard-controlled navigation:
-- **Dashboard**: Real-time bot count, system resource monitoring (RAM/CPU), download speed, and uptime
-- **Attack Builder**: Configurable attack methods with target and duration controls
-- **Remote Shell**: Interactive shell access (broadcast and per-bot)
-- **SOCKS5 Proxy**: Built-in proxy server management (per-bot)
-- **Help System**: Integrated documentation and command reference
+| Category                   | Feature         | Description                                           |
+| -------------------------- | --------------- | ----------------------------------------------------- |
+| **C2 Interface (TUI)**     | Dashboard       | Live bot count, CPU/RAM usage, download speed, uptime |
+|                            | Attack Builder  | Configure attack method, target, and duration         |
+|                            | Remote Shell    | Interactive shell (broadcast or per-bot)              |
+|                            | SOCKS5 Proxy    | Built-in per-bot proxy management                     |
+|                            | Help System     | Integrated docs and command reference                 |
+| **Security & Obfuscation** | Encrypted Comms | TLS 1.2+ secured channels                             |
+|                            | C2 Obfuscation  | Base64 → XOR → RC4 → checksum                         |
+|                            | Evasion         | Sandbox & VM detection                                |
+|                            | Authentication  | HMAC challenge/response                               |
+|                            | Binary Safety   | No plaintext C2 addresses                             |
+| **Cross-Platform**         | Architectures   | 14+ CPU architectures (Mips,x86,ARM,PPC,ETC)          |
+|                            | OS Support      | Linux, Windows, macOS                                 |
+|                            | Deployment      | One-click setup                                       |
 
-### Security & Obfuscation
-- TLS 1.2+ encrypted communications
-- Multi-layer C2 address obfuscation (Base64 → XOR → RC4 → checksum)
-- Sandbox and VM detection evasion
-- HMAC challenge/response authentication
-- No plaintext C2 addresses in binaries
 
-### Cross-Platform Support
-- **14+ CPU architectures** via Go cross-compilation
-- Native support for Linux, Windows, and macOS
-- One-click setup and deployment
+
+![Animation](https://github.com/user-attachments/assets/bab596ce-5269-42ca-ae97-cae26437ae41)
 
 ## ⚔️ Attack Methods
 
