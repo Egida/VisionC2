@@ -3,7 +3,16 @@
 
 All notable changes to the VisionC2 project are documented in this file.
 
+## [2.2] - 2026-02
 
+### Added
+
+- **HTTP/2 Rapid Reset** attack method (`!rapidreset`) — CVE-2023-44487
+  - Raw h2 framing via `golang.org/x/net/http2` + HPACK encoding
+  - Batched HEADERS + RST_STREAM pairs (100 per flush) for maximum throughput
+  - Automatic reconnection when stream IDs are exhausted
+  - Full proxy CONNECT tunnel support (`-p` / `-pu` flags)
+  - 
 ## [2.1] - 2026-02
 
 ### Added
