@@ -32,6 +32,7 @@
 |  Persistent          | Automatic Crontabs, startup Scripts, rexecute downloader on reboot                 |
 |  C2 Resilience      | Supports TXT Records, A Records, Direct IP. (No Plaintext/Bot Decrypts C2 at runtime)    |
 |  Cross-Platform     | Multi-architecture bot binaries (14 targets out-of-the-box/ Custom UPX Packer included)             |
+|  Auto-Setup      | Prebuilt interactive 1000 line Python Script to automate Config Setup and Build (updates source code)              |
 
 ## ⚔️ Attack Methods
 
