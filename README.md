@@ -1,7 +1,7 @@
 
 <div align="center">
 
-# **Vision C2 Go-based Command & Control framework**
+## **VisionC2 - Go Based C2 & Agent**
 
 
 ![Vision C2](vision-banner.svg)
