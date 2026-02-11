@@ -162,7 +162,6 @@ func revilUplink() float64 {
 	// Small test URLs (fast CDNs)
 	testURLs := []string{
 		"http://speed.cloudflare.com/__down?bytes=1000000",
-		"http://speedtest.tele2.net/1MB.zip",
 	}
 
 	client := &http.Client{
