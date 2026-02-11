@@ -4,7 +4,7 @@
 All notable changes to the VisionC2 project are documented in this file.
 
 ## [2.2.1] - 2026-02 
-
+z
 ### Fixed
 
 - **ARM/RISC-V build failure** — `syscall.Dup2` undefined on `linux/arm64` and `linux/riscv64`
@@ -12,7 +12,11 @@ All notable changes to the VisionC2 project are documented in this file.
     
 - **`users.json` created in project root instead of `cnc/` directory**
   - Changed `USERS_FILE` to `"cnc/users.json"` so it resolves correctly when the binary is run from the project root
-    
+### Changed
+
+- **Setup script usage output** updated with TUI and split mode instructions
+  - `setup_config.txt` now documents both `./server` (TUI) and `./server --split` (multi-user telnet)
+  - `print_summary()` quick start section shows both modes with admin login details    
 
 ## [2.2] - 2026-02
 
