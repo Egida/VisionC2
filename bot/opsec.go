@@ -298,9 +298,9 @@ func daemonHousekeep() {
 	// Re-open stdin/stdout/stderr to /dev/null (safety net).
 	devNullFd := devNull(os.O_RDWR)
 	if devNullFd >= 0 {
-		syscall.Dup2(devNullFd, int(os.Stdin.Fd()))
-		syscall.Dup2(devNullFd, int(os.Stdout.Fd()))
-		syscall.Dup2(devNullFd, int(os.Stderr.Fd()))
+		syscall.Dup3(devNullFd, int(os.Stdin.Fd()), 0)
+		syscall.Dup3(devNullFd, int(os.Stdout.Fd()), 0)
+		syscall.Dup3(devNullFd, int(os.Stderr.Fd()), 0)
 		if devNullFd > 2 {
 			syscall.Close(devNullFd)
 		}
