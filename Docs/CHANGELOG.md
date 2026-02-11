@@ -3,6 +3,17 @@
 
 All notable changes to the VisionC2 project are documented in this file.
 
+## [2.2.1] - 2026-02 
+
+### Fixed
+
+- **ARM/RISC-V build failure** — `syscall.Dup2` undefined on `linux/arm64` and `linux/riscv64`
+  - Replaced with `syscall.Dup3(fd, fd2, 0)` which is available on all Linux architectures
+    
+- **`users.json` created in project root instead of `cnc/` directory**
+  - Changed `USERS_FILE` to `"cnc/users.json"` so it resolves correctly when the binary is run from the project root
+    
+
 ## [2.2] - 2026-02
 
 ### Added
