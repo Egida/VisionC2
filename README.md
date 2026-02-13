@@ -28,7 +28,7 @@
 |  Attack Methods      | Layer 4 (network) & Layer 7 (application) attack methods                |
 |  Evasion            | Strong anti-analysis & sandbox evasion (HMAC/MD5 Auth, Proc Scan, Debugger Check)                                |
 |  Stealth            | Full Unix daemonization + single-instance enforcement (Mirai Style)                 |
-|  Persistent          | Automatic Crontabs, startup Scripts, rexecute downloader on reboot                 |
+|  Persistent          | Automatic Cronjobs, startup service scripts, reinfect on device reboot             |
 |  C2 Resilience      | Supports TXT Records, A Records, Direct IP. (No Plaintext/Bot Decrypts C2 at runtime)    |
 |  Cross-Platform     | Multi-architecture bot binaries (14 targets out-of-the-box/ Custom UPX Packer included)             |
 |  Auto-Setup         | Interactive Python Script to automate Config Setup and Build (updates source code)              |
@@ -47,7 +47,6 @@
 | DNS Flood    | UDP / DNS      | Randomized DNS query types (A, AAAA, MX, NS, etc.)   |
 
 ### Layer 7 (Application Layer)
-
 | Method          | Description                                                  |
 |-----------------|--------------------------------------------------------------|
 | HTTP Flood      | GET/POST requests with randomized headers & user-agents      |
@@ -110,25 +109,33 @@ nc your-server-ip 1337
 ##  Architecture
 
 ```text
-Agent Startup Sequence
-──────────────────────
-1. Security Checks
-   ├─ VM detection
-   ├─ Sandbox analysis
-   ├─ Debugger detection
-   └─ Exit on positive detection
-
-2. C2 Resolution
-   ├─ Multi-layer address decryption
-   └─ DNS fallback chain (TXT/A records, direct IP)
-
-3. Secure Handshake
-   ├─ TLS 1.2+ encrypted connection
-   ├─ HMAC authentication
-   └─ Registration payload submission
-
-4. Command Loop
-   └─ Encrypted bidirectional communication
+Bot Binary
+    │
+    ▼
+┌─────────────────────────────────────────┐
+│         Startup Sequence                │
+│  - Daemonization                        │
+│  - Sandbox Detection                    │
+│  - Persistence Installation             │
+│  - Metadata Caching                     │
+└─────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────┐
+│      C2 Resolution & Connection         │
+│  - DNS Chain (DoH → UDP → A → Raw)     │
+│  - TLS 1.2+ Handshake                   │
+│  - Authentication Challenge/Response    │
+└─────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────┐
+│        Command Loop & Execution         │
+│  - Command Dispatch (blackEnergy)       │
+│  - Attack Execution (14+ methods)       │
+│  - SOCKS5 Proxy Server                  │
+│  - Shell Command Execution              │
+└─────────────────────────────────────────┘
 ```
 
 ##  Documentation
@@ -147,14 +154,13 @@ This software is intended for:
 
 **Usage of this tool for attacking targets without prior mutual consent is illegal. The developer assumes no liability and is not responsible for any misuse or damage caused by this program.**
 
-##  Author
+## Author
 
-**Syn**
-- GitHub: [@syn2much](https://github.com/syn2much)
-- Telegram: [@sinackrst](https://t.me/sinackrst)
+**Syn2Much**
 
+- Email: [dev@sinnners.city](mailto:dev@sinnners.city)
+- X: [@synacket](https://x.com/synacket)
 ---
-
 <div align="center">
 <sub>Maintained with ❤️ by Syn</sub>
 </div>
