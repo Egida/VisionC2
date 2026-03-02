@@ -1,7 +1,7 @@
 
 <div align="center">
 
-# Vision C2 — A Linux bot built to survive Analysis
+ ## Vision C2 - Linux bot with advanced encryption/stealth techniques 
 
 > **14-arch cross-compiled agents. DDoS, RCE, SOCKS5. TLS 1.3 transport. Anti-analysis. Anti-sandbox. Anti-debugger. Full daemon persistence. Zero plaintext in the binary. Driven through a real-time Go TUI**
 
@@ -10,34 +10,28 @@
 
 [![Architecture](https://img.shields.io/badge/Full_Architecture-Documentation-blueviolet?style=for-the-badge)](Docs/ARCHITECTURE.md)
 [![Changelog](https://img.shields.io/badge/Full_ChangeLog-Documentation-blueviolet?style=for-the-badge)](Docs/CHANGELOG.md)
+
+### CNC home screen (BubbleTea)
 <img width="907" height="840" alt="image" src="https://github.com/user-attachments/assets/5013c6de-7ac0-4ef8-9aaa-3900c7558b16" />
 
 </div>
 
 ---
 
-## What chose Vision over some mirai clone?
+## Why chose Vision over other Linux bots?
 
-- **Real anti-analysis.** 40+ VM/sandbox/debugger signatures. Parent process debugger detection. If caught, sleeps 24-27 hours (outlasts every sandbox window) then exits cleanly.
-- **Zero plaintext in the binary.** Every sensitive string is AES-128-CTR encrypted at build time and decrypted only at runtime. The encryption key itself is split across 16 individual XOR byte functions scattered throughout the codebase. 
-- **6-layer C2 address obfuscation.** The server address passes through AES-128-CTR, then a 5-layer decode pipeline: Base64 > XOR rotating key > RC4 stream cipher > byte substitution > MD5 checksum verification. 
-- **HMAC challenge-response registration.** Bots authenticate via MD5-based challenge-response with per-campaign sync tokens. No static credentials on the wire — every handshake is unique.
-- **Multi-method DNS resolution.** DoH TXT records (encrypted, bypasses local DNS monitoring) > UDP TXT records > A record fallback > direct IP. 
-- **Triple-redundant startup.** Systemd service + cron watchdog + rc.local entry. Kill one, the others bring it back.
+- **Layer 7 Attacks** Cloudflare Bypass, Http/2 Rapid Reset Exploit, TLS Bypass, support for proxy list. Good luck finding it else where.
+- **Automated Setup** Python script handles everything, don't even touch the code. Just run and deploy.
+- **TLS Communciation** Courtesy of Golang, Full encrypted bot->c2 session. Blends directly with HTTP/S over port 443.
+- **Real anti-analysis.** 40+ VM/sandbox/debugger signatures. Parent process debugger detection. Sandboxes never even reach the main loop.
+- **Zero plaintext in the binary.** Every sensitive string is AES-128-CTR encrypted at build time and decrypted only at runtime. The encryption key itself is split across 16 individual XOR byte functions scattered throughout the codebase.  
+- **6-layer C2 address obfuscation.** The server address passes through AES-128-CTR, then a 5-layer decode pipeline: Base64 > XOR rotating key > RC4 stream cipher > byte substitution > MD5 checksum verification. A massive improvment over traditional XOR/ChaCha string hiding.
+- **HMAC challenge-response registration.** Bots authenticate via MD5-based challenge-response with per-campaign sync tokens. Prevents replay attacks.
+- **Triple-redundant Persistence.** Systemd service + cron watchdog + rc.local entry. Kill one, the others bring it back.
+- **Full SOCKS5 Proxy.** Complete pivoting with RFC 1929 authentication. Runtime credential updates pushed directly through the TUI — no redeployment needed.
+- **Remote Shell.** Command execution with full output capture. Built-in Linux shortcuts and post-exploit helpers for quick pivoting once you're in.
+- **Daemonized Stealth.** Fork+setsid with disguised process names. Single-instance PID lock prevents duplicate agents from running on the same host.
 
----
-
-## Key Features
-
-| | Feature | Details |
-|---|---|---|
-| **Setup** | Auto-Setup | Python script automates config + cross-compilation for 14 architectures |
-| **Comms** | TLS 1.3 | Port 443, indistinguishable from standard HTTPS traffic |
-| **Proxy** | SOCKS5 | Full pivoting with RFC 1929 auth, runtime credential updates via TUI |
-| **Shell** | Remote Exec | Command execution + output capture, Linux shortcuts & post-exploit helpers |
-| **Evasion** | Multi-Layer | AES-128-CTR strings, split XOR key derivation, 40+ detection signatures |
-| **Stealth** | Daemonized | Fork+setsid, disguised process names, single-instance PID lock |
-| **Startup** | Triple | Systemd + cron + rc.local, hidden dir with auto-download script |
 
 ---
 
