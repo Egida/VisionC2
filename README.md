@@ -1,7 +1,7 @@
 
 <div align="center">
 
- ## Vision C2 - Linux bot with advanced encryption/stealth techniques 
+ ## Vision C2 - Advanced Linux Botnet Framewwork
 
 > **14-arch cross-compiled agents. DDoS, RCE, SOCKS5. TLS 1.3 transport. Anti-analysis. Anti-sandbox. Anti-debugger. Full daemon persistence. Zero plaintext in the binary. Driven through a real-time Go TUI**
 
