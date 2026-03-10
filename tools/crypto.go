@@ -9,6 +9,7 @@
 //   go run tools/crypto.go decrypt-slice <hex>          Decrypt a hex blob to string slice
 //   go run tools/crypto.go generate                    Generate all encrypted blobs for config.go
 //   go run tools/crypto.go verify                      Verify config.go blobs decrypt correctly
+//   go run tools/crypto.go resetconfig                 Reset key + blobs to zero-key source state
 
 package main
 
@@ -19,6 +20,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 )
 
@@ -295,6 +297,159 @@ func cmdVerify() {
 }
 
 // ============================================================================
+// RESETCONFIG — restore source to zero-key state
+// ============================================================================
+
+func aesEncrypt(plaintext, aesKey []byte) string {
+	block, err := aes.NewCipher(aesKey)
+	if err != nil {
+		panic(err)
+	}
+	iv := make([]byte, aes.BlockSize)
+	if _, err := rand.Read(iv); err != nil {
+		panic(err)
+	}
+	ct := make([]byte, len(plaintext))
+	cipher.NewCTR(block, iv).XORKeyStream(ct, plaintext)
+	return hex.EncodeToString(append(iv, ct...))
+}
+
+func aesDecrypt(encrypted, aesKey []byte) []byte {
+	if len(encrypted) <= aes.BlockSize {
+		return nil
+	}
+	block, err := aes.NewCipher(aesKey)
+	if err != nil {
+		return nil
+	}
+	iv := encrypted[:aes.BlockSize]
+	ct := encrypted[aes.BlockSize:]
+	pt := make([]byte, len(ct))
+	cipher.NewCTR(block, iv).XORKeyStream(pt, ct)
+	return pt
+}
+
+var keyFuncNames = []string{
+	"mew", "mewtwo", "celebi", "jirachi", "shaymin", "phione",
+	"manaphy", "victini", "keldeo", "meloetta", "genesect",
+	"diancie", "hoopa", "volcanion", "magearna", "marshadow",
+}
+
+func readKeyFromOpsec(path string) []byte {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", path, err)
+		os.Exit(1)
+	}
+	content := string(data)
+	result := make([]byte, 16)
+	for i, name := range keyFuncNames {
+		pat := regexp.MustCompile(`func\s+` + name + `\s*\(\)\s*byte\s*\{\s*return\s+byte\(0x([0-9A-Fa-f]+)\s*\^\s*0x([0-9A-Fa-f]+)\)`)
+		m := pat.FindStringSubmatch(content)
+		if m == nil {
+			fmt.Fprintf(os.Stderr, "Error: could not find XOR pair for %s in %s\n", name, path)
+			os.Exit(1)
+		}
+		a, _ := hex.DecodeString(m[1])
+		b, _ := hex.DecodeString(m[2])
+		result[i] = a[0] ^ b[0]
+	}
+	return result
+}
+
+func patchOpsecZero(path string) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", path, err)
+		os.Exit(1)
+	}
+	content := string(data)
+	for _, name := range keyFuncNames {
+		pat := regexp.MustCompile(`(func\s+` + name + `\s*\(\)\s*byte\s*\{\s*return\s+byte\()0x[0-9A-Fa-f]+\s*\^\s*0x[0-9A-Fa-f]+(\))`)
+		content = pat.ReplaceAllString(content, "${1}0x00 ^ 0x00${2}")
+	}
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		fmt.Fprintf(os.Stderr, "Error writing %s: %v\n", path, err)
+		os.Exit(1)
+	}
+}
+
+func patchCryptoToolZero(path string) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", path, err)
+		os.Exit(1)
+	}
+	content := string(data)
+	pat := regexp.MustCompile(`0x[0-9A-Fa-f]+\s*\^\s*0x[0-9A-Fa-f]+,(\s*//\s*\w+)`)
+	content = pat.ReplaceAllString(content, "0x00 ^ 0x00,${1}")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		fmt.Fprintf(os.Stderr, "Error writing %s: %v\n", path, err)
+		os.Exit(1)
+	}
+}
+
+func reencryptConfigBlobs(configPath string, oldKey, newKey []byte) {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", configPath, err)
+		os.Exit(1)
+	}
+	content := string(data)
+	pat := regexp.MustCompile(`(hex\.DecodeString\(")([0-9a-fA-F]+)("\))`)
+	count := 0
+	content = pat.ReplaceAllStringFunc(content, func(match string) string {
+		m := pat.FindStringSubmatch(match)
+		blob, err := hex.DecodeString(m[2])
+		if err != nil {
+			return match
+		}
+		plaintext := aesDecrypt(blob, oldKey)
+		if plaintext == nil {
+			return match
+		}
+		newBlob := aesEncrypt(plaintext, newKey)
+		count++
+		return m[1] + newBlob + m[3]
+	})
+	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+		fmt.Fprintf(os.Stderr, "Error writing %s: %v\n", configPath, err)
+		os.Exit(1)
+	}
+	fmt.Printf("Re-encrypted %d blobs\n", count)
+}
+
+func cmdResetConfig() {
+	opsecPath := "bot/opsec.go"
+	configPath := "bot/config.go"
+	cryptoPath := "tools/crypto.go"
+
+	currentKey := readKeyFromOpsec(opsecPath)
+	zeroKey := make([]byte, 16)
+
+	isZero := true
+	for _, b := range currentKey {
+		if b != 0 {
+			isZero = false
+			break
+		}
+	}
+	if isZero {
+		fmt.Println("Key is already zeroed — source is already in default state.")
+		return
+	}
+
+	fmt.Printf("Current key: %s\n", hex.EncodeToString(currentKey))
+	fmt.Println("Resetting to zero-key source state...")
+
+	reencryptConfigBlobs(configPath, currentKey, zeroKey)
+	patchOpsecZero(opsecPath)
+	patchCryptoToolZero(cryptoPath)
+
+	fmt.Println("Done. All files restored to zero-key default state.")
+}
+
+// ============================================================================
 // MAIN
 // ============================================================================
 
@@ -308,6 +463,7 @@ Commands:
   decrypt-slice <hex>           Decrypt a hex blob to null-separated string slice
   generate                      Generate all encrypted blobs for config.go
   verify                        Verify config.go blobs decrypt correctly
+  resetconfig                   Reset key + blobs to zero-key source state
 `)
 	os.Exit(1)
 }
@@ -345,6 +501,8 @@ func main() {
 		cmdGenerate()
 	case "verify":
 		cmdVerify()
+	case "resetconfig":
+		cmdResetConfig()
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\n\n", cmd)
 		usage()
