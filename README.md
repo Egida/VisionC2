@@ -5,7 +5,7 @@
 
 
 > 14-arch cross-compiled agents. DDoS, RCE, SOCKS5 pivoting. TLS 1.3 transport.
-> Anti-analysis, anti-sandbox, anti-debugger. Full daemon persistence.
+> Full AES encryption. Anti-analysis, anti-sandbox, anti-debugger checks. Full daemonized persistence.
 > Zero plaintext in the binary. Driven through a real-time Go TUI.
 
 ![Go](https://img.shields.io/badge/Go-1.24.0+-00ADD8?style=for-the-badge&logo=go)
