@@ -32,7 +32,7 @@
 | **Stealth Driven** | All strings AES-128-CTR encrypted at build time (unique per build split-key derivation). C2 address decoded through a 6-layer pipeline: AES → Base64 → XOR → RC4 → byte-sub → MD5 check. Custom UPX packer obfuscates every binary. |
 | **HMAC Registration** | MD5 challenge-response with per-campaign sync tokens. Replay-proof. |
 | **Triple Persistence** | Systemd + cron watchdog + rc.local. Kill one, the others revive it. |
-| **SOCKS5 Pivoting** | RFC 1929 auth. Credentials updated live through the TUI — no redeploy. |
+| **SOCKS5 Pivoting** | Route SOCKS5 through bot or optionally backconnect through your configured proxy relay endpoints.   |
 | **Remote Shell** | Full output capture. Built-in Linux shortcuts + post-exploit helpers. |
 | **Daemon Stealth** | Fork+setsid, disguised process names, PID lock prevents duplicate agents. |
 | **L7 Arsenal** | Cloudflare bypass, HTTP/2 Rapid Reset (CVE-2023-44487), TLS bypass, proxy list support. |
