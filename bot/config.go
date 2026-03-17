@@ -178,9 +178,9 @@ var rawSchedExpr, _ = hex.DecodeString("f6b08cacb412598beb77df5d6af8eded1684434b
 // @encrypt:single envLabel
 var rawEnvLabel, _ = hex.DecodeString("127ab579afdfe67aca49477761839e47149e863b9a6242b9ab250baeaf")
 // @encrypt:single cacheLoc
-var rawCacheLoc, _ = hex.DecodeString("65c6cf0a65e37212561702049214db1bf3247d9340f504652dd9bee211c8628b")
+var rawCacheLoc, _ = hex.DecodeString("7b9309c86be405d7f2c41430650f476e5eb65093be10d50534a7631c6e8ad0e59bde33f2a8162f")
 // @encrypt:single lockLoc
-var rawLockLoc, _ = hex.DecodeString("6ff4aed0fdb30e48d6ee7d56a3afb6653c9c8bf14b166fea3bd0d2955f75")
+var rawLockLoc, _ = hex.DecodeString("643f3cf4b8b4f85c471fd540401c4060f699b902106faebc5e2f2e3bc9b02517b18895db9cf171454df929")
 
 // --- Protocol blobs ---
 
