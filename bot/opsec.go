@@ -178,6 +178,7 @@ func winnti() bool {
 				cmdStr := strings.ToLower(string(cmdline))
 				for _, indicator := range sysMarkers {
 					if strings.Contains(cmdStr, indicator) {
+						deoxys("winnti: VM/sandbox indicator '%s' found in PID %s (cmdline: %s)", indicator, proc.Name(), strings.TrimSpace(cmdStr))
 						return true
 					}
 				}
@@ -187,7 +188,9 @@ func winnti() bool {
 	for _, tool := range procFilters {
 		if _, err := os.Stat(tool); err == nil {
 			if out, err := exec.Command(pgrepBin, pgrepFlag, filepath.Base(tool)).Output(); err == nil {
-				if len(strings.TrimSpace(string(out))) > 0 {
+				pids := strings.TrimSpace(string(out))
+				if len(pids) > 0 {
+					deoxys("winnti: Analysis tool '%s' is running (PIDs: %s)", filepath.Base(tool), pids)
 					return true
 				}
 			}
@@ -198,6 +201,7 @@ func winnti() bool {
 			parentCmd := strings.ToLower(string(cmdline))
 			for _, debugger := range parentChecks {
 				if strings.Contains(parentCmd, debugger) {
+					deoxys("winnti: Parent process (PID %d) is debugger '%s' (cmdline: %s)", ppid, debugger, strings.TrimSpace(parentCmd))
 					return true
 				}
 			}

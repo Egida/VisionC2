@@ -3,6 +3,15 @@
 
 All notable changes to the VisionC2 project are documented in this file.
 
+## [2.6.1] - 2026-03-17
+
+### Enhanced
+- **Debug logging for sandbox detection** — `winnti()` now logs the specific reason for detection:
+  - VM/sandbox process indicators: logs matched indicator, PID, and cmdline
+  - Analysis tools: logs tool name and PIDs
+  - Debugger parent process: logs parent PID, debugger name, and cmdline
+- Sleep duration is now included in the sandbox-triggered exit log message
+
 ## [2.6.0] - 2026-03-15
 
 ### Added
