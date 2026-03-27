@@ -3,6 +3,18 @@
 
 All notable changes to the VisionC2 project are documented in this file.
 
+## [2.6.4] - 2026-03-27
+
+### Fixed
+- **m30w packer: stop renaming ELF linker symbols** — function names (`upx_main2`, `upxfd_create`, `get_upxfn_path`) are internal symbols resolved by the packer's linker. Renaming them broke i386, ARM, MIPS, and PPC64LE packing. These never appear in packed output. Now packs 11/14 architectures (s390x, MIPS64, MIPS64LE unsupported by UPX itself).
+
+### Added
+- **3-way C2 launcher** — interactive mode selector: TUI, Web Panel (Tor), Telnet. Any combination. Flags: `--tui`, `--web`, `--split`, `--daemon`.
+- **Tor hidden service web panel** — `.onion` web dashboard with username/password login via `users.json` (no token, no space gate). WebSocket shell, bot management, attack control.
+- **loader.sh** — architecture-detecting payload loader mapped to VisionC2 binary names.
+
+---
+
 ## [2.6.3] - 2026-03-27
 
 ### Changed
