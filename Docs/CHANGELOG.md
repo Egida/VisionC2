@@ -3,6 +3,36 @@
 
 All notable changes to the VisionC2 project are documented in this file.
 
+## [2.6.5] - 2026-03-28
+
+### Fixed
+- **Tor web panel: shell output not delivered** — `forwardBotOutputToWebShells()` existed but was never called from the OUTPUT_B64 handler; bot shell output was silently dropped for all web panel sessions
+- **Tor web panel: attack dispatcher sending `!attack undefined`** — API returned wrong field names (`name`/`description`/`layer` instead of `id`/`name`/`desc`/`category`), methods never populated into optgroups; command format was `!attack <method>` instead of `!<method>` which the bot expects
+- **Tor web panel: stop attack sending `!stopattack`** — bot expects `!stop`, not `!stopattack`
+- **Tor web panel: SOCKS status not updating** — no SSE `socks_update` events were ever broadcast; added `trackSocksState()` that intercepts `!socks`/`!stopsocks`/`!socksauth` commands from any source (HTTP API, WebSocket shell) and pushes live status via SSE
+- **Tor web panel: activity tab empty** — `PushActivity()` was never called for bot join/leave events; added calls in `addBotConnection()` and both disconnect paths
+
+### Added
+- **Tor web panel re-enabled** — shell output routing fixed, attack dispatch fixed, SOCKS tracking wired up; removed WIP label and hardcoded disable
+- **Baked relay endpoints in CNC** — `bakedRelayEndpoints` var patched by `setup.py`; new `/api/relays` endpoint returns them as JSON so SOCKS relay dropdowns auto-populate with all relays configured during setup
+- **Baked proxy credentials in CNC** — `bakedProxyUser`/`bakedProxyPass` injected as JS globals into the dashboard; SOCKS launcher pre-fills default username/password from setup.py
+- **SOCKS state on BotConnection** — `socksActive`, `socksRelay`, `socksUser` fields added to struct and `/api/bots` response; web panel shows live SOCKS status per bot
+- **Post-exploit shortcuts in web shell** — Shortcuts button in shell action bar opens a popup menu with Quick Actions (persist, flush firewall, kill logging, kill monitors, etc.) and Recon helpers (system info, open ports, SUID binaries, SSH keys, credentials, etc.)
+- **Bot join/leave activity events** — `PushActivity("join"/leave")` on bot connect and both disconnect paths; activity tab now shows live connection events
+
+### Changed
+- **Removed relay management tab** — relays are baked in via `setup.py`, not managed at runtime; removed tab button, panel HTML, relay CRUD JS, and API endpoints (`/api/relays` POST/DELETE, `/api/relay-api`, `/api/relay-stats`)
+- **Launcher defaults to Tor web panel** — previously defaulted to TUI
+- **Keyboard shortcuts renumbered** — 5=Tasks, 6=Users (was 5=Relays, 6=Tasks, 7=Users)
+- **`setup.py` patches CNC** — `update_cnc_relay_endpoints()` and `update_cnc_proxy_credentials()` added; both full setup and relay-update flows now patch relay endpoints and proxy creds into `cnc/main.go` alongside the bot
+
+### Documentation
+- **README** — added Tor Web Panel navigation section, updated Architecture section
+- **ARCHITECTURE.md** — updated to 3-way operator interface, added web panel section with transport/tabs/features, updated response routing diagram
+- **COMMANDS.md** — added full Tor Web Panel reference covering all 6 tabs, bot popup, web shell, post-exploit shortcuts, SOCKS launcher, keyboard shortcuts; updated quick reference card
+
+---
+
 ## [2.6.4] - 2026-03-27
 
 ### Fixed
