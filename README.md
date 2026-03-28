@@ -1,12 +1,11 @@
 
 <div align="center">
  
-## Vision C2 - Advanced Linux Botnet Framework
+# Vision C2 - Advanced Linux Botnet Framework
 
-
-> 14-arch cross-compiled agents. DDoS, RCE, SOCKS5 pivoting. TLS 1.3 transport.
+> DDoS, RCE, SOCKS5 pivoting. TLS 1.3 transport.
 > Full AES encryption. Anti-analysis, anti-sandbox, anti-debugger checks. Full daemonized persistence.
-> Zero plaintext in the binary. Driven through a real-time Go TUI.
+> Zero plaintext in the binary. Driven through a websocket powered Tor web panel or real-time Go TUI.
 
 [Video Showcasing Full Features + Installation](https://www.youtube.com/watch?v=KkIg24KwpB0)
 
@@ -14,9 +13,10 @@
 ![Platform](https://img.shields.io/badge/Platform-Linux-009688?style=for-the-badge&logo=linux&logoColor=white)
 [![Changelog](https://img.shields.io/badge/Changelog-Documentation-blueviolet?style=for-the-badge)](Docs/CHANGELOG.md)
 
+### VisionC2 now supports Tor Browser 
+<img width="1381" height="780" alt="image" src="https://github.com/user-attachments/assets/ed3bf121-6912-43af-abb3-a008cd9af91a" />
 
 
-<img width="907" height="840" alt="CNC Dashboard (BubbleTea TUI)" src="https://github.com/user-attachments/assets/5013c6de-7ac0-4ef8-9aaa-3900c7558b16" />
 
 </div>
 
@@ -111,6 +111,8 @@ To change the C2 address later: `python3 setup.py` → option `[2]`. Redeploy bo
 
 ### Starting the CNC
 
+<img width="1050" height="723" alt="image" src="https://github.com/user-attachments/assets/43e6343f-4bf6-41a6-b52e-9f9318d44b00" />
+
 ```bash
 ./server              # interactive launcher — pick TUI, Telnet, or both
 ./server --tui        # TUI mode only
@@ -118,7 +120,6 @@ To change the C2 address later: `python3 setup.py` → option `[2]`. Redeploy bo
 ./server --daemon     # Telnet headless (no TUI)
 ```
 
-**Web Panel (Tor)** — WIP, coming soon. Will serve a .onion dashboard with username/password login.
 
 Run in background with `screen -S vision ./server` (detach: `Ctrl+A, D`).
 
@@ -134,16 +135,6 @@ Run in background with `screen -S vision ./server` (detach: `Ctrl+A, D`).
 | `Enter` | Select |
 | `q` / `Esc` | Back / Cancel |
 | `r` | Refresh |
-
-### Dashboard Views
-
-- **🤖 Bot List** — Live bot status. `Enter`=shell, `b`=broadcast, `l`=attack, `i`=info, `p`=persist, `r`=reinstall, `k`=kill
-- **💻 Remote Shell** — Interactive shell to one bot. Tabs: Shell / Shortcuts / Linux helpers. `Ctrl+F`=clear, `Ctrl+P`=persist, `Ctrl+R`=reinstall
-- **📡 Broadcast Shell** — Command all bots. Tabs: Command / Shortcuts. `Ctrl+A`=filter arch, `Ctrl+G`=filter RAM, `Ctrl+B`=limit bots
-- **⚡ Launch Attack** — Select method, target, port, duration → `l` to launch
-- **📊 Ongoing Attacks** — Progress bars + time remaining. `s`=stop all
-- **🧦 Socks Manager** — `s`=quick start (relay), `c`=custom relay, `d`=direct mode, `x`=stop. Default creds: `vision:vision`. Update: `!socksauth <user> <pass>`
-- **📜 Connection Logs** — Bot connect/disconnect history
 
 
 ---
