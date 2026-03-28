@@ -86,7 +86,7 @@ Vision has three components:
 ### Prerequisites
 
 ```bash
-sudo apt update && sudo apt install -y openssl git wget gcc python3 screen
+sudo apt update && sudo apt install -y openssl git wget gcc python3 screen tor
 
 # Go 1.24+
 wget https://go.dev/dl/go1.24.1.linux-amd64.tar.gz
