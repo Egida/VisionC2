@@ -27,38 +27,38 @@ import (
 // Must match the XOR byte functions in bot/opsec.go
 // Patched by setup.py at build time — all zeros until then
 var key = []byte{
-	0x10 ^ 0xF0, // mew         — patched by setup.py
-	0xF4 ^ 0xF1, // mewtwo      — patched by setup.py
-	0x2A ^ 0x99, // celebi      — patched by setup.py
-	0x60 ^ 0x11, // jirachi     — patched by setup.py
-	0xC9 ^ 0x05, // shaymin     — patched by setup.py
-	0x40 ^ 0x88, // phione      — patched by setup.py
-	0x08 ^ 0xCB, // manaphy     — patched by setup.py
-	0x73 ^ 0x38, // victini     — patched by setup.py
-	0x18 ^ 0xB9, // keldeo      — patched by setup.py
-	0xF3 ^ 0x63, // meloetta    — patched by setup.py
-	0x75 ^ 0x57, // genesect    — patched by setup.py
-	0xF7 ^ 0x6E, // diancie     — patched by setup.py
-	0x1C ^ 0x56, // hoopa       — patched by setup.py
-	0xFD ^ 0xE5, // volcanion   — patched by setup.py
-	0xED ^ 0xF2, // magearna    — patched by setup.py
-	0xB3 ^ 0xE5, // marshadow   — patched by setup.py
-	0xFC ^ 0x31, // zeraora     — patched by setup.py
-	0x82 ^ 0x9B, // zarude      — patched by setup.py
-	0x2F ^ 0xF8, // regieleki   — patched by setup.py
-	0xA1 ^ 0xA0, // regidrago   — patched by setup.py
-	0x77 ^ 0x28, // glastrier   — patched by setup.py
-	0xB3 ^ 0x67, // spectrier   — patched by setup.py
-	0xFF ^ 0x99, // calyrex     — patched by setup.py
-	0x9B ^ 0x9B, // wyrdeer     — patched by setup.py
-	0xEF ^ 0xBD, // kleavor     — patched by setup.py
-	0x91 ^ 0x64, // ursaluna    — patched by setup.py
-	0x09 ^ 0xBA, // basculegion — patched by setup.py
-	0x78 ^ 0xE0, // sneasler    — patched by setup.py
-	0x8C ^ 0x5F, // overqwil    — patched by setup.py
-	0xB6 ^ 0xAE, // enamorus    — patched by setup.py
-	0x62 ^ 0x85, // tinkaton    — patched by setup.py
-	0x45 ^ 0x70, // annihilape  — patched by setup.py
+	0xAB ^ 0x38, // mew         — patched by setup.py
+	0x51 ^ 0xF0, // mewtwo      — patched by setup.py
+	0x24 ^ 0xEF, // celebi      — patched by setup.py
+	0x07 ^ 0xEA, // jirachi     — patched by setup.py
+	0xA3 ^ 0x8A, // shaymin     — patched by setup.py
+	0x3E ^ 0x8E, // phione      — patched by setup.py
+	0xA6 ^ 0x4C, // manaphy     — patched by setup.py
+	0x80 ^ 0x6C, // victini     — patched by setup.py
+	0xA9 ^ 0xB4, // keldeo      — patched by setup.py
+	0x68 ^ 0x34, // meloetta    — patched by setup.py
+	0x23 ^ 0xF5, // genesect    — patched by setup.py
+	0x52 ^ 0x8D, // diancie     — patched by setup.py
+	0xE0 ^ 0xDE, // hoopa       — patched by setup.py
+	0xAB ^ 0xC0, // volcanion   — patched by setup.py
+	0xAC ^ 0xF5, // magearna    — patched by setup.py
+	0xAF ^ 0xEE, // marshadow   — patched by setup.py
+	0xCA ^ 0x9B, // zeraora     — patched by setup.py
+	0xB1 ^ 0x14, // zarude      — patched by setup.py
+	0x45 ^ 0xD7, // regieleki   — patched by setup.py
+	0xCF ^ 0x73, // regidrago   — patched by setup.py
+	0x70 ^ 0xDE, // glastrier   — patched by setup.py
+	0x0D ^ 0xD5, // spectrier   — patched by setup.py
+	0x5F ^ 0xC0, // calyrex     — patched by setup.py
+	0x67 ^ 0x88, // wyrdeer     — patched by setup.py
+	0x90 ^ 0x30, // kleavor     — patched by setup.py
+	0x98 ^ 0x41, // ursaluna    — patched by setup.py
+	0x22 ^ 0x24, // basculegion — patched by setup.py
+	0x1F ^ 0x3C, // sneasler    — patched by setup.py
+	0xD2 ^ 0xCA, // overqwil    — patched by setup.py
+	0xB4 ^ 0xDB, // enamorus    — patched by setup.py
+	0x0B ^ 0x91, // tinkaton    — patched by setup.py
+	0xFB ^ 0xE1, // annihilape  — patched by setup.py
 }
 
 // ============================================================================

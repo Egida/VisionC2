@@ -75,26 +75,33 @@ build_for_arch() {
         return 1
     fi
     
-    # Strip symbols (safe size reduction)
-    if command -v strip &> /dev/null; then
-        strip --strip-all "$OUTPUT" 2>/dev/null || echo "strip failed for $arch_name"
-    fi
+    # Strip symbols (Go -s -w already strips, this is just extra — silence failures on cross-arch)
+    strip --strip-all "$OUTPUT" 2>/dev/null
 
     # Compress with m30w packer (zero UPX fingerprint)
     local UPX_BIN="$SCRIPT_DIR/upx"
     if [ -x "$UPX_BIN" ]; then
         local before=$(stat -c%s "$OUTPUT")
+        local bh=$(numfmt --to=iec --suffix=B $before 2>/dev/null || echo "${before}B")
         cp "$OUTPUT" "$OUTPUT.tmp"
-        if "$UPX_BIN" --lzma "$OUTPUT.tmp" >/dev/null 2>&1 && [ -f "$OUTPUT.tmp" ] && [ "$(stat -c%s "$OUTPUT.tmp")" -lt "$before" ]; then
+        if "$UPX_BIN" --lzma "$OUTPUT.tmp" 2>&1 | grep -v "^$\|WARNING\|^\s*$" && [ -f "$OUTPUT.tmp" ] && [ "$(stat -c%s "$OUTPUT.tmp")" -lt "$before" ]; then
             mv "$OUTPUT.tmp" "$OUTPUT"
-        elif cp "$OUTPUT" "$OUTPUT.tmp" && "$UPX_BIN" --best "$OUTPUT.tmp" >/dev/null 2>&1 && [ -f "$OUTPUT.tmp" ] && [ "$(stat -c%s "$OUTPUT.tmp")" -lt "$before" ]; then
+            local after=$(stat -c%s "$OUTPUT")
+            local ah=$(numfmt --to=iec --suffix=B $after 2>/dev/null || echo "${after}B")
+            local pct=$(( (before - after) * 100 / before ))
+            echo "    packed: $bh → $ah ($pct% smaller)"
+        elif cp "$OUTPUT" "$OUTPUT.tmp" && "$UPX_BIN" --best "$OUTPUT.tmp" 2>&1 | grep -v "^$\|WARNING\|^\s*$" && [ -f "$OUTPUT.tmp" ] && [ "$(stat -c%s "$OUTPUT.tmp")" -lt "$before" ]; then
             mv "$OUTPUT.tmp" "$OUTPUT"
+            local after=$(stat -c%s "$OUTPUT")
+            local ah=$(numfmt --to=iec --suffix=B $after 2>/dev/null || echo "${after}B")
+            local pct=$(( (before - after) * 100 / before ))
+            echo "    packed: $bh → $ah ($pct% smaller)"
         else
             rm -f "$OUTPUT.tmp"
-            echo "packing skipped for $arch_name"
+            echo "    packing skipped (unsupported arch)"
         fi
     else
-        echo "ERROR: m30w packer not found at $UPX_BIN"
+        echo "    ERROR: m30w packer not found at $UPX_BIN"
     fi
     INDEX=$((INDEX + 1))
 }

