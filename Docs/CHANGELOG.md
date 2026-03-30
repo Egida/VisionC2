@@ -3,6 +3,11 @@
 
 All notable changes to the VisionC2 project are documented in this file.
 
+## [2.6.6] - 2026-03-30
+
+### Changed
+- **Sandbox detection trimmed** — procFilters reduced from 48 to 3 entries (chkrootkit, rkhunter only). parentChecks reduced from 17 to 3 (gdb, strace, frida only). sysMarkers unchanged. Bot was exiting on any machine running common admin tools like auditd, tcpdump, wireshark, objdump, readelf, etc.
+
 ## [2.6.5] - 2026-03-28
 
 ### Fixed
