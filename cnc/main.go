@@ -41,8 +41,8 @@ const (
 	USER_SERVER_PORT = "420"
 
 	// Authentication  these must match bot
-	MAGIC_CODE       = "6w#3Q$pES%9ziMRX"
-	PROTOCOL_VERSION = "proto59"
+	MAGIC_CODE       = "pdxZ44GL3p4kV@mY"
+	PROTOCOL_VERSION = "v5.9.11"
 )
 
 // bakedRelayEndpoints holds relay addresses patched in by setup.py.
@@ -93,8 +93,9 @@ type Credential struct {
 }
 
 var (
-	ongoingAttacks     = make(map[net.Conn]attack)
+	ongoingAttacks     = make(map[int]attack)
 	ongoingAttacksLock sync.RWMutex
+	ongoingAttackSeq   int
 	botConnections     = make(map[string]*BotConnection)
 	botConnsLock       sync.RWMutex
 	botCount           int

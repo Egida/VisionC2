@@ -332,7 +332,7 @@ func fancyBear(relayAddr, sessionID string) {
 func trickbot(clientConn net.Conn) {
 	defer clientConn.Close()
 	clientConn.SetDeadline(time.Now().Add(30 * time.Second))
-	buf := make([]byte, 513)
+	buf := make([]byte, 514)
 	n, err := clientConn.Read(buf)
 	if err != nil || n < 2 || buf[0] != 0x05 {
 		return

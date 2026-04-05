@@ -90,7 +90,6 @@
                     <option value="!socks" data-cat="network">!socks</option>
                     <option value="!stopsocks" data-cat="network">!stopsocks</option>
                     <option value="!socksauth" data-cat="network">!socksauth</option>
-                    <option value="!info" data-cat="mgmt">!info</option>
                     <option value="!persist" data-cat="mgmt">!persist</option>
                     <option value="!reinstall" data-cat="mgmt">!reinstall</option>
                     <option value="!lolnogtfo" data-cat="mgmt">!kill</option>
@@ -146,7 +145,6 @@
                     <button class="ms-btn" onclick="msOpenShells()">Open Shells</button>
                     <button class="ms-btn" onclick="msCmd('!socks')">Start SOCKS</button>
                     <button class="ms-btn" onclick="msCmd('!persist')">Persist</button>
-                    <button class="ms-btn" onclick="msCmd('!info')">Info</button>
                     <button class="ms-btn ms-btn-danger" onclick="msKill()">Kill</button>
                 </div>
             </div>
@@ -274,6 +272,17 @@
                     <div class="atk-opts" id="atk-opts"></div>
                 </div>
             </div>
+
+            <!-- Live Attacks -->
+            <div class="live-attacks-panel" id="live-attacks-panel">
+                <div class="live-attacks-header">
+                    <span class="live-attacks-title">Live Attacks</span>
+                    <span class="live-attacks-count" id="live-attacks-count">0</span>
+                </div>
+                <div class="live-attacks-list" id="live-attacks-list">
+                    <div style="color:var(--text-dim);padding:12px;font-size:13px">No active attacks</div>
+                </div>
+            </div>
         </div>
 
         <!-- Tab: Activity -->
@@ -324,7 +333,6 @@
                                 <option value="!socks">!socks</option>
                                 <option value="!stopsocks">!stopsocks</option>
                                 <option value="!socksauth">!socksauth</option>
-                                <option value="!info">!info</option>
                                 <option value="!persist">!persist</option>
                                 <option value="!lolnogtfo">!kill</option>
                             </select>

