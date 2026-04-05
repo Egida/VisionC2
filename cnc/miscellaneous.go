@@ -40,10 +40,14 @@ func (user *User) GetLevel() level {
 }
 
 type User struct {
-	Username string    `json:"username,omitempty"`
-	Password string    `json:"password,omitempty"`
-	Expire   time.Time `json:"expire"`
-	Level    string    `json:"level"` // Handle level as a string
+	Username    string    `json:"username,omitempty"`
+	Password    string    `json:"password,omitempty"`
+	Expire      time.Time `json:"expire"`
+	Level       string    `json:"level"`
+	Maxtime     int       `json:"maxtime,omitempty"`
+	Concurrents int       `json:"concurrents,omitempty"`
+	Maxbots     int       `json:"maxbots,omitempty"`
+	Methods     []string  `json:"methods,omitempty"`
 }
 
 func AuthUser(username string, password string) (bool, *User) {

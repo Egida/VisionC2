@@ -711,28 +711,191 @@ func handleSSE(w http.ResponseWriter, r *http.Request) {
 // USERS / RELAYS / TASKS API (stub endpoints for dashboard)
 // ============================================================================
 
-func handleAPIUsers(w http.ResponseWriter, r *http.Request) {
-	usersData, err := os.ReadFile(usersFile)
+func loadUsers() ([]User, error) {
+	data, err := os.ReadFile(usersFile)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, []interface{}{})
-		return
+		return nil, err
 	}
 	var users []User
-	if err := json.Unmarshal(usersData, &users); err != nil {
-		writeJSON(w, http.StatusInternalServerError, []interface{}{})
-		return
+	if err := json.Unmarshal(data, &users); err != nil {
+		return nil, err
 	}
-	type safeUser struct {
-		Username string `json:"username"`
-		Level    string `json:"level"`
-		Expire   string `json:"expire"`
+	return users, nil
+}
+
+func saveUsers(users []User) error {
+	data, err := json.MarshalIndent(users, "", "    ")
+	if err != nil {
+		return err
 	}
-	safe := make([]safeUser, len(users))
-	for i, u := range users {
-		safe[i] = safeUser{Username: u.Username, Level: u.Level, Expire: u.Expire.Format(time.RFC3339)}
+	return os.WriteFile(usersFile, data, 0644)
+}
+
+func handleAPIUsers(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case "GET":
+		users, err := loadUsers()
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"error": err.Error()})
+			return
+		}
+		type safeUser struct {
+			Username    string   `json:"username"`
+			Level       string   `json:"level"`
+			Expire      string   `json:"expire"`
+			Maxtime     int      `json:"maxtime"`
+			Concurrents int      `json:"concurrents"`
+			Maxbots     int      `json:"maxbots"`
+			Methods     []string `json:"methods"`
+		}
+		safe := make([]safeUser, len(users))
+		for i, u := range users {
+			safe[i] = safeUser{
+				Username: u.Username, Level: u.Level,
+				Expire: u.Expire.Format(time.RFC3339),
+				Maxtime: u.Maxtime, Concurrents: u.Concurrents,
+				Maxbots: u.Maxbots, Methods: u.Methods,
+			}
+		}
+		writeJSON(w, http.StatusOK, safe)
+
+	case "POST":
+		var req struct {
+			Username    string   `json:"username"`
+			Password    string   `json:"password"`
+			Level       string   `json:"level"`
+			Expire      string   `json:"expire"`
+			Maxtime     int      `json:"maxtime"`
+			Concurrents int      `json:"concurrents"`
+			Maxbots     int      `json:"maxbots"`
+			Methods     []string `json:"methods"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"success": false, "error": "invalid json"})
+			return
+		}
+		if req.Username == "" || req.Password == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"success": false, "error": "username and password required"})
+			return
+		}
+		users, err := loadUsers()
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"success": false, "error": err.Error()})
+			return
+		}
+		for _, u := range users {
+			if u.Username == req.Username {
+				writeJSON(w, http.StatusConflict, map[string]interface{}{"success": false, "error": "user already exists"})
+				return
+			}
+		}
+		expire, _ := time.Parse(time.RFC3339, req.Expire)
+		if expire.IsZero() {
+			expire, _ = time.Parse("2006-01-02", req.Expire)
+		}
+		if expire.IsZero() {
+			expire = time.Now().AddDate(0, 1, 0)
+		}
+		users = append(users, User{
+			Username: req.Username, Password: req.Password,
+			Level: req.Level, Expire: expire,
+			Maxtime: req.Maxtime, Concurrents: req.Concurrents,
+			Maxbots: req.Maxbots, Methods: req.Methods,
+		})
+		if err := saveUsers(users); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"success": false, "error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]interface{}{"success": true})
+
+	case "PUT":
+		var req struct {
+			Username    string   `json:"username"`
+			Password    string   `json:"password"`
+			Level       string   `json:"level"`
+			Expire      string   `json:"expire"`
+			Maxtime     int      `json:"maxtime"`
+			Concurrents int      `json:"concurrents"`
+			Maxbots     int      `json:"maxbots"`
+			Methods     []string `json:"methods"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"success": false, "error": "invalid json"})
+			return
+		}
+		users, err := loadUsers()
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"success": false, "error": err.Error()})
+			return
+		}
+		found := false
+		for i, u := range users {
+			if u.Username == req.Username {
+				if req.Password != "" {
+					users[i].Password = req.Password
+				}
+				if req.Level != "" {
+					users[i].Level = req.Level
+				}
+				if req.Expire != "" {
+					if t, err := time.Parse(time.RFC3339, req.Expire); err == nil {
+						users[i].Expire = t
+					} else if t, err := time.Parse("2006-01-02", req.Expire); err == nil {
+						users[i].Expire = t
+					}
+				}
+				users[i].Maxtime = req.Maxtime
+				users[i].Concurrents = req.Concurrents
+				users[i].Maxbots = req.Maxbots
+				users[i].Methods = req.Methods
+				found = true
+				break
+			}
+		}
+		if !found {
+			writeJSON(w, http.StatusNotFound, map[string]interface{}{"success": false, "error": "user not found"})
+			return
+		}
+		if err := saveUsers(users); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"success": false, "error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]interface{}{"success": true})
+
+	case "DELETE":
+		var req struct {
+			Username string `json:"username"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"success": false, "error": "invalid json"})
+			return
+		}
+		users, err := loadUsers()
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"success": false, "error": err.Error()})
+			return
+		}
+		found := false
+		for i, u := range users {
+			if u.Username == req.Username {
+				users = append(users[:i], users[i+1:]...)
+				found = true
+				break
+			}
+		}
+		if !found {
+			writeJSON(w, http.StatusNotFound, map[string]interface{}{"success": false, "error": "user not found"})
+			return
+		}
+		if err := saveUsers(users); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"success": false, "error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]interface{}{"success": true})
+
+	default:
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]interface{}{"error": "method not allowed"})
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(safe)
 }
 
 // handleAPIRelays returns the baked-in relay endpoints from setup.py.
