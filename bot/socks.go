@@ -185,11 +185,11 @@ func cozyBear(relays []string) {
 					return
 				case <-time.After(backoff):
 				}
-				// Increase backoff up to 60s
-				if backoff < 60*time.Second {
-					backoff = backoff * 2
-					if backoff > 60*time.Second {
-						backoff = 60 * time.Second
+				// Increase backoff up to 30s
+				if backoff < 30*time.Second {
+					backoff += 3 * time.Second
+					if backoff > 30*time.Second {
+						backoff = 30 * time.Second
 					}
 				}
 			} else {

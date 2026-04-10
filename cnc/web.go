@@ -1013,10 +1013,10 @@ func handleAPIAttackMethods(w http.ResponseWriter, r *http.Request) {
 		{"ack", "ACK Flood", "ACK packet flood", "tcp"},
 		{"gre", "GRE Flood", "GRE tunnel flood", "l3"},
 		{"dns", "DNS Amplification", "DNS amplification flood", "udp"},
-		{"http", "HTTP Flood", "HTTP GET/POST flood", "tcp"},
-		{"https", "HTTPS Flood", "HTTPS/TLS flood", "tcp"},
-		{"cfbypass", "CF Bypass", "Cloudflare bypass", "tcp"},
-		{"rapidreset", "Rapid Reset", "HTTP/2 Rapid Reset", "tcp"},
+		{"http", "HTTP Flood", "HTTP GET/POST flood", "l7"},
+		{"https", "HTTPS Flood", "HTTPS/TLS flood", "l7"},
+		{"cfbypass", "CF Bypass", "Cloudflare bypass", "l7"},
+		{"rapidreset", "Rapid Reset", "HTTP/2 Rapid Reset", "l7"},
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(methods)

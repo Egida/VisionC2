@@ -84,13 +84,14 @@ build_for_arch() {
         local before=$(stat -c%s "$OUTPUT")
         local bh=$(numfmt --to=iec --suffix=B $before 2>/dev/null || echo "${before}B")
         cp "$OUTPUT" "$OUTPUT.tmp"
+        chmod 755 "$OUTPUT.tmp"
         if "$UPX_BIN" --lzma "$OUTPUT.tmp" 2>&1 | grep -v "^$\|WARNING\|^\s*$" && [ -f "$OUTPUT.tmp" ] && [ "$(stat -c%s "$OUTPUT.tmp")" -lt "$before" ]; then
             mv "$OUTPUT.tmp" "$OUTPUT"
             local after=$(stat -c%s "$OUTPUT")
             local ah=$(numfmt --to=iec --suffix=B $after 2>/dev/null || echo "${after}B")
             local pct=$(( (before - after) * 100 / before ))
             echo "    packed: $bh → $ah ($pct% smaller)"
-        elif cp "$OUTPUT" "$OUTPUT.tmp" && "$UPX_BIN" --best "$OUTPUT.tmp" 2>&1 | grep -v "^$\|WARNING\|^\s*$" && [ -f "$OUTPUT.tmp" ] && [ "$(stat -c%s "$OUTPUT.tmp")" -lt "$before" ]; then
+        elif cp "$OUTPUT" "$OUTPUT.tmp" && chmod 755 "$OUTPUT.tmp" && "$UPX_BIN" --best "$OUTPUT.tmp" 2>&1 | grep -v "^$\|WARNING\|^\s*$" && [ -f "$OUTPUT.tmp" ] && [ "$(stat -c%s "$OUTPUT.tmp")" -lt "$before" ]; then
             mv "$OUTPUT.tmp" "$OUTPUT"
             local after=$(stat -c%s "$OUTPUT")
             local ah=$(numfmt --to=iec --suffix=B $after 2>/dev/null || echo "${after}B")

