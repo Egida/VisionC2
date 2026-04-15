@@ -3,6 +3,22 @@
 
 All notable changes to the VisionC2 project are documented in this file.
 
+## [2.8.7] - 2026-04-15
+
+### Added
+- **Relay stats push** — relay binary now accepts `-c2 <url>`, `-interval <s>`, and `-name <id>` flags; when `-c2` is set, a `pushStatsLoop()` goroutine POSTs live stats (active connections, total sessions, bytes up/down, failed sessions, connected bots, uptime) to the CNC `/api/relay-report` endpoint every `interval` seconds; authenticated via `X-Relay-Key` header
+- **`/api/relay-report` endpoint (CNC)** — unauthenticated-to-relays POST endpoint that accepts stats payloads and caches them in memory per relay name; relays not seen in 90s are marked `Up: false`
+- **`/api/relays/stats` endpoint (CNC)** — merges relay list from `relays.json` with latest cached stats; consumed by dashboard every 15s
+- **`POST /api/relays` and `DELETE /api/relays`** — runtime add/remove relay endpoints; persisted to `cnc/db/relays.json`
+- **Dashboard relay health cards** — SOCKS tab now shows a live card per relay: status dot, active connections, total sessions, bandwidth up/down, connected bots, uptime, last seen, and the exact `-c2` flag command to start the relay binary; updates every 15s
+- **`cnc/db/` directory** — new JSON database folder for all runtime-managed state; starts with `relays.json`
+
+### Changed
+- **Relay endpoints no longer baked into bot binary** — `rawRelayEndpoints` encrypted blob and `relayEndpoints` var removed from `bot/config.go`; `!socks` now requires an explicit relay address or port — `!socks` with no args returns a usage error
+- **`setup.py` relay prompt removed** — relay endpoints are no longer asked for or written during any setup option; option 3 updated to reflect dashboard management; summary output updated
+- **`bakedRelayEndpoints` var removed from `cnc/main.go`** — replaced by `loadRelaysFromDisk()` / `saveRelaysToDisk()` backed by `cnc/db/relays.json`
+- **PROXY.md fully rewritten** — reflects runtime relay management, new relay flags, stats push setup, dashboard instructions
+
 ## [2.8.6] - 2026-04-15
 
 ### Changed

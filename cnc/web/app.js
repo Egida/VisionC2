@@ -1186,9 +1186,109 @@ function populateRelayDropdown() {
   }).catch(function () { });
 }
 
-function loadRelays() {}
-function loadRelayAPIStatus() {}
-function loadRelayStats() {}
+function loadRelays() { loadRelayStats(); }
+function loadRelayAPIStatus() { loadRelayStats(); }
+
+function loadRelayStats() {
+  fetch('/api/relays/stats')
+    .then(function (r) { return r.json(); })
+    .then(renderRelayHealthCards)
+    .catch(function () {});
+}
+
+function relayBytesStr(b) {
+  if (!b) return '0 B';
+  if (b >= 1073741824) return (b / 1073741824).toFixed(2) + ' GB';
+  if (b >= 1048576) return (b / 1048576).toFixed(2) + ' MB';
+  if (b >= 1024) return (b / 1024).toFixed(2) + ' KB';
+  return b + ' B';
+}
+
+function renderRelayHealthCards(relays) {
+  var wrap = document.getElementById('socks-relay-health');
+  if (!wrap) return;
+  if (!relays || !relays.length) {
+    wrap.innerHTML =
+      '<div class="relay-empty">' +
+      '<span>No relays configured</span>' +
+      '<button class="relay-add-btn" onclick="showAddRelayModal()" data-tooltip="Add a relay server to the pool">+ Add Relay</button>' +
+      '</div>';
+    return;
+  }
+  var html = '<div class="relay-health-grid">';
+  relays.forEach(function (r) {
+    var up = r.up;
+    var dotCls = up ? 'sse-connected' : 'sse-disconnected';
+    var uptime = r.uptimeSecs ? fmtUptimeSecs(r.uptimeSecs) : '—';
+    var lastSeen = r.lastSeen ? ago(r.lastSeen) : 'never';
+    html +=
+      '<div class="relay-health-card">' +
+      '<div class="rhc-header">' +
+      '<span class="sse-indicator ' + dotCls + '" style="margin-right:8px"></span>' +
+      '<span class="rhc-name">' + escHtml(r.name || '—') + '</span>' +
+      '<span class="rhc-host">' + escHtml(r.host || '') + ':' + escHtml(r.socksPort || '1080') + '</span>' +
+      '<button class="rhc-remove" onclick="removeRelay(\'' + escHtml(r.id) + '\')" data-tooltip="Remove this relay">&times;</button>' +
+      '</div>' +
+      '<div class="rhc-stats">' +
+      '<div class="rhc-stat"><span class="rhc-stat-label">Active</span><span class="rhc-stat-val">' + (r.activeConns || 0) + '</span></div>' +
+      '<div class="rhc-stat"><span class="rhc-stat-label">Total sessions</span><span class="rhc-stat-val">' + (r.totalSessions || 0) + '</span></div>' +
+      '<div class="rhc-stat"><span class="rhc-stat-label">Bots</span><span class="rhc-stat-val">' + (r.connectedBots || 0) + '</span></div>' +
+      '<div class="rhc-stat"><span class="rhc-stat-label">Up ↑</span><span class="rhc-stat-val">' + relayBytesStr(r.bytesUp) + '</span></div>' +
+      '<div class="rhc-stat"><span class="rhc-stat-label">Down ↓</span><span class="rhc-stat-val">' + relayBytesStr(r.bytesDown) + '</span></div>' +
+      '<div class="rhc-stat"><span class="rhc-stat-label">Failed</span><span class="rhc-stat-val">' + (r.failedSessions || 0) + '</span></div>' +
+      '<div class="rhc-stat"><span class="rhc-stat-label">Uptime</span><span class="rhc-stat-val">' + uptime + '</span></div>' +
+      '<div class="rhc-stat"><span class="rhc-stat-label">Last seen</span><span class="rhc-stat-val">' + lastSeen + '</span></div>' +
+      '</div>' +
+      '<div class="rhc-footer">' +
+      '<code class="rhc-cmd">-c2 ' + location.origin + '/api/relay-report -name ' + escHtml(r.name || 'relay') + '</code>' +
+      '</div>' +
+      '</div>';
+  });
+  html += '<button class="relay-add-btn" onclick="showAddRelayModal()" data-tooltip="Add a relay server to the pool">+ Add Relay</button>';
+  html += '</div>';
+  wrap.innerHTML = html;
+}
+
+function fmtUptimeSecs(s) {
+  if (s < 60) return s + 's';
+  if (s < 3600) return Math.floor(s / 60) + 'm ' + (s % 60) + 's';
+  var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+  return h + 'h ' + m + 'm';
+}
+
+function removeRelay(id) {
+  fetch('/api/relays?id=' + encodeURIComponent(id), { method: 'DELETE' })
+    .then(function (r) { return r.json(); })
+    .then(function () { loadRelayStats(); showToast('Relay removed', true); })
+    .catch(function () { showToast('Failed to remove relay', false); });
+}
+
+function showAddRelayModal() {
+  showUrlInput({
+    title: 'Add Relay',
+    message: 'Enter the relay address. The relay binary will connect to this CNC to push stats.',
+    placeholder: 'relay.example.com',
+    required: true,
+    confirmText: 'Add',
+    icon: 'warn',
+    confirmClass: 'ok',
+    onConfirm: function (host) {
+      var parts = host.split(':');
+      var body = {
+        host: parts[0],
+        controlPort: parts[1] || '9001',
+        socksPort: parts[2] || '1080'
+      };
+      fetch('/api/relays', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      }).then(function (r) { return r.json(); })
+        .then(function () { loadRelayStats(); showToast('Relay added', true); })
+        .catch(function () { showToast('Failed to add relay', false); });
+    }
+  });
+}
 
 function humanBytes(b) {
   if (b < 1024) return b + ' B';
@@ -2857,6 +2957,10 @@ function loadLiveAttacks() {
 }
 setInterval(loadLiveAttacks, 2000);
 loadLiveAttacks();
+
+// Relay stats — refresh every 15s in background
+setInterval(loadRelayStats, 15000);
+loadRelayStats();
 
 // ===========================================================================
 // TASKS

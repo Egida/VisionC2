@@ -319,11 +319,17 @@ User ──[SOCKS5]──▶ 🤖 Bot:1080 ──▶ 🎯 Target
 | **Data Channel** | `fancyBear()` | Per-session relay connection |
 | **Protocol** | `trickbot()` | SOCKS5 v/username/IPv4/IPv6 |
 
-> **🔥 Failover:** Bots rotate through relay list with exponential backoff (5s → 60s max).
+> **🔥 Failover:** Bots rotate through relay list with exponential backoff (5s → 60s max). Relay address always supplied at runtime — nothing baked in the binary.
+
+**🗄️ Relay Management:**
+- Relay list stored in `cnc/db/relays.json` — managed via CNC dashboard at runtime
+- Relay binary pushes live stats to CNC via `-c2 <url> -interval <s>` flags
+- Dashboard SOCKS tab shows relay health cards: active connections, bandwidth, bot count, uptime
+- Add/remove relays from dashboard without rebuilding anything
 
 **🔐 Authentication:**
 - Username/password auth (RFC 1929) when credentials set
-- Falls back to no-auth when credentials empty
+- Auto-generated 12-char credentials per build (setup.py)
 - Runtime credential updates via `!socksauth`
 
 ---
@@ -399,8 +405,7 @@ VisionC2/
 1. **🐛 Debug Mode** — Enable/disable verbose logging
 2. **🌐 C2 Configuration** — Set IP/domain + admin port  
 3. **🔐 Security Tokens** — Generate syncToken + buildTag + configSeed
-4. **🔁 Relay Endpoints** — Configure backconnect SOCKS5 relays
-5. **👤 SOCKS5 Credentials** — Set default proxy auth
+4. **👤 SOCKS5 Credentials** — Auto-generated 12-char random per build
 6. **🔒 C2 Obfuscation** — 6-layer encoding + AES encryption
 7. **🔑 Key Generation** — Fresh AES key + XOR byte randomization
 8. **📝 Config Encryption** — Encrypt all sensitive strings
@@ -410,7 +415,7 @@ VisionC2/
 
 **🔄 Quick Options:**
 - **Option 2**: Update C2 address only (keep tokens/certs)
-- **Option 3**: Update relay endpoints + SOCKS5 credentials
+- **Option 3**: Update SOCKS5 credentials + re-encrypt config blobs (relay endpoints managed via dashboard)
 
 > **💾 Output:** Binaries in `bins/`, certificates in `cnc/certificates/`, config summary in `setup_config.txt`
 
