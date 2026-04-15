@@ -19,6 +19,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"os"
 	"regexp"
 	"strings"
@@ -27,38 +28,38 @@ import (
 // Must match the XOR byte functions in bot/opsec.go
 // Patched by setup.py at build time — all zeros until then
 var key = []byte{
-	0x5B ^ 0xB8, // mew         — patched by setup.py
-	0x6F ^ 0xF6, // mewtwo      — patched by setup.py
-	0x28 ^ 0xE6, // celebi      — patched by setup.py
-	0x57 ^ 0xE1, // jirachi     — patched by setup.py
-	0xBD ^ 0x48, // shaymin     — patched by setup.py
-	0x61 ^ 0xB7, // phione      — patched by setup.py
-	0x6C ^ 0x81, // manaphy     — patched by setup.py
-	0x23 ^ 0x47, // victini     — patched by setup.py
-	0x19 ^ 0xF2, // keldeo      — patched by setup.py
-	0xE9 ^ 0x5D, // meloetta    — patched by setup.py
-	0x0D ^ 0xCF, // genesect    — patched by setup.py
-	0xD8 ^ 0xE0, // diancie     — patched by setup.py
-	0x84 ^ 0x7F, // hoopa       — patched by setup.py
-	0x56 ^ 0x83, // volcanion   — patched by setup.py
-	0x2A ^ 0x5C, // magearna    — patched by setup.py
-	0x3F ^ 0xD8, // marshadow   — patched by setup.py
-	0x5B ^ 0xE1, // zeraora     — patched by setup.py
-	0xB2 ^ 0xEB, // zarude      — patched by setup.py
-	0x61 ^ 0xE7, // regieleki   — patched by setup.py
-	0xF9 ^ 0x06, // regidrago   — patched by setup.py
-	0x93 ^ 0x17, // glastrier   — patched by setup.py
-	0x69 ^ 0x30, // spectrier   — patched by setup.py
-	0x0F ^ 0xF8, // calyrex     — patched by setup.py
-	0x16 ^ 0xD8, // wyrdeer     — patched by setup.py
-	0x69 ^ 0x7E, // kleavor     — patched by setup.py
-	0x4E ^ 0x05, // ursaluna    — patched by setup.py
-	0xAD ^ 0x52, // basculegion — patched by setup.py
-	0x1D ^ 0xC0, // sneasler    — patched by setup.py
-	0x76 ^ 0x18, // overqwil    — patched by setup.py
-	0x3A ^ 0x2C, // enamorus    — patched by setup.py
-	0x19 ^ 0xB4, // tinkaton    — patched by setup.py
-	0x84 ^ 0x91, // annihilape  — patched by setup.py
+	0xD2 ^ 0x1A, // mew         — patched by setup.py
+	0x1A ^ 0x05, // mewtwo      — patched by setup.py
+	0x3E ^ 0xD4, // celebi      — patched by setup.py
+	0x29 ^ 0xE3, // jirachi     — patched by setup.py
+	0x3C ^ 0x9B, // shaymin     — patched by setup.py
+	0xC4 ^ 0x61, // phione      — patched by setup.py
+	0x57 ^ 0x7F, // manaphy     — patched by setup.py
+	0x4D ^ 0x1F, // victini     — patched by setup.py
+	0x48 ^ 0x6D, // keldeo      — patched by setup.py
+	0x04 ^ 0x38, // meloetta    — patched by setup.py
+	0xEA ^ 0x5F, // genesect    — patched by setup.py
+	0x2D ^ 0xA5, // diancie     — patched by setup.py
+	0x7C ^ 0x80, // hoopa       — patched by setup.py
+	0x71 ^ 0xF0, // volcanion   — patched by setup.py
+	0xF9 ^ 0x1A, // magearna    — patched by setup.py
+	0x68 ^ 0x19, // marshadow   — patched by setup.py
+	0x41 ^ 0x4D, // zeraora     — patched by setup.py
+	0x83 ^ 0x23, // zarude      — patched by setup.py
+	0xF6 ^ 0x03, // regieleki   — patched by setup.py
+	0x2D ^ 0x22, // regidrago   — patched by setup.py
+	0x87 ^ 0x43, // glastrier   — patched by setup.py
+	0x51 ^ 0x88, // spectrier   — patched by setup.py
+	0x6C ^ 0xD6, // calyrex     — patched by setup.py
+	0x12 ^ 0x4D, // wyrdeer     — patched by setup.py
+	0xEC ^ 0x7E, // kleavor     — patched by setup.py
+	0x24 ^ 0x0E, // ursaluna    — patched by setup.py
+	0x1E ^ 0x5A, // basculegion — patched by setup.py
+	0xE3 ^ 0x79, // sneasler    — patched by setup.py
+	0x23 ^ 0x55, // overqwil    — patched by setup.py
+	0xFD ^ 0xAA, // enamorus    — patched by setup.py
+	0x1B ^ 0x11, // tinkaton    — patched by setup.py
+	0x58 ^ 0xA3, // annihilape  — patched by setup.py
 }
 
 // ============================================================================
@@ -68,11 +69,11 @@ var key = []byte{
 func encrypt(plaintext string) string {
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		panic(err)
+		log.Fatalf("encrypt: aes.NewCipher: %v", err)
 	}
 	iv := make([]byte, aes.BlockSize)
 	if _, err := rand.Read(iv); err != nil {
-		panic(err)
+		log.Fatalf("encrypt: rand.Read: %v", err)
 	}
 	ct := make([]byte, len(plaintext))
 	cipher.NewCTR(block, iv).XORKeyStream(ct, []byte(plaintext))
@@ -207,11 +208,11 @@ func cmdVerify() {
 func aesEncrypt(plaintext, aesKey []byte) string {
 	block, err := aes.NewCipher(aesKey)
 	if err != nil {
-		panic(err)
+		log.Fatalf("aesEncrypt: aes.NewCipher: %v", err)
 	}
 	iv := make([]byte, aes.BlockSize)
 	if _, err := rand.Read(iv); err != nil {
-		panic(err)
+		log.Fatalf("aesEncrypt: rand.Read: %v", err)
 	}
 	ct := make([]byte, len(plaintext))
 	cipher.NewCTR(block, iv).XORKeyStream(ct, plaintext)

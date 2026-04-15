@@ -50,14 +50,22 @@ func loadTLSConfig() *tls.Config {
 	}
 
 	if !loaded {
+		cwd, _ := os.Getwd()
 		fmt.Printf("[FATAL] Failed to load TLS certificates: %v\n", err)
-		fmt.Println("[FATAL] Make sure server.crt and server.key exist in ./cnc/certificates/ or ./certificates/")
+		fmt.Printf("[FATAL] Working directory: %s\n", cwd)
+		fmt.Println("[FATAL] Expected one of:")
+		for _, p := range certPaths {
+			fmt.Printf("[FATAL]   %s + %s\n", p.cert, p.key)
+		}
+		fmt.Println("[FATAL] Generate with: openssl req -x509 -newkey rsa:4096 -nodes \\")
+		fmt.Println("[FATAL]   -keyout certificates/server.key -out certificates/server.crt -days 365 -subj '/CN=cnc'")
 		os.Exit(1)
 	}
 
 	return &tls.Config{
 		Certificates: []tls.Certificate{cert},
 		MinVersion:   tls.VersionTLS12,
+		MaxVersion:   tls.VersionTLS13,
 		CurvePreferences: []tls.CurveID{
 			tls.X25519,    // Modern, fast elliptic curve
 			tls.CurveP256, // Fallback NIST curve
