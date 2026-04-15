@@ -415,6 +415,10 @@ body::before {
   color: var(--text);
 }
 
+.tab:focus {
+  outline: none;
+}
+
 .tab.active {
   color: var(--accent);
 }
