@@ -8,13 +8,13 @@
 <tr>
 <td width="50%">
 
- **Modular Bot Builds**                                                                                                                                                                                                                                                                       Per-build module selection via Go build tags — attacks, SOCKS, or shell-only. Bots advertise capabilities on join; commands only route to bots that can execute them.
+ **Modular Bot Builds**                                                                                                                                                                                                                                                                      Per-build module selection via Go build tags — attacks, SOCKS, or shell-only. Bots advertise capabilities on join; commands only route to bots that can execute them.
 
 </td>
 <td width="50%">
 
 **Fully Static Binaries**
-Built with `CGO_ENABLED=0` — no glibc dependency, no libc at all. Every binary runs on any Linux kernel: ancient routers, uClibc embedded devices, minimal containers. All 14 architectures produce a `statically linked` ELF.
+Every binary runs on any Linux kernel: ancient routers, uClibc embedded devices, minimal containers. All 14 architectures produce a `statically linked` ELF.
 
 </td>
 </tr>
