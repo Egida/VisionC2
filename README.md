@@ -17,7 +17,7 @@
 [![Go](https://img.shields.io/badge/Go-1.24+-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://go.dev)
 [![Platform](https://img.shields.io/badge/Platform-Linux-009688?style=for-the-badge&logo=linux&logoColor=white)]()
 [![Architectures](https://img.shields.io/badge/Architectures-14-blueviolet?style=for-the-badge)](#deploying-bots)
-[![License](https://img.shields.io/badge/License-Educational_Use_Only-red?style=for-the-badge)](#legal-disclaimer)
+[![Changelog](https://img.shields.io/badge/Changelog-Docs-f59e0b?style=for-the-badge)](Docs/CHANGELOG.md)
 
 <br>
 
