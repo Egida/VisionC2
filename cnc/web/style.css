@@ -1181,6 +1181,16 @@ tr.bot-row:hover td {
   background: var(--bg-card-hover);
 }
 
+tr.bot-row.shell-bg-active td {
+  border-left: 2px solid var(--accent);
+}
+tr.bot-row.shell-bg-active td:first-child::after {
+  content: ' ●';
+  color: var(--accent);
+  font-size: 0.65em;
+  vertical-align: super;
+}
+
 .country-badge {
   background: var(--bg-elevated);
   padding: 3px 10px;
@@ -2690,12 +2700,12 @@ tr.bot-row:hover td {
   overflow-y: auto;
   padding: 10px 14px;
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: var(--shell-font-size, 13px);
   white-space: pre-wrap;
   word-break: break-all;
-  color: var(--text);
+  color: var(--term-fg, var(--text));
   line-height: 1.6;
-  background: var(--bg-base);
+  background: var(--term-bg, var(--bg-base));
 }
 
 .shell-input-row {
@@ -2848,55 +2858,81 @@ tr.bot-row:hover td {
   border-color: var(--red);
 }
 
-.shell-shortcuts-menu {
+/* File context menu */
+.ctx-item {
+  padding: 6px 14px; cursor: pointer; color: var(--text);
+  font-size: 12px; transition: background 0.1s; font-family: var(--mono);
+}
+.ctx-item:hover { background: var(--bg-card-hover); }
+.ctx-item-danger { color: var(--red); }
+.ctx-item-danger:hover { background: var(--red-dim); }
+
+/* Clickable IPs and paths in shell output */
+.out-ip { color: var(--cyan); cursor: pointer; text-decoration: underline dotted; border-radius: 2px; }
+.out-ip:hover { background: var(--bg-elevated); }
+.out-path { color: var(--green); cursor: pointer; text-decoration: underline dotted; border-radius: 2px; }
+.out-path:hover { background: var(--bg-elevated); }
+
+/* ── Toolkit mega-menu ───────────────────────────────────────── */
+.shell-toolkit-wrap { position: relative; }
+.shell-toolkit-menu {
+  display: none;
   position: absolute;
   bottom: 100%;
-  right: 10px;
-  width: 340px;
-  max-height: 420px;
-  overflow-y: auto;
+  right: 0;
+  margin-bottom: 4px;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  border-radius: var(--radius);
+  box-shadow: 0 -4px 24px rgba(0,0,0,.4);
+  width: min(960px, 92vw);
+  max-height: min(70vh, 640px);
   z-index: 100;
-  padding: 6px 0;
-  margin-bottom: 6px;
-}
-
-.ssm-cat {
-  padding: 8px 14px 4px;
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--accent);
-}
-
-.ssm-item {
-  display: flex;
   flex-direction: column;
-  gap: 1px;
-  padding: 6px 14px;
-  cursor: pointer;
-  transition: background var(--transition);
 }
+.shell-toolkit-menu.open { display: flex; animation: fadeSlideUp 0.15s ease; }
+.toolkit-search-row {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.toolkit-search-input {
+  width: 100%; background: var(--bg-input); color: var(--text);
+  border: 1px solid var(--border); border-radius: 4px;
+  padding: 5px 8px; font-size: 12px; font-family: var(--mono);
+  outline: none; box-sizing: border-box;
+}
+.toolkit-search-input:focus { border-color: var(--accent); }
+#toolkit-grid-body { overflow-y: auto; flex: 1; padding: 6px; }
+.toolkit-section { margin-bottom: 8px; }
+.toolkit-section-header {
+  font-size: 9px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1px; color: var(--accent);
+  padding: 6px 6px 4px; border-bottom: 1px solid var(--border); margin-bottom: 4px;
+}
+.toolkit-section-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
+.toolkit-item {
+  padding: 5px 8px; border-radius: 5px; cursor: pointer;
+  border: 1px solid transparent; transition: all .12s;
+}
+.toolkit-item:hover { background: var(--bg-card-hover); border-color: var(--border); }
+.toolkit-item-name {
+  font-size: 11px; font-weight: 600; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.toolkit-item-preview {
+  font-size: 9px; font-family: var(--mono); color: var(--text-dim);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px;
+}
+.toolkit-item:hover .toolkit-item-preview { color: var(--text-muted); }
 
-.ssm-item:hover {
-  background: var(--bg-card-hover);
+/* Shell theme picker + zoom in action bar */
+.shell-theme-select {
+  background: var(--bg-elevated); color: var(--text-muted);
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 4px 6px; font-size: 11px; cursor: pointer; outline: none;
 }
-
-.ssm-name {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text);
-  font-family: var(--mono);
-}
-
-.ssm-desc {
-  font-size: 10px;
-  color: var(--text-dim);
-}
+.shell-theme-select:hover { border-color: var(--accent); color: var(--text); }
 
 /* ============================================================================
    ATTACK PANEL
@@ -3796,145 +3832,43 @@ tr.health-dead-row:hover td {
   text-decoration: underline;
 }
 
-/* Standard 8 colors */
-.ansi-fg-0 {
-  color: #545862;
-}
+/* ANSI colors — use CSS vars so terminal themes can override them */
+.ansi-fg-0  { color: var(--ansi-0,  #545862); }
+.ansi-fg-1  { color: var(--ansi-1,  #e06c75); }
+.ansi-fg-2  { color: var(--ansi-2,  #98c379); }
+.ansi-fg-3  { color: var(--ansi-3,  #e5c07b); }
+.ansi-fg-4  { color: var(--ansi-4,  #61afef); }
+.ansi-fg-5  { color: var(--ansi-5,  #c678dd); }
+.ansi-fg-6  { color: var(--ansi-6,  #56b6c2); }
+.ansi-fg-7  { color: var(--ansi-7,  #abb2bf); }
+.ansi-fg-8  { color: var(--ansi-8,  #636d83); }
+.ansi-fg-9  { color: var(--ansi-9,  #ff6b81); }
+.ansi-fg-10 { color: var(--ansi-10, #7ec883); }
+.ansi-fg-11 { color: var(--ansi-11, #f0c674); }
+.ansi-fg-12 { color: var(--ansi-12, #5dade2); }
+.ansi-fg-13 { color: var(--ansi-13, #d19a66); }
+.ansi-fg-14 { color: var(--ansi-14, #4ec9b0); }
+.ansi-fg-15 { color: var(--ansi-15, #ffffff); }
+.ansi-bg-0  { background: var(--ansi-0, #282c34); }
+.ansi-bg-1  { background: var(--ansi-1, rgba(224,108,117,0.25)); }
+.ansi-bg-2  { background: var(--ansi-2, rgba(152,195,121,0.20)); }
+.ansi-bg-3  { background: var(--ansi-3, rgba(229,192,123,0.20)); }
+.ansi-bg-4  { background: var(--ansi-4, rgba(97,175,239,0.20)); }
+.ansi-bg-5  { background: var(--ansi-5, rgba(198,120,221,0.20)); }
+.ansi-bg-6  { background: var(--ansi-6, rgba(86,182,194,0.20)); }
+.ansi-bg-7  { background: var(--ansi-7, rgba(171,178,191,0.15)); }
 
-.ansi-fg-1 {
-  color: #e06c75;
-}
-
-.ansi-fg-2 {
-  color: #98c379;
-}
-
-.ansi-fg-3 {
-  color: #e5c07b;
-}
-
-.ansi-fg-4 {
-  color: #61afef;
-}
-
-.ansi-fg-5 {
-  color: #c678dd;
-}
-
-.ansi-fg-6 {
-  color: #56b6c2;
-}
-
-.ansi-fg-7 {
-  color: #abb2bf;
-}
-
-/* Bright 8 colors */
-.ansi-fg-8 {
-  color: #636d83;
-}
-
-.ansi-fg-9 {
-  color: #ff6b81;
-}
-
-.ansi-fg-10 {
-  color: #7ec883;
-}
-
-.ansi-fg-11 {
-  color: #f0c674;
-}
-
-.ansi-fg-12 {
-  color: #5dade2;
-}
-
-.ansi-fg-13 {
-  color: #d19a66;
-}
-
-.ansi-fg-14 {
-  color: #4ec9b0;
-}
-
-.ansi-fg-15 {
-  color: #ffffff;
-}
-
-/* Background colors */
-.ansi-bg-0 {
-  background: #282c34;
-}
-
-.ansi-bg-1 {
-  background: rgba(224, 108, 117, 0.25);
-}
-
-.ansi-bg-2 {
-  background: rgba(152, 195, 121, 0.2);
-}
-
-.ansi-bg-3 {
-  background: rgba(229, 192, 123, 0.2);
-}
-
-.ansi-bg-4 {
-  background: rgba(97, 175, 239, 0.2);
-}
-
-.ansi-bg-5 {
-  background: rgba(198, 120, 221, 0.2);
-}
-
-.ansi-bg-6 {
-  background: rgba(86, 182, 194, 0.2);
-}
-
-.ansi-bg-7 {
-  background: rgba(171, 178, 191, 0.15);
-}
-
-/* Light theme overrides */
-[data-theme="light"] .ansi-fg-0 {
-  color: #383a42;
-}
-
-[data-theme="light"] .ansi-fg-1 {
-  color: #e45649;
-}
-
-[data-theme="light"] .ansi-fg-2 {
-  color: #50a14f;
-}
-
-[data-theme="light"] .ansi-fg-3 {
-  color: #c18401;
-}
-
-[data-theme="light"] .ansi-fg-4 {
-  color: #4078f2;
-}
-
-[data-theme="light"] .ansi-fg-5 {
-  color: #a626a4;
-}
-
-[data-theme="light"] .ansi-fg-6 {
-  color: #0184bc;
-}
-
-[data-theme="light"] .ansi-fg-7 {
-  color: #383a42;
-}
-
-[data-theme="light"] .ansi-bg-0 {
-  background: #e5e5e6;
-}
-
-[data-theme="light"] .ansi-bg-7 {
-  background: rgba(56, 58, 66, 0.1);
-}
+/* Light theme overrides (no terminal theme active) */
+[data-theme="light"] .ansi-fg-0 { color: #383a42; }
+[data-theme="light"] .ansi-fg-1 { color: #e45649; }
+[data-theme="light"] .ansi-fg-2 { color: #50a14f; }
+[data-theme="light"] .ansi-fg-3 { color: #c18401; }
+[data-theme="light"] .ansi-fg-4 { color: #4078f2; }
+[data-theme="light"] .ansi-fg-5 { color: #a626a4; }
+[data-theme="light"] .ansi-fg-6 { color: #0184bc; }
+[data-theme="light"] .ansi-fg-7 { color: #383a42; }
+[data-theme="light"] .ansi-bg-0 { background: #e5e5e6; }
+[data-theme="light"] .ansi-bg-7 { background: rgba(56,58,66,0.1); }
 
 /* ---------------------------------------------------------------------------
    Scanner Tab

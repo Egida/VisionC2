@@ -16,6 +16,8 @@ import (
 // ============================================================================
 
 var upgrader = websocket.Upgrader{
+	ReadBufferSize:  16 * 1024,   // 16KB for control frames and commands
+	WriteBufferSize: 512 * 1024,  // 512KB for file download payloads
 	CheckOrigin: func(r *http.Request) bool {
 		// Only allow same-origin WebSocket connections
 		origin := r.Header.Get("Origin")
@@ -41,6 +43,12 @@ func (s *safeWS) writeJSON(v interface{}) error {
 	return s.conn.WriteJSON(v)
 }
 
+// fileAccum holds in-progress file download state per bot.
+type fileAccum struct {
+	name string
+	data strings.Builder
+}
+
 var (
 	webShellConns     = make(map[string][]*safeWS)
 	webShellConnsLock sync.RWMutex
@@ -53,6 +61,10 @@ var (
 	// When the next output arrives and is an absolute path, update cwd.
 	webShellPendingCd     = make(map[string]bool)
 	webShellPendingCdLock sync.Mutex
+
+	// webShellFileAccum tracks in-progress file downloads per bot.
+	webShellFileAccum     = make(map[string]*fileAccum)
+	webShellFileAccumLock sync.Mutex
 )
 
 func registerWebShell(botID string, ws *safeWS) {
@@ -76,8 +88,9 @@ func unregisterWebShell(botID string, ws *safeWS) {
 	}
 }
 
-// forwardBotOutputToWebShells sends output to all web shell connections for a bot.
-// No-ops when no connections exist (zero overhead when unused).
+// forwardBotOutputToWebShells routes non-streaming bot output to web shell connections.
+// Intercepts __FILE_START__/__FILE_END__ markers to assemble file download payloads,
+// and updates tracked cwd when a cd+pwd is pending.
 func forwardBotOutputToWebShells(botID, output string) {
 	// If a cd+pwd is pending, capture the resolved path to update cwd
 	webShellPendingCdLock.Lock()
@@ -87,7 +100,6 @@ func forwardBotOutputToWebShells(botID, output string) {
 	}
 	webShellPendingCdLock.Unlock()
 	if pending {
-		// Extract pwd from first line (output may contain ---LS--- marker + ls data after it)
 		resolved := strings.TrimSpace(output)
 		if idx := strings.Index(resolved, "\n"); idx != -1 {
 			resolved = strings.TrimSpace(resolved[:idx])
@@ -99,13 +111,72 @@ func forwardBotOutputToWebShells(botID, output string) {
 		}
 	}
 
+	trimmed := strings.TrimSpace(output)
+
+	// --- File transfer: START marker ---
+	// Bot sends: __FILE_START__<filename>\n<base64>\n__FILE_END__
+	if strings.HasPrefix(trimmed, "__FILE_START__") {
+		rest := strings.TrimPrefix(trimmed, "__FILE_START__")
+		nlIdx := strings.Index(rest, "\n")
+		if nlIdx < 0 {
+			nlIdx = len(rest)
+		}
+		fname := rest[:nlIdx]
+		payload := ""
+		if nlIdx < len(rest) {
+			payload = rest[nlIdx+1:]
+		}
+		endIdx := strings.Index(payload, "\n__FILE_END__")
+		if endIdx >= 0 {
+			// Complete file arrived in one message
+			sendWebShellFile(botID, fname, strings.TrimSpace(payload[:endIdx]))
+		} else {
+			// File spans multiple messages; accumulate
+			webShellFileAccumLock.Lock()
+			webShellFileAccum[botID] = &fileAccum{name: fname}
+			if payload != "" {
+				webShellFileAccum[botID].data.WriteString(payload)
+			}
+			webShellFileAccumLock.Unlock()
+			sendWebShellOutput(botID, "[download] receiving "+fname+"...\n")
+		}
+		return
+	}
+
+	// --- File transfer: END marker (multi-message path) ---
+	if trimmed == "__FILE_END__" {
+		webShellFileAccumLock.Lock()
+		accum := webShellFileAccum[botID]
+		delete(webShellFileAccum, botID)
+		webShellFileAccumLock.Unlock()
+		if accum != nil {
+			sendWebShellFile(botID, accum.name, accum.data.String())
+		}
+		return
+	}
+
+	// --- Accumulating file data ---
+	webShellFileAccumLock.Lock()
+	accum := webShellFileAccum[botID]
+	webShellFileAccumLock.Unlock()
+	if accum != nil {
+		webShellFileAccumLock.Lock()
+		accum.data.WriteString(trimmed)
+		webShellFileAccumLock.Unlock()
+		return
+	}
+
+	sendWebShellOutput(botID, output)
+}
+
+// sendWebShellOutput sends a plain output message to all web shell connections for a bot.
+func sendWebShellOutput(botID, output string) {
 	webShellConnsLock.RLock()
 	conns := webShellConns[botID]
 	if len(conns) == 0 {
 		webShellConnsLock.RUnlock()
 		return
 	}
-	// Copy slice under read lock
 	snapshot := make([]*safeWS, len(conns))
 	copy(snapshot, conns)
 	webShellConnsLock.RUnlock()
@@ -122,12 +193,67 @@ func forwardBotOutputToWebShells(botID, output string) {
 			dead = append(dead, ws)
 		}
 	}
-
-	// Remove dead connections
 	for _, ws := range dead {
 		unregisterWebShell(botID, ws)
 		ws.conn.Close()
 	}
+}
+
+// sendWebShellStreamMsg sends a typed streaming message (stream_stdout, stream_stderr,
+// stream_start, stream_done) to all web shell connections for a bot.
+func sendWebShellStreamMsg(botID string, msg map[string]interface{}) {
+	webShellConnsLock.RLock()
+	conns := webShellConns[botID]
+	if len(conns) == 0 {
+		webShellConnsLock.RUnlock()
+		return
+	}
+	snapshot := make([]*safeWS, len(conns))
+	copy(snapshot, conns)
+	webShellConnsLock.RUnlock()
+
+	var dead []*safeWS
+	for _, ws := range snapshot {
+		if err := ws.writeJSON(msg); err != nil {
+			dead = append(dead, ws)
+		}
+	}
+	for _, ws := range dead {
+		unregisterWebShell(botID, ws)
+		ws.conn.Close()
+	}
+}
+
+// sendWebShellFile delivers a completed file download to all web shell connections.
+func sendWebShellFile(botID, filename, b64data string) {
+	webShellConnsLock.RLock()
+	conns := webShellConns[botID]
+	if len(conns) == 0 {
+		webShellConnsLock.RUnlock()
+		return
+	}
+	snapshot := make([]*safeWS, len(conns))
+	copy(snapshot, conns)
+	webShellConnsLock.RUnlock()
+
+	msg := map[string]string{
+		"type": "file",
+		"name": filename,
+		"data": b64data,
+	}
+
+	var dead []*safeWS
+	for _, ws := range snapshot {
+		if err := ws.writeJSON(msg); err != nil {
+			dead = append(dead, ws)
+		}
+	}
+	for _, ws := range dead {
+		unregisterWebShell(botID, ws)
+		ws.conn.Close()
+	}
+
+	sendWebShellOutput(botID, "[download] file ready: "+filename+"\n")
 }
 
 // handleWebShellWS is the WebSocket endpoint for the remote shell modal.
@@ -152,12 +278,13 @@ func handleWebShellWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Allow up to 16MB messages for file uploads (10MB file ≈ 13.3MB base64 + JSON overhead)
+	wsConn.SetReadLimit(16 * 1024 * 1024)
+
 	ws := &safeWS{conn: wsConn}
 	registerWebShell(botID, ws)
-	// Reset cwd for fresh shell session
-	webShellCwdLock.Lock()
-	delete(webShellCwd, botID)
-	webShellCwdLock.Unlock()
+	// Intentionally do NOT reset webShellCwd — cwd persists across
+	// shell open/close for session continuity.
 	defer func() {
 		unregisterWebShell(botID, ws)
 		wsConn.Close()
@@ -171,9 +298,19 @@ func handleWebShellWS(w http.ResponseWriter, r *http.Request) {
 		}
 
 		var msg struct {
-			Command string `json:"command"`
+			Command  string `json:"command"`
+			Type     string `json:"type"`
+			FileName string `json:"fileName"`
+			Data     string `json:"data"`
+			Stream   bool   `json:"stream"`
 		}
 		if err := json.Unmarshal(msgBytes, &msg); err != nil {
+			continue
+		}
+
+		// Handle file upload from browser → relay to bot as !upload
+		if msg.Type == "upload" && msg.FileName != "" && msg.Data != "" {
+			sendToSingleBot(botID, "!upload "+msg.FileName+" "+msg.Data)
 			continue
 		}
 
@@ -182,19 +319,17 @@ func handleWebShellWS(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		// Auto-prefix with !shell for non-! commands (mirrors TUI behavior)
+		// Auto-prefix with !shell or !stream for non-! commands
 		if !strings.HasPrefix(cmd, "!") {
-			// Track cd commands to maintain working directory across stateless shells
+			// cd always uses blocking !shell so pwd output can update cwd tracking
 			if strings.HasPrefix(cmd, "cd ") || cmd == "cd" {
 				dir := strings.TrimSpace(strings.TrimPrefix(cmd, "cd"))
 				if dir == "" || dir == "~" {
 					dir = "$HOME"
 				}
-				// Build the cd command with current cwd context
 				webShellCwdLock.RLock()
 				cur := webShellCwd[botID]
 				webShellCwdLock.RUnlock()
-				// Let the shell resolve the real path via pwd, then list files
 				var cdCmd string
 				if cur != "" {
 					cdCmd = "cd " + shellQuote(cur) + " && cd " + shellQuote(dir) + " && pwd && echo '---LS---' && ls -laF"
@@ -202,19 +337,34 @@ func handleWebShellWS(w http.ResponseWriter, r *http.Request) {
 					cdCmd = "cd " + shellQuote(dir) + " && pwd && echo '---LS---' && ls -laF"
 				}
 				cmd = "!shell " + cdCmd
-				// Mark that we're waiting for pwd output to update cwd
 				webShellPendingCdLock.Lock()
 				webShellPendingCd[botID] = true
 				webShellPendingCdLock.Unlock()
 			} else {
-				// Prepend cd to tracked cwd for stateless shell
+				webShellCwdLock.RLock()
+				cwd := webShellCwd[botID]
+				webShellCwdLock.RUnlock()
+				prefix := "!shell "
+				if msg.Stream {
+					prefix = "!stream "
+				}
+				if cwd != "" {
+					cmd = prefix + "cd " + shellQuote(cwd) + " && " + cmd
+				} else {
+					cmd = prefix + cmd
+				}
+			}
+		}
+
+		// For !download with relative paths, prepend tracked cwd
+		if strings.HasPrefix(cmd, "!download ") {
+			parts := strings.SplitN(cmd, " ", 2)
+			if len(parts) == 2 && parts[1] != "" && !strings.HasPrefix(parts[1], "/") {
 				webShellCwdLock.RLock()
 				cwd := webShellCwd[botID]
 				webShellCwdLock.RUnlock()
 				if cwd != "" {
-					cmd = "!shell cd " + shellQuote(cwd) + " && " + cmd
-				} else {
-					cmd = "!shell " + cmd
+					cmd = "!download " + cwd + "/" + parts[1]
 				}
 			}
 		}

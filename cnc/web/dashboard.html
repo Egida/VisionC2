@@ -540,6 +540,17 @@
 
     <div class="toast" id="toast"></div>
 
+    <!-- File context menu (right-click in file browser) -->
+    <div id="file-ctx-menu" style="display:none;position:fixed;z-index:9999;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.5);padding:4px 0;min-width:160px;font-size:12px;">
+        <div class="ctx-item" id="ctx-copy-item" onclick="ctxCopyPath()">&#128203; Copy Path</div>
+        <div class="ctx-item" id="ctx-cd-item" onclick="ctxCd()">&#128193; Open / cd</div>
+        <div class="ctx-item" id="ctx-cat-item" onclick="ctxCat()">&#128196; View (cat)</div>
+        <div class="ctx-item" id="ctx-dl-item" onclick="ctxDownload()">&#11015; Download</div>
+        <div class="ctx-item" id="ctx-chmod-item" onclick="ctxChmod()">&#9881; chmod +x</div>
+        <div class="ctx-item" id="ctx-rename-item" onclick="ctxRename()">&#9998; Rename</div>
+        <div class="ctx-item ctx-item-danger" id="ctx-del-item" onclick="ctxDelete()">&#128465; Delete</div>
+    </div>
+
     <!-- Shell modal (enhanced with sidebar + file browser) -->
     <div class="shell-overlay" id="shell-overlay" onclick="if(event.target===this)closeShell()">
         <div class="shell-modal">
@@ -599,8 +610,21 @@
                     Output</button>
                 <button class="shell-action-btn" onclick="shellNetScan()" title="Quick network recon from bot">Net
                     Scan</button>
-                <button class="shell-action-btn shell-action-btn-shortcuts"
-                    onclick="toggleShellShortcuts()" title="Post-exploit shortcuts &amp; recon helpers">Shortcuts</button>
+                <div class="shell-toolkit-wrap" id="shell-toolkit-wrap">
+                    <button class="shell-action-btn" onclick="toggleToolkit()" title="100+ red-team helpers">Toolkit &#9662;</button>
+                    <div class="shell-toolkit-menu" id="shell-toolkit-menu">
+                        <div class="toolkit-search-row">
+                            <input id="toolkit-search" class="toolkit-search-input" placeholder="Search commands..."
+                                oninput="buildToolkitMenu()" autocomplete="off">
+                        </div>
+                        <div id="toolkit-grid-body"></div>
+                    </div>
+                </div>
+                <select id="shell-theme-picker" class="shell-theme-select" onchange="applyShellTheme(this.value)" title="Terminal theme"></select>
+                <button class="shell-action-btn" onclick="shellZoom(+1)" title="Zoom in (Ctrl+=)">A+</button>
+                <button class="shell-action-btn" onclick="shellZoom(-1)" title="Zoom out (Ctrl+-)">A-</button>
+                <button class="shell-action-btn" onclick="shellUploadFile()" title="Upload file to bot cwd">Upload</button>
+                <input type="file" id="shell-upload-input" style="display:none" onchange="shellHandleUpload(this)">
                 <button class="shell-action-btn" style="color:var(--accent);border-color:var(--accent)"
                     onclick="shellStartSocks()" title="Start SOCKS proxy">SOCKS</button>
                 <button class="shell-action-btn shell-action-danger" onclick="clearShellHistory()"
@@ -642,6 +666,8 @@
                     <div class="help-section-title">Shell</div>
                     <div class="help-row"><kbd>Tab</kbd><span>Autocomplete ! commands</span></div>
                     <div class="help-row"><kbd>&uarr;</kbd> / <kbd>&darr;</kbd><span>Command history</span></div>
+                    <div class="help-row"><kbd>Ctrl+=</kbd> / <kbd>Ctrl+-</kbd><span>Zoom terminal font</span></div>
+                    <div class="help-row"><span class="help-action">Right-click file</span><span>File context menu</span></div>
                     <div class="help-row"><kbd>Escape</kbd><span>Close shell</span></div>
                 </div>
                 <div class="help-section">
